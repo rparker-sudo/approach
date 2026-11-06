@@ -1,6 +1,16 @@
-# Volley Strength
+# Load & Launch
 
-An iPhone app for volleyball athletes and coaches: weight-training programs and fuel plans built around the volleyball schedule.
+**Build it under the bar. Use it above the net.**
+
+An iPhone app for volleyball athletes and coaches: weight training, fuel and planning built around the volleyball schedule. App Store subtitle suggestion: *Volleyball Strength and Fuel*.
+
+The app has four areas: **Load** (training), **Refuel** (meals and hydration), **Plan** (season, week and match days) and **Launch** (touch height and progress). Coaches also get a **Team** tab.
+
+## Brand
+- Brand kit: `assets/brand/source/` (SVG originals) and `src/lib/brand-tokens.json`, the source of truth for colors and type
+- Theme: `src/lib/theme.ts` builds the dark (default) and light themes from the tokens. Users switch in Settings → Appearance.
+- Fonts: Inter (body) and Inter Tight 600 (display, uppercase), bundled with the app; all numbers use tabular figures
+- Icons: `assets/icon.png` (iOS, from `app-icon-dark`), `assets/android-icon-foreground.png`, `assets/splash-icon.png`, `assets/favicon.png`
 
 ## What it does
 
@@ -10,13 +20,13 @@ An iPhone app for volleyball athletes and coaches: weight-training programs and 
 - Adds injury-prevention work for each position (shoulders for hitters, knees for middles, hands and wrists for setters, ankles and low positions for liberos)
 - Today screen: today's lift, today's fuel targets and the week at a glance
 - Logs workouts set by set and pre-fills the weight you used last time
-- Fuel tab: carb, protein and water targets that change with the type of day (rest, lift, practice, match, tournament, day before a match), plus meal timing and food ideas. Calories are left out on purpose, since many users are teens.
-- Progress tab: estimated strength gains, body weight and workout history
+- Refuel tab: carb, protein and water targets that change with the type of day (rest, lift, practice, match, tournament, day before a match), plus meal timing and food ideas. Calories are left out on purpose, since many users are teens.
+- Launch tab: **Above the net**, your approach touch height minus the net height (women's 2.24 m, men's 2.43 m, or a custom youth height), plus strength gains, body weight and workout history
 
 **Coach mode**
 - Add athletes and build a program for each athlete or for a group
 - Edit any session: swap, add, remove or reorder exercises and change sets, reps and effort
-- Tap **Send** to share a program by text, email or AirDrop. Athletes paste it in under **Program → Import from coach**.
+- Tap **Send** to share a program by text, email or AirDrop. Athletes paste it in under **Plan → Import from coach**.
 
 All data stays on the phone. There are no accounts, no servers and no data collection.
 
@@ -46,7 +56,7 @@ As you edit the code, the app on your phone refreshes on its own.
 
 1. **Join the Apple Developer Program** at https://developer.apple.com/programs/ ($99/year). Approval can take 1–2 days.
 2. **Create a free Expo account** at https://expo.dev/signup.
-3. **Pick a unique app ID.** In `app.json`, change `"bundleIdentifier": "com.volleystrength.app"` to something only you own, for example `com.yourname.volleystrength`. If you plan to rename the app, change `"name"` too.
+3. **Pick a unique app ID.** In `app.json`, change `"bundleIdentifier": "com.loadandlaunch.app"` to something only you own, for example `com.yourname.loadandlaunch`.
 4. **Build the app in the cloud** (no Mac needed):
 
    ```bash
@@ -83,7 +93,7 @@ As you edit the code, the app on your phone refreshes on its own.
 
 ```
 src/app/            Screens (each file is a screen)
-  (tabs)/           Today/Team, Program(s), Fuel, Progress tabs
+  (tabs)/           index = Load (Team for coaches), fuel = Refuel, program = Plan, progress = Launch
   onboarding.tsx    First-launch setup
   builder.tsx       Build or rebuild a program
   session.tsx       Edit a session's exercises
@@ -95,7 +105,8 @@ src/lib/
   exercises.ts      Exercise library
   nutrition.ts      Fuel guidance by day type
   store.tsx         On-device storage
-src/components/     Shared UI pieces
+  theme.ts          Brand theme built from brand-tokens.json
+src/components/     Shared UI pieces (ui.tsx holds the brand Text, buttons, logo and net tape)
 ```
 
 ## Ideas for version 2

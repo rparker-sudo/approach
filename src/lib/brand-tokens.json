@@ -1,0 +1,68 @@
+{
+  "name": "Load & Launch",
+  "tagline": "Build it under the bar. Use it above the net.",
+  "color": {
+    "palette": {
+      "carbon": "#0B0B0C",
+      "graphite": "#1C1D20",
+      "gunmetal": "#3A3D42",
+      "seam": "#4A4E55",
+      "steel": "#A7ABB2",
+      "chrome": "#C9CDD2",
+      "mist": "#F1F2F4",
+      "chalk": "#FFFFFF"
+    },
+    "dark": {
+      "background": "#0B0B0C",
+      "surface": "#1C1D20",
+      "surfaceRaised": "#26282C",
+      "border": "#3A3D42",
+      "textPrimary": "#FFFFFF",
+      "textSecondary": "#A7ABB2",
+      "textMuted": "#6B7078",
+      "actionPrimaryBg": "#FFFFFF",
+      "actionPrimaryText": "#0B0B0C",
+      "achievement": "#C9CDD2",
+      "chartLine": "#C9CDD2",
+      "chartGrid": "#3A3D42"
+    },
+    "light": {
+      "background": "#FFFFFF",
+      "surface": "#F1F2F4",
+      "surfaceRaised": "#FFFFFF",
+      "border": "#C9CDD2",
+      "textPrimary": "#0B0B0C",
+      "textSecondary": "#3A3D42",
+      "textMuted": "#6B7078",
+      "actionPrimaryBg": "#0B0B0C",
+      "actionPrimaryText": "#FFFFFF",
+      "achievement": "#3A3D42",
+      "chartLine": "#0B0B0C",
+      "chartGrid": "#C9CDD2"
+    },
+    "status": {
+      "_note": "Monochrome brand. Use these only for genuine errors/warnings, never decoration.",
+      "error": "#E5484D",
+      "warning": "#E2A336"
+    }
+  },
+  "typography": {
+    "display": { "family": "Inter Tight", "fallback": "Inter, 'Helvetica Neue', Arial, sans-serif", "weight": 600, "transform": "uppercase", "letterSpacingEm": 0.18, "use": "Logo wordmark, screen titles, hero numbers' labels" },
+    "body": { "family": "Inter", "fallback": "'Helvetica Neue', Arial, sans-serif", "weights": [400, 500, 600], "use": "Everything else" },
+    "numbers": { "fontVariantNumeric": "tabular-nums", "use": "Weights, reps, sets, jump heights, macros" },
+    "scale": { "caption": 12, "footnote": 13, "body": 16, "title3": 20, "title2": 24, "title1": 32, "hero": 48 }
+  },
+  "radius": { "sm": 8, "md": 12, "lg": 16, "pill": 999 },
+  "spacing": [4, 8, 12, 16, 24, 32, 48],
+  "modules": [
+    { "id": "load", "label": "Load", "description": "Lifting and plyometrics", "icon": "barbell" },
+    { "id": "refuel", "label": "Refuel", "description": "Meals and hydration", "icon": "bowl" },
+    { "id": "plan", "label": "Plan", "description": "Season, week, and match days", "icon": "calendar" },
+    { "id": "launch", "label": "Launch", "description": "Touch height and progress", "icon": "volleyball" }
+  ],
+  "netHeights": {
+    "_note": "Used for the 'Above the net' stat. Let users pick; youth heights vary by age group.",
+    "womenIndoorMeters": 2.24,
+    "menIndoorMeters": 2.43
+  }
+}

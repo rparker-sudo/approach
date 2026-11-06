@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import type { AppData, Athlete, BodyLog, Profile, Program, WorkoutLog } from './types';
+import type { AppData, Athlete, BodyLog, Profile, Program, TouchLog, WorkoutLog } from './types';
 import { uid } from './util';
 
 const KEY = 'volley-strength/data/v1';
@@ -29,6 +29,10 @@ type Store = {
   saveAthlete: (a: Athlete) => void;
   deleteAthlete: (id: string) => void;
   resetAll: () => void;
+  setTheme: (t: 'dark' | 'light') => void;
+  addTouchLog: (t: TouchLog) => void;
+  deleteTouchLog: (date: string) => void;
+  setNetHeight: (inches: number) => void;
 };
 
 const Ctx = createContext<Store | null>(null);
@@ -96,7 +100,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return { ...d, athletes: exists ? d.athletes.map((x) => (x.id === a.id ? a : x)) : [...d.athletes, a] };
         }),
       deleteAthlete: (id) => update((d) => ({ ...d, athletes: d.athletes.filter((a) => a.id !== id) })),
-      resetAll: () => setData(EMPTY),
+      resetAll: () => setData((d) => ({ ...EMPTY, theme: d.theme })),
+      setTheme: (theme) => update((d) => ({ ...d, theme })),
+      addTouchLog: (t) => update((d) => ({ ...d, touchLogs: [...(d.touchLogs ?? []), t] })),
+      deleteTouchLog: (date) => update((d) => ({ ...d, touchLogs: (d.touchLogs ?? []).filter((x) => x.date !== date) })),
+      setNetHeight: (netHeightIn) => update((d) => ({ ...d, netHeightIn })),
     }),
     [data, ready, update],
   );

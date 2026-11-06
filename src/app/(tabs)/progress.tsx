@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
-import { Body, Button, Card, colors, Field, H1, H2, Label, Row, Screen } from '../../components/ui';
+import { Alert, Pressable, View } from 'react-native';
+import AboveTheNet from '../../components/AboveTheNet';
+import ScreenHeader from '../../components/ScreenHeader';
+import { Body, Button, Card, colors, Field, H2, Label, Row, Screen, Text } from '../../components/ui';
 import { getExercise } from '../../lib/exercises';
 import { useStore } from '../../lib/store';
 import { estimate1RM, formatDate, parseNum } from '../../lib/util';
 
 type LiftPoint = { date: string; e1rm: number; best: string };
 
-export default function Progress() {
+export default function Launch() {
   const { data, addBodyLog, deleteLog } = useStore();
   const [bw, setBw] = useState('');
 
@@ -44,8 +46,9 @@ export default function Progress() {
 
   return (
     <Screen tab>
-      <H1>Progress</H1>
-      <Row style={{ gap: 10 }}>
+      <ScreenHeader title="Launch" subtitle="Touch height and progress" />
+      <AboveTheNet />
+      <Row style={{ gap: 12 }}>
         <Big label="Workouts" value={String(data.logs.length)} />
         <Big label="Last 4 weeks" value={String(last28)} />
       </Row>
@@ -53,12 +56,12 @@ export default function Progress() {
       <Card>
         <H2>Strength</H2>
         {lifts.length === 0 ? (
-          <Body muted>Log a workout with weights and your lifts will show here.</Body>
+          <Body muted>Log a workout with weights. Your lifts show up here.</Body>
         ) : (
           lifts.map(([id, points]) => <LiftRow key={id} name={getExercise(id).name} points={points} />)
         )}
         <Body muted style={{ fontSize: 12 }}>
-          Estimated max = a calculated guess of your one-rep max from your best set. You don't need to test it.
+          Estimated max is calculated from your best set. No need to test it.
         </Body>
       </Card>
 
@@ -79,7 +82,7 @@ export default function Progress() {
           />
         </Row>
         {data.bodyLogs.length > 0 ? (
-          <Bars values={data.bodyLogs.slice(-12).map((b) => b.weightLb)} labels={data.bodyLogs.slice(-12).map((b) => formatDate(b.date).split(',').pop()!.trim())} color={colors.navy} />
+          <Bars values={data.bodyLogs.slice(-12).map((b) => b.weightLb)} labels={data.bodyLogs.slice(-12).map((b) => formatDate(b.date).split(',').pop()!.trim())} />
         ) : (
           <Body muted style={{ fontSize: 13 }}>Optional. Used to keep your fuel targets accurate.</Body>
         )}
@@ -101,7 +104,7 @@ export default function Progress() {
           >
             <Card style={{ padding: 12, gap: 2 }}>
               <Row style={{ justifyContent: 'space-between' }}>
-                <Text style={{ fontWeight: '700', color: colors.ink, fontSize: 15 }}>{l.sessionName}</Text>
+                <Text style={{ fontWeight: '600', fontSize: 16 }}>{l.sessionName}</Text>
                 <Text style={{ color: colors.muted, fontSize: 13 }}>{formatDate(l.date)}</Text>
               </Row>
               <Text style={{ color: colors.muted, fontSize: 13 }}>{sets} sets{l.note ? ` · ${l.note}` : ''}</Text>
@@ -117,8 +120,8 @@ export default function Progress() {
 function Big({ label, value }: { label: string; value: string }) {
   return (
     <Card style={{ flex: 1, gap: 2 }}>
-      <Text style={{ fontSize: 28, fontWeight: '800', color: colors.ink }}>{value}</Text>
-      <Text style={{ fontSize: 13, color: colors.muted, fontWeight: '600' }}>{label}</Text>
+      <Text style={{ fontSize: 32, fontWeight: '600' }}>{value}</Text>
+      <Text style={{ fontSize: 13, color: colors.muted }}>{label}</Text>
     </Card>
   );
 }
@@ -130,24 +133,24 @@ function LiftRow({ name, points }: { name: string; points: LiftPoint[] }) {
   return (
     <View style={{ gap: 6, paddingVertical: 6, borderTopWidth: 1, borderTopColor: colors.line }}>
       <Row style={{ justifyContent: 'space-between' }}>
-        <Text style={{ fontWeight: '700', color: colors.ink, fontSize: 15, flex: 1 }}>{name}</Text>
-        <Text style={{ fontWeight: '800', color: colors.ink }}>{last.e1rm} lb</Text>
+        <Text style={{ fontWeight: '600', fontSize: 16, flex: 1 }}>{name}</Text>
+        <Text style={{ fontWeight: '600' }}>{last.e1rm} lb</Text>
       </Row>
       <Row style={{ justifyContent: 'space-between' }}>
         <Text style={{ color: colors.muted, fontSize: 12 }}>Last best set: {last.best}</Text>
         {points.length > 1 ? (
-          <Text style={{ color: change >= 0 ? colors.good : colors.danger, fontSize: 12, fontWeight: '700' }}>
+          <Text style={{ color: change > 0 ? colors.achievement : colors.muted, fontSize: 12, fontWeight: '600' }}>
             {change >= 0 ? '+' : ''}
             {change} lb est. max
           </Text>
         ) : null}
       </Row>
-      {points.length > 1 ? <Bars values={points.slice(-10).map((p) => p.e1rm)} color={colors.accent} /> : null}
+      {points.length > 1 ? <Bars values={points.slice(-10).map((p) => p.e1rm)} /> : null}
     </View>
   );
 }
 
-function Bars({ values, labels, color }: { values: number[]; labels?: string[]; color: string }) {
+function Bars({ values, labels }: { values: number[]; labels?: string[] }) {
   const max = Math.max(...values);
   const min = Math.min(...values);
   const span = Math.max(max - min, 1);
@@ -155,7 +158,7 @@ function Bars({ values, labels, color }: { values: number[]; labels?: string[]; 
     <View>
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 4, height: 54 }}>
         {values.map((v, i) => (
-          <View key={i} style={{ flex: 1, height: 12 + ((v - min) / span) * 42, backgroundColor: color, borderRadius: 4, opacity: i === values.length - 1 ? 1 : 0.45 }} />
+          <View key={i} style={{ flex: 1, height: 12 + ((v - min) / span) * 42, backgroundColor: i === values.length - 1 ? colors.chartLine : colors.chartGrid, borderRadius: 2 }} />
         ))}
       </View>
       {labels ? (

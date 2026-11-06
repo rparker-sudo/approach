@@ -373,10 +373,26 @@ export function dayAdvice(week: DayType[], i: number, liftsToday: boolean, heavy
   const today = week[i];
   const tomorrow = week[(i + 1) % 7];
   const yesterday = week[(i + 6) % 7];
-  if (isMatch(today)) return 'Match day: no lifting. Fuel up and hydrate.';
-  if (isMatch(tomorrow) && liftsToday && heavyLower) return 'Match tomorrow: keep leg work light today.';
-  if (isMatch(tomorrow)) return 'Match tomorrow: rest legs, extra carbs and fluids.';
-  if (isMatch(yesterday) && !liftsToday) return 'Day after a match: recover, stretch, sleep.';
+  if (isMatch(today)) return 'Match day. No lifting. Eat early, sip water all day.';
+  if (isMatch(tomorrow) && liftsToday && heavyLower) return 'Match tomorrow. Keep the legs light today.';
+  if (isMatch(tomorrow)) return 'Match tomorrow. Rest the legs. Carbs and water tonight.';
+  if (isMatch(yesterday) && !liftsToday) return 'Day after a match. Recover, stretch, sleep.';
   if (today === 'practice' && liftsToday) return 'Lift after practice, not before.';
   return null;
+}
+
+/** One short line for the top of the Load screen, in the brand voice. */
+export function captainLine(program: Program, i: number): string {
+  const week = program.volleyballWeek;
+  const session = program.sessions.find((s) => s.id === program.liftSchedule[i]);
+  if (isMatch(week[i])) return week[i] === 'tournament' ? 'Tournament day. Fuel early, fuel often.' : 'Match day. Trust the work.';
+  if (session) {
+    const legs = session.exercises.some((e) => ['back-squat', 'front-squat', 'goblet-squat', 'trap-bar-deadlift', 'split-squat', 'rdl', 'db-rdl', 'step-up', 'hip-thrust'].includes(e.exerciseId));
+    const sets = session.exercises[0] ? session.exercises.find((e) => e.sets >= 3)?.sets ?? session.exercises[0].sets : 3;
+    return legs ? `Legs today. ${sets} sets, you've got this.` : `Upper body today. ${sets} sets, stay sharp.`;
+  }
+  for (let d = 1; d <= 2; d++) {
+    if (isMatch(week[(i + d) % 7])) return d === 1 ? 'Match tomorrow. Carbs tonight.' : 'Match in 2 days. Carbs tonight.';
+  }
+  return 'Recovery day. Sleep is training too.';
 }

@@ -1,7 +1,7 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { Body, Button, Card, colors, Field, H2, Label, Row, Screen, Stepper, styles } from '../components/ui';
+import { Modal, Pressable, ScrollView, View } from 'react-native';
+import { Body, Button, Card, colors, Field, H2, Label, Row, Screen, Stepper, Text, TextInput, display, Icon } from '../components/ui';
 import { CATEGORY_LABEL, EXERCISES, getExercise } from '../lib/exercises';
 import { useStore } from '../lib/store';
 import type { ExerciseCategory, ProgramExercise, Session } from '../lib/types';
@@ -63,16 +63,16 @@ export default function SessionScreen() {
           <Card key={`${e.exerciseId}-${i}`}>
             <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.accent }}>{CATEGORY_LABEL[info.category].toUpperCase()}</Text>
+                <Text style={[display(12), { color: colors.muted }]}>{CATEGORY_LABEL[info.category]}</Text>
                 <H2>{info.name}</H2>
                 <Body muted style={{ fontSize: 13 }}>{info.cue}</Body>
               </View>
               <View style={{ gap: 2 }}>
                 <Pressable accessibilityLabel="Move up" onPress={() => move(i, -1)} hitSlop={6}>
-                  <Text style={{ fontSize: 18, color: colors.muted }}>▲</Text>
+                  <Icon name="chevron.up" size={16} color={colors.muted} />
                 </Pressable>
                 <Pressable accessibilityLabel="Move down" onPress={() => move(i, 1)} hitSlop={6}>
-                  <Text style={{ fontSize: 18, color: colors.muted }}>▼</Text>
+                  <Icon name="chevron.down" size={16} color={colors.muted} />
                 </Pressable>
               </View>
             </Row>
@@ -83,15 +83,15 @@ export default function SessionScreen() {
             <Row>
               <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
                 <Label>Reps</Label>
-                <TextInput style={[styles.input, { minWidth: 0 }]} value={e.reps} onChangeText={(t) => setEx(i, { reps: t })} />
+                <TextInput style={{ minWidth: 0 }} value={e.reps} onChangeText={(t) => setEx(i, { reps: t })} />
               </View>
               <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
                 <Label>Effort</Label>
-                <TextInput style={[styles.input, { minWidth: 0 }]} value={e.effort} onChangeText={(t) => setEx(i, { effort: t })} />
+                <TextInput style={{ minWidth: 0 }} value={e.effort} onChangeText={(t) => setEx(i, { effort: t })} />
               </View>
             </Row>
             <TextInput
-              style={[styles.input, { fontSize: 14 }]}
+              style={{ fontSize: 14 }}
               placeholder="Notes (optional)"
               placeholderTextColor={colors.faint}
               value={e.notes ?? ''}
@@ -114,8 +114,7 @@ export default function SessionScreen() {
       <Card>
         <Label>What does effort mean?</Label>
         <Body style={{ fontSize: 14 }}>
-          RPE = how hard a set feels from 1–10. RPE 7 means you could have done about 3 more reps. Athletes should rarely
-          go to failure, especially in-season.
+          RPE is how hard a set feels, 1–10. RPE 7 means about 3 reps left in the tank. Rarely go to failure, never in-season.
         </Body>
       </Card>
 
@@ -124,7 +123,7 @@ export default function SessionScreen() {
           <Row style={{ justifyContent: 'space-between', padding: 16 }}>
             <H2>{picker?.replaceIndex != null ? 'Swap exercise' : 'Add exercise'}</H2>
             <Pressable onPress={() => setPicker(null)} hitSlop={10}>
-              <Text style={{ color: colors.accent, fontWeight: '700', fontSize: 16 }}>Cancel</Text>
+              <Text style={{ fontWeight: '600', fontSize: 16 }}>Cancel</Text>
             </Pressable>
           </Row>
           <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 0, gap: 8, paddingBottom: 48 }}>
@@ -134,7 +133,7 @@ export default function SessionScreen() {
                 {EXERCISES.filter((x) => x.category === c).map((x) => (
                   <Pressable key={x.id} onPress={() => pick(x.id)}>
                     <Card style={{ padding: 12, gap: 2 }}>
-                      <Text style={{ fontWeight: '700', fontSize: 15, color: colors.ink }}>{x.name}</Text>
+                      <Text style={{ fontWeight: '600', fontSize: 16 }}>{x.name}</Text>
                       <Text style={{ color: colors.muted, fontSize: 13 }}>{x.cue}</Text>
                     </Card>
                   </Pressable>

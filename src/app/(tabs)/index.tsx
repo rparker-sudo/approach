@@ -1,9 +1,25 @@
 import { router } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import ScreenHeader from '../../components/ScreenHeader';
 import TeamHome from '../../components/TeamHome';
-import { Body, Button, Card, colors, H1, H2, Icon, Label, Pill, Row, Screen } from '../../components/ui';
+import {
+  Body,
+  Button,
+  Card,
+  colors,
+  H1,
+  H2,
+  Icon,
+  Label,
+  NetTape,
+  Note,
+  Pill,
+  Row,
+  Screen,
+  Text,
+} from '../../components/ui';
 import { getExercise } from '../../lib/exercises';
-import { dayAdvice } from '../../lib/generator';
+import { captainLine, dayAdvice } from '../../lib/generator';
 import { fuelDay, fuelTargets } from '../../lib/nutrition';
 import { useStore } from '../../lib/store';
 import { DAY_TYPES, WEEKDAYS } from '../../lib/types';
@@ -27,26 +43,18 @@ function Today() {
   const profile = data.profile!;
   const i = weekdayIndex();
   const now = new Date();
-
-  const header = (
-    <Row style={{ justifyContent: 'space-between' }}>
-      <View style={{ flex: 1 }}>
-        <Body muted>{now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</Body>
-        <H1>Hi {profile.name || 'there'}</H1>
-      </View>
-      <Pressable accessibilityLabel="Settings" onPress={() => router.push('/settings')} hitSlop={10}>
-        <Icon name="gearshape.fill" color={colors.muted} size={24} />
-      </Pressable>
-    </Row>
-  );
+  const dateLine = `${now.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}${
+    profile.name ? ` · ${profile.name}` : ''
+  }`;
 
   if (!activeProgram) {
     return (
       <Screen tab>
-        {header}
+        <ScreenHeader title="Load" subtitle={dateLine} />
+        <NetTape />
         <Card>
           <H2>No program yet</H2>
-          <Body muted>Build one in a minute, or import one your coach sent you.</Body>
+          <Body muted>Build one in a minute, or import the one your coach sent.</Body>
           <Button title="Build my program" icon="wand.and.stars" onPress={() => router.push('/builder')} />
           <Button kind="ghost" title="Import from coach" onPress={() => router.push('/import')} />
         </Card>
@@ -70,7 +78,8 @@ function Today() {
 
   return (
     <Screen tab>
-      {header}
+      <ScreenHeader title="Load" subtitle={dateLine} />
+      <Text style={{ fontSize: 20, fontWeight: '600' }}>{captainLine(activeProgram, i)}</Text>
 
       <Card>
         <Row style={{ justifyContent: 'space-between' }}>
@@ -83,17 +92,15 @@ function Today() {
             <Body muted>{session.focus}</Body>
             <View style={{ gap: 4 }}>
               {session.exercises.slice(0, 4).map((e, k) => (
-                <Body key={k} style={{ fontSize: 14 }}>
-                  • {getExercise(e.exerciseId).name} — {e.sets} × {e.reps}
-                </Body>
+                <Text key={k} style={{ fontSize: 13 }}>
+                  {getExercise(e.exerciseId).name} <Text style={{ color: colors.muted, fontSize: 13 }}>{e.sets} × {e.reps}</Text>
+                </Text>
               ))}
               {session.exercises.length > 4 ? (
-                <Body muted style={{ fontSize: 14 }}>+ {session.exercises.length - 4} more</Body>
+                <Text style={{ fontSize: 13, color: colors.muted }}>+ {session.exercises.length - 4} more</Text>
               ) : null}
             </View>
-            {doneToday ? (
-              <Pill text="✓ Done today" color={colors.good} bg={colors.goodSoft} />
-            ) : null}
+            {doneToday ? <Pill text="Done today" achievement /> : null}
             <Button
               title={doneToday ? 'Log it again' : 'Start workout'}
               icon="play.fill"
@@ -102,26 +109,22 @@ function Today() {
           </>
         ) : (
           <>
-            <H2>{vb === 'game' || vb === 'tournament' ? 'Match day: no lifting' : 'No lift today'}</H2>
+            <H2>{vb === 'game' || vb === 'tournament' ? 'Match day. No lifting.' : 'No lift today'}</H2>
             <Body muted>
-              {vb === 'off'
-                ? 'Rest day. Sleep, eat well, and do some light stretching.'
-                : 'Focus on volleyball today. Your next lift is coming up.'}
+              {vb === 'off' ? 'Recovery day. Sleep, eat, stretch.' : 'Volleyball only today. Next lift is coming up.'}
             </Body>
           </>
         )}
-        {advice ? (
-          <View style={{ backgroundColor: colors.warnSoft, padding: 10, borderRadius: 10 }}>
-            <Text style={{ color: colors.warn, fontWeight: '600' }}>{advice}</Text>
-          </View>
-        ) : null}
+        {advice ? <Note>{advice}</Note> : null}
       </Card>
+
+      <NetTape />
 
       <Pressable onPress={() => router.navigate('/fuel')}>
         <Card>
           <Row style={{ justifyContent: 'space-between' }}>
-            <Label>Today's fuel</Label>
-            <Text style={{ color: colors.faint, fontSize: 20 }}>›</Text>
+            <Label>Refuel</Label>
+            <Icon name="chevron.right" size={14} color={colors.faint} />
           </Row>
           <H2>{fuel.title}</H2>
           <Body muted>{fuel.summary}</Body>
@@ -132,7 +135,7 @@ function Today() {
               <Stat label="Water" value={`${targets.fluidsOz[0]}+ oz`} />
             </Row>
           ) : (
-            <Body muted style={{ fontSize: 13 }}>Add your body weight in Settings to see gram targets.</Body>
+            <Text style={{ fontSize: 13, color: colors.muted }}>Add your body weight in Settings to see gram targets.</Text>
           )}
         </Card>
       </Pressable>
@@ -147,7 +150,7 @@ function Today() {
             const done = doneThisWeek.some((l) => new Date(l.date).toDateString() === date.toDateString());
             return (
               <View key={d} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
-                <Text style={{ fontSize: 12, color: k === i ? colors.accent : colors.muted, fontWeight: '700' }}>{d}</Text>
+                <Text style={{ fontSize: 12, color: k === i ? colors.ink : colors.faint, fontWeight: k === i ? '600' : '400' }}>{d}</Text>
                 <View
                   style={{
                     width: 28,
@@ -155,20 +158,20 @@ function Today() {
                     borderRadius: 14,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: done ? colors.good : lift ? colors.accentSoft : colors.bg,
+                    backgroundColor: done ? colors.achievement : 'transparent',
+                    borderWidth: done ? 0 : 1,
+                    borderColor: lift ? colors.ink : colors.line,
                   }}
                 >
-                  <Text style={{ color: done ? '#fff' : colors.accent, fontWeight: '800', fontSize: 12 }}>
-                    {done ? '✓' : lift ? 'L' : ''}
-                  </Text>
+                  {done ? <Icon name="checkmark" size={12} color={colors.bg} /> : lift ? <Text style={{ fontSize: 12, fontWeight: '600' }}>L</Text> : null}
                 </View>
               </View>
             );
           })}
         </Row>
-        <Body muted style={{ fontSize: 13 }}>
+        <Text style={{ fontSize: 13, color: colors.muted }}>
           {doneThisWeek.length} of {planned} lifts done this week
-        </Body>
+        </Text>
       </Card>
     </Screen>
   );
@@ -176,9 +179,11 @@ function Today() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, borderRadius: 10, padding: 10 }}>
-      <Text style={{ fontSize: 12, color: colors.muted, fontWeight: '600' }}>{label}</Text>
-      <Text style={{ fontSize: 15, color: colors.ink, fontWeight: '800', marginTop: 2 }}>{value}</Text>
+    <View style={{ flex: 1, backgroundColor: colors.raised, borderRadius: 8, padding: 10 }}>
+      <Text style={{ fontSize: 12, color: colors.muted }}>{label}</Text>
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 16, fontWeight: '600', marginTop: 2 }}>
+        {value}
+      </Text>
     </View>
   );
 }

@@ -1,9 +1,9 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { getExercise } from '../lib/exercises';
 import { dayAdvice } from '../lib/generator';
 import type { DayType, Program } from '../lib/types';
 import { DAY_TYPES, WEEKDAYS } from '../lib/types';
-import { Chip, ChipRow, colors, Body } from './ui';
+import { Body, Chip, ChipRow, colors, Icon, Text } from './ui';
 
 const ORDER: DayType[] = ['off', 'practice', 'game', 'tournament'];
 
@@ -29,20 +29,20 @@ export function WeekEditor({ value, onChange }: { value: DayType[]; onChange: (w
                 flex: 1,
                 alignItems: 'center',
                 paddingVertical: 10,
-                borderRadius: 10,
+                borderRadius: 8,
                 backgroundColor: colors.day[t],
                 borderWidth: 1,
                 borderColor: t === 'off' ? colors.line : 'transparent',
               }}
             >
-              <Text style={{ fontSize: 12, fontWeight: '700', color: colors.muted }}>{d}</Text>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.ink, marginTop: 4 }}>{meta.short}</Text>
+              <Text style={{ fontSize: 12, fontWeight: '600' }}>{d}</Text>
+              <Text style={{ fontSize: 12, marginTop: 4 }}>{meta.short}</Text>
             </Pressable>
           );
         })}
       </View>
       <Body muted style={{ fontSize: 13 }}>
-        Tap a day to change it: Off → Practice → Match → Tournament.
+        Tap a day to change it: Off, Practice, Match, Tournament. Darker days are bigger days.
       </Body>
     </View>
   );
@@ -87,33 +87,33 @@ export function ProgramWeek({
               gap: 12,
               padding: 12,
               borderRadius: 12,
-              backgroundColor: '#fff',
+              backgroundColor: colors.card,
               borderWidth: highlight === i ? 2 : 1,
-              borderColor: highlight === i ? colors.accent : colors.line,
+              borderColor: highlight === i ? colors.ink : colors.line,
             }}
           >
             <View style={{ width: 44, alignItems: 'center' }}>
-              <Text style={{ fontWeight: '800', color: colors.ink }}>{d}</Text>
-              <View style={{ marginTop: 4, backgroundColor: colors.day[vb], borderRadius: 6, paddingHorizontal: 4, paddingVertical: 2 }}>
-                <Text style={{ fontSize: 10, fontWeight: '700', color: colors.muted }}>{DAY_TYPES.find((x) => x.id === vb)!.short}</Text>
+              <Text style={{ fontWeight: '600' }}>{d}</Text>
+              <View style={{ marginTop: 4, backgroundColor: colors.day[vb], borderRadius: 4, borderWidth: vb === 'off' ? 1 : 0, borderColor: colors.line, paddingHorizontal: 4, paddingVertical: 2 }}>
+                <Text style={{ fontSize: 12 }}>{DAY_TYPES.find((x) => x.id === vb)!.short}</Text>
               </View>
             </View>
             <View style={{ flex: 1, gap: 2 }}>
               {session ? (
                 <>
-                  <Text style={{ fontWeight: '700', color: colors.ink, fontSize: 15 }}>{session.name}</Text>
+                  <Text style={{ fontWeight: '600', fontSize: 16 }}>{session.name}</Text>
                   <Text style={{ color: colors.muted, fontSize: 13 }}>
                     {session.exercises.length} exercises · {vb === 'off' ? 'No volleyball' : `${vbLabel} day`}
                   </Text>
                 </>
               ) : (
-                <Text style={{ color: colors.muted, fontSize: 15, fontWeight: '600' }}>
+                <Text style={{ color: colors.muted, fontSize: 16, fontWeight: '500' }}>
                   {vb === 'off' ? 'Rest' : `${vbLabel}, no lift`}
                 </Text>
               )}
-              {advice ? <Text style={{ color: colors.warn, fontSize: 12, marginTop: 2 }}>{advice}</Text> : null}
+              {advice ? <Text style={{ color: colors.ink, fontSize: 12, marginTop: 4 }}>{advice}</Text> : null}
             </View>
-            {session && onPressSession ? <Text style={{ color: colors.faint, fontSize: 20, alignSelf: 'center' }}>›</Text> : null}
+            {session && onPressSession ? <View style={{ alignSelf: 'center' }}><Icon name="chevron.right" size={14} color={colors.faint} /></View> : null}
           </Pressable>
         );
       })}

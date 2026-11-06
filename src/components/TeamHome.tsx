@@ -1,18 +1,19 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, Share, Text, View } from 'react-native';
+import { Alert, Pressable, Share, View } from 'react-native';
 import { encodeProgram, useStore } from '../lib/store';
 import type { Athlete, Position } from '../lib/types';
 import { POSITIONS } from '../lib/types';
 import { uid } from '../lib/util';
-import { Body, Button, Card, Chip, ChipRow, colors, Field, H1, H2, Icon, Label, Row, Screen } from './ui';
+import ScreenHeader from './ScreenHeader';
+import { Body, Button, Card, Chip, ChipRow, colors, Field, H2, Icon, Label, NetTape, Row, Screen, Text } from './ui';
 
 export async function shareProgram(programId: string, programs: ReturnType<typeof useStore>['data']['programs'], coachName?: string) {
   const p = programs.find((x) => x.id === programId);
   if (!p) return;
   const intro =
     `${coachName ? coachName + ' sent you' : 'Here is'} a training program: "${p.name}".\n\n` +
-    'To open it: in the Volley Strength app, go to Program → Import from coach, then paste this whole message.\n\n';
+    'To open it in Load & Launch: go to Plan, tap Import from coach, then paste this whole message.\n\n';
   await Share.share({ message: intro + encodeProgram(p) });
 }
 
@@ -32,28 +33,20 @@ export default function TeamHome() {
 
   return (
     <Screen tab>
-      <Row style={{ justifyContent: 'space-between' }}>
-        <View style={{ flex: 1 }}>
-          <Body muted>{data.profile?.name}</Body>
-          <H1>Your team</H1>
-        </View>
-        <Pressable accessibilityLabel="Settings" onPress={() => router.push('/settings')} hitSlop={10}>
-          <Icon name="gearshape.fill" color={colors.muted} size={24} />
-        </Pressable>
-      </Row>
+      <ScreenHeader title="Team" subtitle={data.profile?.name} />
 
-      <Card style={{ backgroundColor: colors.navy, borderColor: colors.navy }}>
-        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>How it works</Text>
-        <Text style={{ color: '#D6E2F0', lineHeight: 20 }}>
-          1. Add your athletes. 2. Build a program for each athlete, or one for a group. 3. Tap Send. Players paste it into
-          the app on their phones.
+      <Card style={{ backgroundColor: colors.raised }}>
+        <Label>How it works</Label>
+        <Text style={{ lineHeight: 22 }}>
+          Add your athletes. Build a program for each one, or one for a group. Tap Send. Players paste it into the app.
         </Text>
       </Card>
 
       {data.athletes.length === 0 && !adding ? (
         <Card>
+          <NetTape />
           <H2>No athletes yet</H2>
-          <Body muted>Add your players to keep track of who has which program.</Body>
+          <Body muted>Add your players to track who has which program.</Body>
         </Card>
       ) : null}
 
@@ -124,7 +117,7 @@ function AthleteCard({
               {athlete.position} · {program ? program.name : 'No program yet'}
             </Body>
           </View>
-          <Text style={{ color: colors.faint, fontSize: 20 }}>{open ? '⌃' : '⌄'}</Text>
+          <Icon name={open ? 'chevron.up' : 'chevron.down'} size={14} color={colors.faint} />
         </Row>
       </Pressable>
       {open ? (

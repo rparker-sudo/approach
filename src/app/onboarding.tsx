@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Body, Button, Card, colors, Field, H1, H2, Label, OptionCard, Screen } from '../components/ui';
+import { Body, Button, Card, colors, Field, H1, H2, Label, OptionCard, Screen, Lockup, NetTape } from '../components/ui';
 import { LiftDaysPicker, WeekEditor } from '../components/week';
 import { generateProgram } from '../lib/generator';
 import { useStore } from '../lib/store';
@@ -61,25 +61,25 @@ export default function Onboarding() {
         <Screen>
           {step === 0 && (
             <>
-              <View style={{ gap: 8, marginTop: 12 }}>
-                <H1>Volley Strength</H1>
-                <Body muted>
-                  Weight training and fuel plans built around your volleyball schedule. Lift smarter, recover better, play
-                  fresher.
+              <View style={{ gap: 20, marginTop: 24, marginBottom: 8 }}>
+                <Lockup badge={132} />
+                <NetTape />
+                <Body muted style={{ textAlign: 'center' }}>
+                  Lifting and fuel built around your volleyball week.
                 </Body>
               </View>
               <Label>Who are you?</Label>
               <OptionCard
-                icon="figure.strengthtraining.traditional"
+                icon="dumbbell"
                 title="I'm an athlete"
-                subtitle="Build my own training program and track my progress"
+                subtitle="Build my program and track my progress"
                 selected={role === 'athlete'}
                 onPress={() => setRole('athlete')}
               />
               <OptionCard
-                icon="person.3.fill"
+                icon="person.3"
                 title="I'm a coach"
-                subtitle="Build programs for my players and send them out"
+                subtitle="Build programs and send them to players"
                 selected={role === 'coach'}
                 onPress={() => setRole('coach')}
               />
@@ -105,7 +105,7 @@ export default function Onboarding() {
           {step === 2 && (
             <>
               <H1>What position do you play?</H1>
-              <Body muted>Your program adds injury-prevention work for your position.</Body>
+              <Body muted>Your program adds injury-prevention work for it.</Body>
               {POSITIONS.map((p) => (
                 <OptionCard key={p} title={p} selected={position === p} onPress={() => setPosition(p)} />
               ))}

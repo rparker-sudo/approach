@@ -4,7 +4,7 @@ import { useStore } from '../lib/store';
 import type { Program } from '../lib/types';
 import { EXPERIENCE, PHASES } from '../lib/types';
 import { shareProgram } from './TeamHome';
-import { Body, Button, Card, colors, H1, Label, Pill, Row } from './ui';
+import { Body, Button, Card, colors, Label, Pill, Row, Text } from './ui';
 import { ProgramWeek } from './week';
 import { weekdayIndex } from '../lib/util';
 
@@ -17,18 +17,21 @@ export default function ProgramDetail({ program, afterDelete }: { program: Progr
   return (
     <View style={{ gap: 14 }}>
       <View style={{ gap: 8 }}>
-        <H1>{program.name}</H1>
+        <Text style={{ fontSize: 24, fontWeight: '600' }}>{program.name}</Text>
         <Row style={{ flexWrap: 'wrap', gap: 6 }}>
-          <Pill text={phase.label} bg={colors.accentSoft} color={colors.accent} />
+          <Pill text={phase.label} bg={colors.day.game} />
           <Pill text={program.position} />
           <Pill text={EXPERIENCE.find((e) => e.id === program.experience)!.label} />
           {program.forName ? <Pill text={`For ${program.forName}`} /> : null}
         </Row>
         {program.author ? <Body muted style={{ fontSize: 13 }}>From {program.author}</Body> : null}
-        <Body muted style={{ fontSize: 14 }}>{phase.blurb}</Body>
+        <Body muted style={{ fontSize: 13 }}>{phase.blurb}</Body>
       </View>
 
-      <Label>Weekly plan · tap a lift to see or edit it</Label>
+      <View style={{ gap: 4 }}>
+        <Label>This week</Label>
+        <Text style={{ fontSize: 13, color: colors.muted }}>Tap a lift to see or edit it.</Text>
+      </View>
       <ProgramWeek
         program={program}
         highlight={coach ? undefined : weekdayIndex()}

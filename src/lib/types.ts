@@ -129,4 +129,12 @@ export type AppData = {
   logs: WorkoutLog[];
   bodyLogs: BodyLog[];
   athletes: Athlete[];
+  /** Appearance. Dark is the brand default. */
+  theme?: 'dark' | 'light';
+  /** Approach touch measurements, newest last. Inches. */
+  touchLogs?: TouchLog[];
+  /** Net height used for "Above the net", in inches. */
+  netHeightIn?: number;
 };
+
+export type TouchLog = { date: string; inches: number };

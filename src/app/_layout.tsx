@@ -1,29 +1,75 @@
+import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
+import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';
+import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
+import { InterTight_600SemiBold } from '@expo-google-fonts/inter-tight/600SemiBold';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { colors } from '../components/ui';
-import { StoreProvider } from '../lib/store';
+import * as SystemUI from 'expo-system-ui';
+import { useEffect } from 'react';
+import { colors, DisplayTitle } from '../components/ui';
+import { StoreProvider, useStore } from '../lib/store';
+import { applyTheme } from '../lib/theme';
+
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    InterTight_600SemiBold,
+  });
+  if (!fontsLoaded && !fontError) return null;
   return (
     <StoreProvider>
-      <StatusBar style="dark" />
+      <ThemedApp />
+    </StoreProvider>
+  );
+}
+
+function ThemedApp() {
+  const { ready, data } = useStore();
+  const mode = data.theme ?? 'dark';
+  applyTheme(mode);
+
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(colors.bg).catch(() => {});
+    if (ready) SplashScreen.hideAsync().catch(() => {});
+  }, [ready, mode]);
+
+  if (!ready) return null;
+
+  // Keyed on the theme so every screen re-renders with the new colors.
+  return (
+    <ThemeStack key={mode} />
+  );
+}
+
+function ThemeStack() {
+  return (
+    <>
+      <StatusBar style={colors.mode === 'dark' ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
-          headerTintColor: colors.navy,
-          headerTitleStyle: { color: colors.ink },
+          headerTintColor: colors.ink,
+          headerStyle: { backgroundColor: colors.bg },
+          headerShadowVisible: false,
+          headerTitle: ({ children }) => <DisplayTitle>{children}</DisplayTitle>,
           contentStyle: { backgroundColor: colors.bg },
           headerBackButtonDisplayMode: 'minimal',
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
-        <Stack.Screen name="builder" options={{ title: 'Build a Program', presentation: 'modal' }} />
-        <Stack.Screen name="program/[id]" options={{ title: 'Program' }} />
-        <Stack.Screen name="session" options={{ title: 'Edit Session' }} />
-        <Stack.Screen name="workout" options={{ title: 'Workout', gestureEnabled: false }} />
-        <Stack.Screen name="import" options={{ title: 'Import Program', presentation: 'modal' }} />
+        <Stack.Screen name="builder" options={{ title: 'Build a program', presentation: 'modal' }} />
+        <Stack.Screen name="program/[id]" options={{ title: 'Plan' }} />
+        <Stack.Screen name="session" options={{ title: 'Edit session' }} />
+        <Stack.Screen name="workout" options={{ title: 'Load', gestureEnabled: false }} />
+        <Stack.Screen name="import" options={{ title: 'Import program', presentation: 'modal' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
       </Stack>
-    </StoreProvider>
+    </>
   );
 }

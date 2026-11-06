@@ -1,7 +1,7 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, Text, TextInput, View } from 'react-native';
-import { Body, Button, Card, colors, H2, Label, Row, Screen, styles } from '../components/ui';
+import { Alert, Pressable, View } from 'react-native';
+import { Body, Button, Card, colors, H2, Label, Row, Screen, Text, TextInput, Icon } from '../components/ui';
 import { getExercise } from '../lib/exercises';
 import { useStore } from '../lib/store';
 import type { LoggedSet, WorkoutLog } from '../lib/types';
@@ -55,7 +55,7 @@ export default function Workout() {
 
   function finish() {
     if (done === 0) {
-      Alert.alert('Nothing checked off', 'Tap the circle next to each set you finish.');
+      Alert.alert('No sets checked off', 'Tap the circle next to each set you finish, then save.');
       return;
     }
     const log: WorkoutLog = {
@@ -68,7 +68,7 @@ export default function Workout() {
       note: note.trim() || undefined,
     };
     addLog(log);
-    Alert.alert('Workout saved', `${done} of ${total} sets done. Nice work! Refuel with protein and carbs within an hour.`);
+    Alert.alert('Workout saved', `${done} of ${total} sets in. Refuel within an hour: protein and carbs.`);
     router.back();
   }
 
@@ -87,7 +87,7 @@ export default function Workout() {
           title: session.name,
           headerLeft: () => (
             <Pressable onPress={cancel} hitSlop={10}>
-              <Text style={{ color: colors.accent, fontSize: 16, fontWeight: '600' }}>Cancel</Text>
+              <Text style={{ fontSize: 16, fontWeight: '600' }}>Cancel</Text>
             </Pressable>
           ),
         }}
@@ -96,8 +96,8 @@ export default function Workout() {
         <Body muted>
           {done} / {total} sets
         </Body>
-        <View style={{ flex: 1, height: 8, backgroundColor: colors.line, borderRadius: 4, marginLeft: 12 }}>
-          <View style={{ width: `${total ? (done / total) * 100 : 0}%`, height: 8, backgroundColor: colors.good, borderRadius: 4 }} />
+        <View style={{ flex: 1, height: 6, backgroundColor: colors.chartGrid, borderRadius: 3, marginLeft: 12 }}>
+          <View style={{ width: `${total ? (done / total) * 100 : 0}%`, height: 6, backgroundColor: colors.achievement, borderRadius: 3 }} />
         </View>
       </Row>
 
@@ -123,7 +123,7 @@ export default function Workout() {
                 <Text style={{ width: 34, fontWeight: '700', color: colors.muted }}>{si + 1}</Text>
                 {info.weighted ? (
                   <TextInput
-                    style={[styles.input, { flex: 1, minWidth: 0, paddingVertical: 8 }]}
+                    style={{ flex: 1, minWidth: 0, paddingVertical: 8 }}
                     keyboardType="decimal-pad"
                     placeholder="—"
                     placeholderTextColor={colors.faint}
@@ -132,7 +132,7 @@ export default function Workout() {
                   />
                 ) : null}
                 <TextInput
-                  style={[styles.input, { flex: 1, minWidth: 0, paddingVertical: 8 }]}
+                  style={{ flex: 1, minWidth: 0, paddingVertical: 8 }}
                   keyboardType="numbers-and-punctuation"
                   value={s.reps}
                   onChangeText={(t) => setSet(ei, si, { reps: t })}
@@ -153,12 +153,12 @@ export default function Workout() {
                     borderRadius: 20,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: s.done ? colors.good : colors.bg,
+                    backgroundColor: s.done ? colors.achievement : 'transparent',
                     borderWidth: s.done ? 0 : 2,
                     borderColor: colors.line,
                   }}
                 >
-                  <Text style={{ color: '#fff', fontWeight: '900' }}>{s.done ? '✓' : ''}</Text>
+                  {s.done ? <Icon name="checkmark" size={16} color={colors.bg} /> : null}
                 </Pressable>
               </Row>
             ))}
@@ -168,7 +168,7 @@ export default function Workout() {
 
       <Label>How did it feel?</Label>
       <TextInput
-        style={[styles.input, { minHeight: 70, textAlignVertical: 'top' }]}
+        style={{ minHeight: 70, textAlignVertical: 'top' }}
         multiline
         placeholder="Optional note: sore knee, felt strong, etc."
         placeholderTextColor={colors.faint}
@@ -181,5 +181,7 @@ export default function Workout() {
 }
 
 const stylesLocal = {
-  col: { fontSize: 12, fontWeight: '700' as const, color: colors.muted },
+  get col() {
+    return { fontSize: 12, fontWeight: '600' as const, color: colors.muted };
+  },
 };

@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, TextInput } from 'react-native';
-import { Body, Button, colors, H2, Screen, styles } from '../components/ui';
+import { Alert } from 'react-native';
+import { Body, Button, colors, H2, Screen, TextInput } from '../components/ui';
 import { decodeProgram, useStore } from '../lib/store';
 
 export default function ImportScreen() {
@@ -12,11 +12,11 @@ export default function ImportScreen() {
   function doImport() {
     const program = decodeProgram(text);
     if (!program) {
-      Alert.alert("That didn't work", 'Make sure you copied the whole message your coach sent, then paste it again.');
+      Alert.alert("Couldn't read that program", 'Copy the whole message your coach sent, then paste it again.');
       return;
     }
     saveProgram(program, !coach);
-    Alert.alert('Program added', coach ? `"${program.name}" is in your Programs.` : `"${program.name}" is now your active program.`);
+    Alert.alert('Program added', coach ? `"${program.name}" is in Plan.` : `"${program.name}" is now your active program.`);
     router.back();
   }
 
@@ -27,7 +27,7 @@ export default function ImportScreen() {
         Open the message from your coach, press and hold it, choose Copy, then paste it below.
       </Body>
       <TextInput
-        style={[styles.input, { minHeight: 180, textAlignVertical: 'top', fontSize: 13 }]}
+        style={{ minHeight: 180, textAlignVertical: 'top', fontSize: 13 }}
         multiline
         autoCorrect={false}
         autoCapitalize="none"

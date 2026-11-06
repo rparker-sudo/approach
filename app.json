@@ -1,34 +1,49 @@
 {
   "expo": {
-    "name": "Volley Strength",
-    "slug": "volley-strength",
+    "name": "Load & Launch",
+    "slug": "load-and-launch",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.volleystrength.app",
+      "bundleIdentifier": "com.loadandlaunch.app",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleDisplayName": "Load & Launch"
       }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#0B0B0C",
+        "foregroundImage": "./assets/android-icon-foreground.png"
       },
-      "predictiveBackGestureEnabled": false,
-      "package": "com.volleystrength.app"
+      "package": "com.loadandlaunch.app",
+      "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "Load & Launch",
+      "shortName": "Load & Launch",
+      "themeColor": "#0B0B0C",
+      "backgroundColor": "#0B0B0C",
+      "description": "Build it under the bar. Use it above the net."
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#0B0B0C"
+        }
+      ],
+      "expo-font"
     ],
-    "scheme": "volleystrength"
+    "scheme": "loadandlaunch",
+    "backgroundColor": "#0B0B0C"
   }
 }

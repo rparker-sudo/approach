@@ -1,14 +1,15 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert } from 'react-native';
-import { Body, Button, Card, Chip, ChipRow, Field, H2, Label, Screen } from '../components/ui';
+import Constants from 'expo-constants';
+import { Body, Button, Card, Chip, ChipRow, colors, Field, H2, Label, Lockup, Screen, Text } from '../components/ui';
 import { useStore } from '../lib/store';
 import { POSITIONS } from '../lib/types';
 import { parseNum } from '../lib/util';
 import { NUTRITION_DISCLAIMER } from '../lib/nutrition';
 
 export default function Settings() {
-  const { data, setProfile, resetAll } = useStore();
+  const { data, setProfile, resetAll, setTheme } = useStore();
   const [name, setName] = useState(data.profile?.name ?? '');
   const [weight, setWeight] = useState(data.profile?.bodyWeightLb ? String(data.profile.bodyWeightLb) : '');
   if (!data.profile) return null;
@@ -36,6 +37,14 @@ export default function Settings() {
         </>
       ) : null}
       <Button title="Save" onPress={save} />
+
+      <Card>
+        <H2>Appearance</H2>
+        <ChipRow>
+          <Chip label="Dark" selected={(data.theme ?? 'dark') === 'dark'} onPress={() => setTheme('dark')} />
+          <Chip label="Light" selected={data.theme === 'light'} onPress={() => setTheme('light')} />
+        </ChipRow>
+      </Card>
 
       <Card>
         <H2>Mode</H2>
@@ -70,6 +79,11 @@ export default function Settings() {
             ])
           }
         />
+      </Card>
+
+      <Card style={{ alignItems: 'center', paddingVertical: 24 }}>
+        <Lockup badge={96} />
+        <Text style={{ fontSize: 12, color: colors.faint }}>Version {Constants.expoConfig?.version ?? '1.0.0'}</Text>
       </Card>
 
       <Body muted style={{ fontSize: 12 }}>

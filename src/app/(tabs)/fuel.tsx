@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Text, View } from 'react-native';
-import { Body, Card, Chip, ChipRow, colors, H1, H2, Label, Row, Screen } from '../../components/ui';
+import { View } from 'react-native';
+import ScreenHeader from '../../components/ScreenHeader';
+import { Body, Card, Chip, ChipRow, colors, H2, Label, Row, Screen, Text } from '../../components/ui';
 import { FOOD_IDEAS, fuelDay, fuelTargets, NUTRITION_DISCLAIMER } from '../../lib/nutrition';
 import { useStore } from '../../lib/store';
 import type { DayType } from '../../lib/types';
@@ -15,7 +16,7 @@ const OPTIONS: { id: string; day: DayType; lift: boolean; label: string }[] = [
   { id: 'tournament', day: 'tournament', lift: false, label: 'Tournament' },
 ];
 
-export default function Fuel() {
+export default function Refuel() {
   const { data, activeProgram } = useStore();
   const coach = data.profile?.role === 'coach';
   const i = weekdayIndex();
@@ -32,8 +33,8 @@ export default function Fuel() {
 
   return (
     <Screen tab>
-      <H1>Fuel</H1>
-      <Body muted>What to eat and drink changes with the kind of day you have.</Body>
+      <ScreenHeader title="Refuel" subtitle="Meals and hydration" />
+      <Body muted>Bigger day, more fuel. Pick the day to see the plan.</Body>
       <ChipRow>
         {OPTIONS.map((o) => (
           <Chip key={o.id} label={o.id === todayId && !coach ? `${o.label} (today)` : o.label} selected={sel === o.id} onPress={() => setSel(o.id)} />
@@ -45,7 +46,7 @@ export default function Fuel() {
         <Body muted>{fuel.summary}</Body>
         {targets ? (
           <View style={{ gap: 8 }}>
-            <Target label="Carbohydrates" value={`${targets.carbsG[0]}–${targets.carbsG[1]} g`} hint="Main fuel for jumping and quick moves" />
+            <Target label="Carbohydrates" value={`${targets.carbsG[0]}–${targets.carbsG[1]} g`} hint="Main fuel for jumps and quick moves" />
             <Target label="Protein" value={`${targets.proteinG[0]}–${targets.proteinG[1]} g`} hint={`Spread out: about ${targets.proteinPerMealG[0]}–${targets.proteinPerMealG[1]} g per meal`} />
             <Target label="Fluids" value={`${targets.fluidsOz[0]}–${targets.fluidsOz[1]} oz`} hint="Pale-yellow urine means you're on track" />
           </View>
@@ -62,9 +63,9 @@ export default function Fuel() {
         <H2>Build your plate</H2>
         <PlateBar plate={fuel.plate} />
         <Row style={{ alignItems: 'flex-start', gap: 8 }}>
-          <FoodCol title="Carbs" color={colors.accent} items={FOOD_IDEAS.carbs} />
-          <FoodCol title="Protein" color={colors.navy} items={FOOD_IDEAS.protein} />
-          <FoodCol title="Fruit & veg" color={colors.good} items={FOOD_IDEAS.veg} />
+          <FoodCol title="Carbs" swatch={PLATE.carbs} items={FOOD_IDEAS.carbs} />
+          <FoodCol title="Protein" swatch={PLATE.protein} items={FOOD_IDEAS.protein} />
+          <FoodCol title="Fruit & veg" swatch={PLATE.veg} items={FOOD_IDEAS.veg} />
         </Row>
       </Card>
 
@@ -72,8 +73,8 @@ export default function Fuel() {
         <H2>Timing</H2>
         {fuel.timing.map((t, k) => (
           <View key={k} style={{ gap: 2, paddingVertical: 4 }}>
-            <Text style={{ fontWeight: '700', color: colors.ink }}>{t.when}</Text>
-            <Body muted style={{ fontSize: 14 }}>{t.what}</Body>
+            <Text style={{ fontWeight: '600' }}>{t.when}</Text>
+            <Body muted style={{ fontSize: 13 }}>{t.what}</Body>
           </View>
         ))}
       </Card>
@@ -85,10 +86,10 @@ export default function Fuel() {
 
 function Target({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <View style={{ backgroundColor: colors.bg, borderRadius: 10, padding: 12 }}>
+    <View style={{ backgroundColor: colors.raised, borderRadius: 8, padding: 12 }}>
       <Row style={{ justifyContent: 'space-between' }}>
         <Label>{label}</Label>
-        <Text style={{ fontSize: 17, fontWeight: '800', color: colors.ink }}>{value}</Text>
+        <Text style={{ fontSize: 20, fontWeight: '600' }}>{value}</Text>
       </Row>
       <Text style={{ color: colors.muted, fontSize: 13, marginTop: 2 }}>{hint}</Text>
     </View>
@@ -97,16 +98,16 @@ function Target({ label, value, hint }: { label: string; value: string; hint: st
 
 function PlateBar({ plate }: { plate: { carbs: number; protein: number; veg: number } }) {
   const parts = [
-    { k: 'Carbs', v: plate.carbs, c: colors.accent },
-    { k: 'Protein', v: plate.protein, c: colors.navy },
-    { k: 'Fruit & veg', v: plate.veg, c: colors.good },
+    { k: 'Carbs', v: plate.carbs, s: PLATE.carbs },
+    { k: 'Protein', v: plate.protein, s: PLATE.protein },
+    { k: 'Fruit & veg', v: plate.veg, s: PLATE.veg },
   ];
   return (
     <View style={{ gap: 6 }}>
-      <View style={{ flexDirection: 'row', height: 28, borderRadius: 8, overflow: 'hidden' }}>
+      <View style={{ flexDirection: 'row', height: 28, borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: colors.line }}>
         {parts.map((p) => (
-          <View key={p.k} style={{ flex: p.v, backgroundColor: p.c, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>{Math.round(p.v * 100)}%</Text>
+          <View key={p.k} style={{ flex: p.v, backgroundColor: p.s.bg, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ color: p.s.fg, fontSize: 12, fontWeight: '600' }}>{Math.round(p.v * 100)}%</Text>
           </View>
         ))}
       </View>
@@ -117,12 +118,28 @@ function PlateBar({ plate }: { plate: { carbs: number; protein: number; veg: num
   );
 }
 
-function FoodCol({ title, color, items }: { title: string; color: string; items: string[] }) {
+/** Plate shares as tone steps (monochrome brand). Read at render so the theme applies. */
+const PLATE = {
+  get carbs() {
+    return { bg: colors.primaryBg, fg: colors.primaryText };
+  },
+  get protein() {
+    return { bg: colors.day.tournament, fg: colors.ink };
+  },
+  get veg() {
+    return { bg: colors.raised, fg: colors.ink };
+  },
+};
+
+function FoodCol({ title, swatch, items }: { title: string; swatch: { bg: string }; items: string[] }) {
   return (
     <View style={{ flex: 1, gap: 3 }}>
-      <Text style={{ color, fontWeight: '800', fontSize: 13 }}>{title}</Text>
+      <Row style={{ gap: 6 }}>
+        <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: swatch.bg, borderWidth: 1, borderColor: colors.line }} />
+        <Text style={{ fontWeight: '600', fontSize: 13 }}>{title}</Text>
+      </Row>
       {items.map((x) => (
-        <Text key={x} style={{ fontSize: 13, color: colors.ink }}>
+        <Text key={x} style={{ fontSize: 13 }}>
           {x}
         </Text>
       ))}

@@ -31,7 +31,16 @@
       "description": "Build it under the bar. Use it above the net."
     },
     "plugins": [
-      "expo-router",
+      [
+        "expo-router",
+        {
+          "asyncRoutes": {
+            "web": false,
+            "default": false
+          },
+          "sitemap": false
+        }
+      ],
       [
         "expo-splash-screen",
         {

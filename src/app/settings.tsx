@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
+import { showAlert } from '../lib/dialog';
 import { useState } from 'react';
-import { Alert } from 'react-native';
+
 import Constants from 'expo-constants';
 import { Body, Button, Card, Chip, ChipRow, colors, Field, H2, Label, Lockup, Screen, Text } from '../components/ui';
 import { useStore } from '../lib/store';
@@ -66,7 +67,7 @@ export default function Settings() {
           kind="danger"
           title="Erase all data"
           onPress={() =>
-            Alert.alert('Erase everything?', 'This deletes your programs, workouts and settings from this phone.', [
+            showAlert('Erase everything?', 'This deletes your programs, workouts and settings from this phone.', [
               { text: 'Cancel', style: 'cancel' },
               {
                 text: 'Erase',

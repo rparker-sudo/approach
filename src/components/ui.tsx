@@ -1,4 +1,5 @@
 import { SymbolView } from 'expo-symbols';
+import type { AndroidSymbol } from 'expo-symbols';
 import type { SFSymbol } from 'sf-symbols-typescript';
 import { ReactNode } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -111,10 +112,31 @@ export function NetTape({ style }: { style?: StyleProp<ViewStyle> }) {
 
 /* ---------- Layout ---------- */
 
+/** SF Symbol (iOS) → Material Symbols Outlined (browser/Android). Same outline style on both. */
+const WEB_ICON: Partial<Record<string, AndroidSymbol>> = {
+  'person.3': 'groups',
+  dumbbell: 'fitness_center',
+  'fork.knife': 'restaurant',
+  calendar: 'calendar_month',
+  volleyball: 'sports_volleyball',
+  gearshape: 'settings',
+  'chevron.right': 'chevron_right',
+  'chevron.up': 'expand_less',
+  'chevron.down': 'expand_more',
+  checkmark: 'check',
+  'checkmark.circle': 'check_circle',
+  'play.fill': 'play_arrow',
+  'wand.and.stars': 'auto_awesome',
+  plus: 'add',
+  'square.and.arrow.up': 'ios_share',
+  'square.and.arrow.down': 'download',
+  'arrow.triangle.2.circlepath': 'autorenew',
+};
+
 export function Icon({ name, size = 22, color }: { name: SFSymbol; size?: number; color?: string }) {
   return (
     <SymbolView
-      name={name}
+      name={{ ios: name, android: WEB_ICON[name], web: WEB_ICON[name] }}
       size={size}
       tintColor={color ?? colors.ink}
       fallback={<View style={{ width: size, height: size }} />}

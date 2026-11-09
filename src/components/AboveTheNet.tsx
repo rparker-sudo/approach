@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { showAlert } from '../lib/dialog';
+import { Pressable, View } from 'react-native';
 import { useStore } from '../lib/store';
 import { BRAND } from '../lib/theme';
 import { formatDate, parseNum } from '../lib/util';
@@ -43,7 +44,7 @@ export default function AboveTheNet() {
   function save() {
     const total = parseNum(ft) * 12 + parseNum(inch);
     if (total < 60 || total > 160) {
-      Alert.alert('Check that height', 'Enter your standing-reach-plus-jump touch in feet and inches, like 9 ft 8 in.');
+      showAlert('Check that height', 'Enter your standing-reach-plus-jump touch in feet and inches, like 9 ft 8 in.');
       return;
     }
     const prevBest = best;
@@ -138,7 +139,7 @@ export default function AboveTheNet() {
             <Pressable
               key={l.date}
               onLongPress={() =>
-                Alert.alert('Delete this touch?', undefined, [
+                showAlert('Delete this touch?', undefined, [
                   { text: 'Cancel', style: 'cancel' },
                   { text: 'Delete', style: 'destructive', onPress: () => deleteTouchLog(l.date) },
                 ])

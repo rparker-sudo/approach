@@ -8,6 +8,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
+import DialogHost from '../components/DialogHost';
 import { colors, DisplayTitle } from '../components/ui';
 import { StoreProvider, useStore } from '../lib/store';
 import { applyTheme } from '../lib/theme';
@@ -70,6 +71,7 @@ function ThemeStack() {
         <Stack.Screen name="import" options={{ title: 'Import program', presentation: 'modal' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
       </Stack>
+      <DialogHost />
     </>
   );
 }

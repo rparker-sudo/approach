@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { Alert, View } from 'react-native';
+import { showAlert } from '../lib/dialog';
+import { View } from 'react-native';
 import { useStore } from '../lib/store';
 import type { Program } from '../lib/types';
 import { EXPERIENCE, PHASES } from '../lib/types';
@@ -59,7 +60,7 @@ export default function ProgramDetail({ program, afterDelete }: { program: Progr
           kind="danger"
           title="Delete program"
           onPress={() =>
-            Alert.alert('Delete this program?', 'Workout history you logged is kept.', [
+            showAlert('Delete this program?', 'Workout history you logged is kept.', [
               { text: 'Cancel', style: 'cancel' },
               {
                 text: 'Delete',

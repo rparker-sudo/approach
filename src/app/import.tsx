@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
+import { showAlert } from '../lib/dialog';
 import { useState } from 'react';
-import { Alert } from 'react-native';
+
 import { Body, Button, colors, H2, Screen, TextInput } from '../components/ui';
 import { decodeProgram, useStore } from '../lib/store';
 
@@ -12,11 +13,11 @@ export default function ImportScreen() {
   function doImport() {
     const program = decodeProgram(text);
     if (!program) {
-      Alert.alert("Couldn't read that program", 'Copy the whole message your coach sent, then paste it again.');
+      showAlert("Couldn't read that program", 'Copy the whole message your coach sent, then paste it again.');
       return;
     }
     saveProgram(program, !coach);
-    Alert.alert('Program added', coach ? `"${program.name}" is in Plan.` : `"${program.name}" is now your active program.`);
+    showAlert('Program added', coach ? `"${program.name}" is in Plan.` : `"${program.name}" is now your active program.`);
     router.back();
   }
 

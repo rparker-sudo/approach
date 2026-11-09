@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
+import { showAlert, shareText } from '../lib/dialog';
 import { useState } from 'react';
-import { Alert, Pressable, Share, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { encodeProgram, useStore } from '../lib/store';
 import type { Athlete, Position } from '../lib/types';
 import { POSITIONS } from '../lib/types';
@@ -14,7 +15,7 @@ export async function shareProgram(programId: string, programs: ReturnType<typeo
   const intro =
     `${coachName ? coachName + ' sent you' : 'Here is'} a training program: "${p.name}".\n\n` +
     'To open it in Load & Launch: go to Plan, tap Import from coach, then paste this whole message.\n\n';
-  await Share.share({ message: intro + encodeProgram(p) });
+  await shareText(intro + encodeProgram(p), `Load & Launch: ${p.name}`);
 }
 
 export default function TeamHome() {
@@ -58,7 +59,7 @@ export default function TeamHome() {
           onToggle={() => setOpen(open === a.id ? null : a.id)}
           onAssign={(programId) => saveAthlete({ ...a, programId })}
           onDelete={() =>
-            Alert.alert(`Remove ${a.name}?`, 'Their programs stay in your Programs list.', [
+            showAlert(`Remove ${a.name}?`, 'Their programs stay in your Programs list.', [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Remove', style: 'destructive', onPress: () => deleteAthlete(a.id) },
             ])

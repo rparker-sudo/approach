@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { showAlert } from '../../lib/dialog';
+import { Pressable, View } from 'react-native';
 import AboveTheNet from '../../components/AboveTheNet';
 import ScreenHeader from '../../components/ScreenHeader';
 import { Body, Button, Card, colors, Field, H2, Label, Row, Screen, Text } from '../../components/ui';
@@ -96,7 +97,7 @@ export default function Launch() {
           <Pressable
             key={l.id}
             onLongPress={() =>
-              Alert.alert('Delete this workout?', undefined, [
+              showAlert('Delete this workout?', undefined, [
                 { text: 'Cancel', style: 'cancel' },
                 { text: 'Delete', style: 'destructive', onPress: () => deleteLog(l.id) },
               ])

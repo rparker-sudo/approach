@@ -1,6 +1,7 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { showAlert } from '../lib/dialog';
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View, Platform } from 'react-native';
 import { Body, Button, Card, colors, H2, Label, Row, Screen, Text, TextInput, Icon } from '../components/ui';
 import { getExercise } from '../lib/exercises';
 import { useStore } from '../lib/store';
@@ -55,7 +56,7 @@ export default function Workout() {
 
   function finish() {
     if (done === 0) {
-      Alert.alert('No sets checked off', 'Tap the circle next to each set you finish, then save.');
+      showAlert('No sets checked off', 'Tap the circle next to each set you finish, then save.');
       return;
     }
     const log: WorkoutLog = {
@@ -68,13 +69,13 @@ export default function Workout() {
       note: note.trim() || undefined,
     };
     addLog(log);
-    Alert.alert('Workout saved', `${done} of ${total} sets in. Refuel within an hour: protein and carbs.`);
+    showAlert('Workout saved', `${done} of ${total} sets in. Refuel within an hour: protein and carbs.`);
     router.back();
   }
 
   function cancel() {
     if (done === 0) return router.back();
-    Alert.alert('Leave workout?', "Sets you've checked off won't be saved.", [
+    showAlert('Leave workout?', "Sets you've checked off won't be saved.", [
       { text: 'Keep going', style: 'cancel' },
       { text: 'Leave', style: 'destructive', onPress: () => router.back() },
     ]);
@@ -86,7 +87,7 @@ export default function Workout() {
         options={{
           title: session.name,
           headerLeft: () => (
-            <Pressable onPress={cancel} hitSlop={10}>
+            <Pressable onPress={cancel} hitSlop={10} style={{ paddingHorizontal: Platform.OS === 'web' ? 16 : 0 }}>
               <Text style={{ fontSize: 16, fontWeight: '600' }}>Cancel</Text>
             </Pressable>
           ),

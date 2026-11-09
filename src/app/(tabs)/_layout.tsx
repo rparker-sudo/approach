@@ -1,5 +1,7 @@
 import { Redirect } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
+import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts, Icon } from '../../components/ui';
 import { useStore } from '../../lib/store';
 
@@ -9,6 +11,7 @@ import { useStore } from '../../lib/store';
  */
 export default function TabsLayout() {
   const { data } = useStore();
+  const insets = useSafeAreaInsets();
   if (!data.profile) return <Redirect href="/onboarding" />;
   const coach = data.profile.role === 'coach';
 
@@ -18,8 +21,13 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.ink,
         tabBarInactiveTintColor: colors.faint,
-        tabBarStyle: { backgroundColor: colors.bg, borderTopColor: colors.line },
-        tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 12 },
+        tabBarStyle: {
+          backgroundColor: colors.bg,
+          borderTopColor: colors.line,
+          // Browsers: give icon + label room, plus the iPhone home-bar area.
+          ...(Platform.OS === 'web' ? { height: 66 + insets.bottom, paddingTop: 4, paddingBottom: 4 + insets.bottom } : null),
+        },
+        tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 16 },
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >

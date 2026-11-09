@@ -97,7 +97,14 @@ export type Program = {
   postedAt?: string;
   /** Coach only: edited since the last post. */
   unposted?: boolean;
+  /** Real dates (matches, tournaments, days off) that override the default week. */
+  events?: CalendarEvent[];
+  /** Per-date lift choice: session id, or null for rest. Wins over the automatic plan. */
+  overrides?: Record<string, string | null>;
 };
+
+/** A dated volleyball event. date is local 'YYYY-MM-DD'. */
+export type CalendarEvent = { date: string; type: DayType; label?: string };
 
 export type Profile = {
   name: string;
@@ -108,6 +115,8 @@ export type Profile = {
   bodyWeightLb: number | null;
   liftDaysPerWeek: number;
   volleyballWeek: DayType[];
+  /** Weekdays (Monday = 0) the user chose to lift on. */
+  liftDays?: number[];
 };
 
 export type LoggedSet = { weight: string; reps: string; done: boolean };

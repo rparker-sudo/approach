@@ -1,0 +1,50 @@
+# Builds the browser version of Load & Launch and publishes it to GitHub Pages
+# on every push to main. Setup steps are in the README ("Browser version on GitHub Pages").
+name: Deploy web app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # Site lives at https://<owner>.github.io/<repo>/ unless you set a custom domain (APP_URL + BASE_PATH variables).
+      EXPO_BASE_URL: ${{ vars.BASE_PATH != '' && vars.BASE_PATH || format('/{0}', github.event.repository.name) }}
+      EXPO_PUBLIC_APP_URL: ${{ vars.APP_URL != '' && vars.APP_URL || format('https://{0}.github.io/{1}', github.repository_owner, github.event.repository.name) }}
+      EXPO_PUBLIC_APP_STORE_ID: ${{ vars.APP_STORE_ID }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx expo export --platform web --clear
+      - run: node scripts/postbuild-web.mjs
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

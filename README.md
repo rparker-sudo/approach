@@ -2,7 +2,7 @@
 
 **Build it under the bar. Use it above the net.**
 
-An iPhone app for volleyball athletes and coaches: weight training, fuel and planning built around the volleyball schedule. App Store subtitle suggestion: *Volleyball Strength and Fuel*.
+An iPhone app (plus a mobile browser version) for volleyball athletes and coaches: weight training, fuel and planning built around the volleyball schedule. App Store subtitle suggestion: *Volleyball Strength and Fuel*.
 
 The app has four areas: **Load** (training), **Refuel** (meals and hydration), **Plan** (season, week and match days) and **Launch** (touch height and progress). Coaches also get a **Team** tab.
 
@@ -10,13 +10,15 @@ The app has four areas: **Load** (training), **Refuel** (meals and hydration), *
 - Brand kit: `assets/brand/source/` (SVG originals) and `src/lib/brand-tokens.json`, the source of truth for colors and type
 - Theme: `src/lib/theme.ts` builds the dark (default) and light themes from the tokens. Users switch in Settings → Appearance.
 - Fonts: Inter (body) and Inter Tight 600 (display, uppercase), bundled with the app; all numbers use tabular figures
-- Icons: `assets/icon.png` (iOS, from `app-icon-dark`), `assets/android-icon-foreground.png`, `assets/splash-icon.png`, `assets/favicon.png`
+- Icons: `assets/icon.png` (iOS, from `app-icon-dark`), `assets/splash-icon.png`, `assets/favicon.png`
 
 ## What it does
 
 **Athlete mode**
 - Builds a weight-training program from your position, lifting experience, time of year (off-season, preseason, in-season or post-season) and your weekly volleyball schedule
 - Never lifts on match days, keeps heavy legs away from the day before a match, and spreads sessions out
+- **Pick your lift days**: the app suggests days, and you tap the days you actually lift. Change them anytime under Plan → Edit lift days, no rebuild needed
+- **Season calendar**: mark real match, tournament and day-off dates (with names like "Reno Classic"). When an event lands on a lift day, that week's lift moves to the nearest good day, or a lighter session is swapped in the day before a match, with a note saying what changed. Tap any date to choose its lift yourself
 - Adds injury-prevention work for each position (shoulders for hitters, knees for middles, hands and wrists for setters, ankles and low positions for liberos)
 - Today screen: today's lift, today's fuel targets and the week at a glance
 - Logs workouts set by set and pre-fills the weight you used last time
@@ -26,6 +28,8 @@ The app has four areas: **Load** (training), **Refuel** (meals and hydration), *
 **Coach mode (teams)**
 - Create teams (for example Varsity and JV). Each team gets a 6-character join code.
 - Build one workout per team and tap **Post**. Every athlete on the roster gets it. Edit later and post again to update everyone.
+- The coach sets the team's lift days and season calendar (match and tournament dates). Athletes see them read-only.
+- **QR code invites**: Team → Show QR code. Athletes scan it with the iPhone Camera; it opens the app's join page with the team code filled in. Before the App Store launch it opens the browser version; afterward Safari also offers the iPhone app.
 - See the roster, who trained this week, and each athlete's recent lifts and notes.
 
 **Athletes on a team** make an account, enter the team code once, and the team workout becomes their plan. Logged workouts go to the coach. **Solo athletes** can skip accounts and build their own program.
@@ -43,7 +47,22 @@ Team sync needs a free Supabase project. Until you connect one, the app runs in 
 
 What is stored online: name, email, role, position, team membership, posted team workouts, and the workouts athletes log for a team. Body weight, touch height and fuel targets stay on the phone. Coaches see only their own teams; athletes see only their team's workout and their coach's name. Check with your district before collecting student data, especially for athletes under 13.
 
-The claude.ai preview link can't reach Supabase, so it always runs in demo mode. Use the app in Expo Go or a hosted website (`npm run build:web`) for live sync.
+The claude.ai preview link can't reach Supabase, so it always runs in demo mode. Use the app in Expo Go or the GitHub Pages site for live sync.
+
+## Browser version on GitHub Pages
+
+The repository includes `.github/workflows/deploy-web.yml`, which builds the browser version and publishes it every time you push to `main`. Team QR codes point at this site.
+
+1. Create a free GitHub account and a new repository (for example `load-and-launch`), and push this project to it.
+2. In the repository: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+3. **Settings → Secrets and variables → Actions → New repository secret**: add `SUPABASE_URL` and `SUPABASE_ANON_KEY` (same values as your `.env`). Skip this to publish in demo mode.
+4. Push to `main` (or open **Actions → Deploy web app → Run workflow**). The site appears at `https://<your-username>.github.io/load-and-launch/`.
+5. Put that address in `.env` as `EXPO_PUBLIC_APP_URL` (and in the EAS build settings) so QR codes in the iPhone app point to it. The GitHub build sets it automatically.
+6. After the App Store launch, add a repository **variable** `APP_STORE_ID` (the number in your App Store link) so Safari shows a "Get the app" banner on the site.
+
+**Using your own domain** (for example `https://lift.yourschool.org`): add the domain under Settings → Pages, then add two repository variables: `APP_URL` set to the full address, and `BASE_PATH` set to `/`.
+
+To build the site yourself: `EXPO_BASE_URL=/load-and-launch npm run build:web`, then upload `dist/`.
 
 ---
 
@@ -110,6 +129,11 @@ As you edit the code, the app on your phone refreshes on its own.
 src/app/            Screens (each file is a screen)
   (tabs)/           index = Load (Team for coaches), fuel = Refuel, program = Plan, progress = Launch
   onboarding.tsx    First-launch setup
+  calendar.tsx      Season calendar (dates, per-date lift choices)
+  schedule.tsx      Edit lift days (the usual week)
+  team/[id].tsx     A coach's team: code, workout, roster, recent lifts
+  invite.tsx        Team QR code
+  join.tsx          Join a team (opened by QR links: /join?code=…)
   builder.tsx       Build or rebuild a program
   session.tsx       Edit a session's exercises
   workout.tsx       Log a workout
@@ -117,6 +141,8 @@ src/app/            Screens (each file is a screen)
   settings.tsx
 src/lib/
   generator.ts      Program-building rules (scheduling, phases, positions)
+  calendar.ts       Real-date plan: calendar events, automatic lift moves, overrides
+  team.tsx          Team sync (backend/ has the Supabase and demo-mode versions)
   exercises.ts      Exercise library
   nutrition.ts      Fuel guidance by day type
   store.tsx         On-device storage
@@ -125,7 +151,6 @@ src/components/     Shared UI pieces (ui.tsx holds the brand Text, buttons, logo
 ```
 
 ## Ideas for version 2
-- Accounts and live sync, so coaches see athletes' logs (would need a free Supabase or Firebase backend)
 - Multi-week progression (for example, adding weight automatically week to week)
 - Exercise demo videos
-- Calendar with real dates for matches and tournaments
+- Season phases by date (switch from preseason to in-season lifting automatically)

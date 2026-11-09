@@ -3,9 +3,9 @@ import { View } from 'react-native';
 import ScreenHeader from '../../components/ScreenHeader';
 import { Body, Card, Chip, ChipRow, colors, H2, Label, Row, Screen, Text } from '../../components/ui';
 import { FOOD_IDEAS, fuelDay, fuelTargets, NUTRITION_DISCLAIMER } from '../../lib/nutrition';
+import { addDays, dayTypeOn, planForDate, today } from '../../lib/calendar';
 import { useStore } from '../../lib/store';
 import type { DayType } from '../../lib/types';
-import { weekdayIndex } from '../../lib/util';
 
 const OPTIONS: { id: string; day: DayType; lift: boolean; label: string }[] = [
   { id: 'rest', day: 'off', lift: false, label: 'Rest' },
@@ -19,14 +19,15 @@ const OPTIONS: { id: string; day: DayType; lift: boolean; label: string }[] = [
 export default function Refuel() {
   const { data, activeProgram } = useStore();
   const coach = data.profile?.role === 'coach';
-  const i = weekdayIndex();
-  const todayDay = activeProgram?.volleyballWeek[i] ?? 'practice';
-  const todayLift = !!activeProgram?.liftSchedule[i];
+  const day = today();
+  const todayPlan = activeProgram ? planForDate(activeProgram, day) : null;
+  const todayDay = todayPlan?.dayType ?? 'practice';
+  const todayLift = !!todayPlan?.sessionId;
   const todayId =
     OPTIONS.find((o) => o.day === todayDay && (o.day === 'game' || o.day === 'tournament' || o.lift === todayLift))?.id ?? 'practice';
   const [sel, setSel] = useState(todayId);
   const opt = OPTIONS.find((o) => o.id === sel)!;
-  const nextDay = activeProgram?.volleyballWeek[(i + 1) % 7];
+  const nextDay = activeProgram ? dayTypeOn(activeProgram, addDays(day, 1)) : undefined;
   const matchTomorrow = !coach && sel === todayId && (nextDay === 'game' || nextDay === 'tournament');
   const fuel = fuelDay(opt.day, opt.lift, matchTomorrow);
   const targets = coach ? null : fuelTargets(fuel, data.profile?.bodyWeightLb ?? null);

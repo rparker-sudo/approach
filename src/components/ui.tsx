@@ -254,6 +254,7 @@ export function Chip({ label, selected, onPress }: { label: string; selected: bo
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
+      aria-selected={selected}
       onPress={onPress}
       style={{
         paddingHorizontal: 14,
@@ -290,6 +291,7 @@ export function OptionCard({
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
+      aria-selected={selected}
       onPress={onPress}
       style={{
         flexDirection: 'row',

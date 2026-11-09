@@ -3,6 +3,7 @@ import { Pressable, View } from 'react-native';
 import ProgramDetail from '../../components/ProgramDetail';
 import ScreenHeader from '../../components/ScreenHeader';
 import { Body, Button, Card, colors, H2, Icon, Label, NetTape, Pill, Row, Screen } from '../../components/ui';
+import { formatKey, today, upcomingEvents } from '../../lib/calendar';
 import { useStore } from '../../lib/store';
 import { teamProgramId, useTeams } from '../../lib/team';
 import { formatDate } from '../../lib/util';
@@ -62,10 +63,20 @@ export default function ProgramTab() {
   }
 
   const others = data.programs.filter((p) => p.id !== activeProgram?.id);
+  const nextEvent = activeProgram ? upcomingEvents(activeProgram, today(), 1)[0] : undefined;
   const waitingForCoach = teams.length > 0 && !data.programs.some((p) => p.teamId);
   return (
     <Screen tab>
-      <ScreenHeader title="Plan" subtitle={teams.length ? teams.map((t) => t.name).join(' · ') : 'Season, week, and match days'} />
+      <ScreenHeader
+        title="Plan"
+        subtitle={
+          nextEvent
+            ? `Next: ${nextEvent.type === 'tournament' ? 'Tournament' : 'Match'} ${formatKey(nextEvent.date)}`
+            : teams.length
+              ? teams.map((t) => t.name).join(' · ')
+              : 'Season, week, and match days'
+        }
+      />
       {waitingForCoach ? (
         <Card>
           <NetTape />

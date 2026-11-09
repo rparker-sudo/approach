@@ -1,8 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Body, Button, Card, Chip, ChipRow, Field, H2, Label, Screen } from '../components/ui';
-import { LiftDaysPicker, WeekEditor } from '../components/week';
-import { generateProgram } from '../lib/generator';
+import { LiftDayPicker, WeekEditor } from '../components/week';
+import { generateProgram, pickLiftDays } from '../lib/generator';
 import { useStore } from '../lib/store';
 import { teamProgramId, useTeams } from '../lib/team';
 import type { DayType, Experience, Phase, ProgramPosition } from '../lib/types';
@@ -27,10 +27,21 @@ function BuilderForm() {
   const [position, setPosition] = useState<ProgramPosition>(existing?.position ?? (team ? 'All positions' : profile.position));
   const [phase, setPhase] = useState<Phase>(existing?.phase ?? profile.phase);
   const [experience, setExperience] = useState<Experience>(existing?.experience ?? profile.experience);
-  const [week, setWeek] = useState<DayType[]>(existing?.volleyballWeek ?? profile.volleyballWeek);
-  const [liftDays, setLiftDays] = useState(
-    existing ? existing.liftSchedule.filter(Boolean).length || 2 : profile.liftDaysPerWeek,
-  );
+  const [week, setWeekState] = useState<DayType[]>(existing?.volleyballWeek ?? profile.volleyballWeek);
+  const [liftDays, setLiftDaysState] = useState<number[]>(() => {
+    if (existing) return existing.liftSchedule.map((s, i) => (s ? i : -1)).filter((i) => i >= 0);
+    return profile.liftDays?.length ? profile.liftDays : pickLiftDays(week, profile.liftDaysPerWeek);
+  });
+  // Until the user taps a day, changing the volleyball week re-suggests lift days.
+  const [daysTouched, setDaysTouched] = useState(!!existing || !!profile.liftDays?.length);
+  const setLiftDays = (d: number[]) => {
+    setDaysTouched(true);
+    setLiftDaysState(d);
+  };
+  const setWeek = (w: DayType[]) => {
+    setWeekState(w);
+    if (!daysTouched) setLiftDaysState(pickLiftDays(w, liftDays.length || 2));
+  };
   const positionChoices: ProgramPosition[] = team || coach ? ['All positions', ...POSITIONS] : POSITIONS;
 
   function build() {
@@ -42,16 +53,22 @@ function BuilderForm() {
       phase,
       experience,
       volleyballWeek: week,
-      liftDaysPerWeek: liftDays,
+      liftDaysPerWeek: liftDays.length,
+      liftDays,
     });
     let program = existing ? { ...generated, id: existing.id } : generated;
+    if (existing) {
+      // Keep the season calendar. Date choices that pointed at old sessions go back to automatic; chosen rest days stay.
+      const overrides = Object.fromEntries(Object.entries(existing.overrides ?? {}).filter(([, v]) => v === null));
+      program = { ...program, events: existing.events, overrides };
+    }
     if (team) {
       // The coach's working copy of the team workout. Posting sends it to the roster.
       program = { ...program, id: teamProgramId(team.id), teamId: team.id, teamName: team.name, postedAt: existing?.postedAt, unposted: true };
     }
     saveProgram(program, !coach);
     if (!coach) {
-      setProfile({ ...profile, position: position === 'All positions' ? profile.position : position, phase, experience, volleyballWeek: week, liftDaysPerWeek: liftDays });
+      setProfile({ ...profile, position: position === 'All positions' ? profile.position : position, phase, experience, volleyballWeek: week, liftDaysPerWeek: liftDays.length, liftDays });
     }
     router.back();
     if (coach && !existing && !team) router.push(`/program/${program.id}`);
@@ -104,11 +121,16 @@ function BuilderForm() {
       </Card>
 
       <Card>
-        <H2>Lift days per week</H2>
-        <LiftDaysPicker value={liftDays} onChange={setLiftDays} />
+        <H2>Lift days</H2>
+        <LiftDayPicker week={week} value={liftDays} onChange={setLiftDays} />
       </Card>
 
-      <Button title={existing ? 'Rebuild program' : team ? 'Build team workout' : 'Build program'} icon="wand.and.stars" onPress={build} />
+      <Button
+        title={existing ? 'Rebuild program' : team ? 'Build team workout' : 'Build program'}
+        icon="wand.and.stars"
+        disabled={liftDays.length === 0}
+        onPress={build}
+      />
     </Screen>
   );
 }

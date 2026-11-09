@@ -146,6 +146,7 @@ export default function Workout() {
                 <Pressable
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: s.done }}
+                  aria-checked={s.done}
                   accessibilityLabel={`Set ${si + 1} done`}
                   onPress={() => {
                     setSet(ei, si, { done: !s.done });

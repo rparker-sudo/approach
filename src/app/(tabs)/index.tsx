@@ -18,6 +18,7 @@ import {
   Screen,
   Text,
 } from '../../components/ui';
+import { addDays, dayTypeOn, isHeavyLegs, mondayOf, today, weekPlan } from '../../lib/calendar';
 import { getExercise } from '../../lib/exercises';
 import { captainLine, dayAdvice } from '../../lib/generator';
 import { fuelDay, fuelTargets } from '../../lib/nutrition';
@@ -71,29 +72,31 @@ function Today() {
     );
   }
 
-  const vb = activeProgram.volleyballWeek[i];
-  const sessionId = activeProgram.liftSchedule[i];
-  const session = activeProgram.sessions.find((s) => s.id === sessionId);
-  const heavy = !!session?.exercises.some((e) => getExercise(e.exerciseId).category === 'lower');
-  const advice = dayAdvice(activeProgram.volleyballWeek, i, !!session, heavy);
-  const nextVb = activeProgram.volleyballWeek[(i + 1) % 7];
+  // Real dates: the season calendar and automatic lift moves apply.
+  const day = today();
+  const week = weekPlan(activeProgram, mondayOf(day));
+  const todayPlan = week[i];
+  const vb = todayPlan.dayType;
+  const session = activeProgram.sessions.find((s) => s.id === todayPlan.sessionId);
+  const advice = todayPlan.note ?? dayAdvice(week.map((p) => p.dayType), i, !!session, isHeavyLegs(session));
+  const nextVb = dayTypeOn(activeProgram, addDays(day, 1));
   const fuel = fuelDay(vb, !!session, nextVb === 'game' || nextVb === 'tournament');
   const targets = fuelTargets(fuel, profile.bodyWeightLb);
 
   const weekStart = startOfWeek();
   const doneThisWeek = data.logs.filter((l) => new Date(l.date) >= weekStart && l.programId === activeProgram.id);
   const doneToday = doneThisWeek.some((l) => new Date(l.date).toDateString() === now.toDateString());
-  const planned = activeProgram.liftSchedule.filter(Boolean).length;
+  const planned = week.filter((p) => p.sessionId).length;
 
   return (
     <Screen tab>
       <ScreenHeader title="Load" subtitle={dateLine} />
-      <Text style={{ fontSize: 20, fontWeight: '600' }}>{captainLine(activeProgram, i)}</Text>
+      <Text style={{ fontSize: 20, fontWeight: '600' }}>{captainLine(activeProgram, day)}</Text>
 
       <Card>
         <Row style={{ justifyContent: 'space-between' }}>
           <Label>Today</Label>
-          <Pill text={DAY_TYPES.find((d) => d.id === vb)!.label} bg={colors.day[vb]} />
+          <Pill text={todayPlan.event?.label ?? DAY_TYPES.find((d) => d.id === vb)!.label} bg={colors.day[vb]} />
         </Row>
         {session ? (
           <>
@@ -153,7 +156,7 @@ function Today() {
         <Label>This week</Label>
         <Row style={{ gap: 6 }}>
           {WEEKDAYS.map((d, k) => {
-            const lift = !!activeProgram.liftSchedule[k];
+            const lift = !!week[k].sessionId;
             const date = new Date(weekStart);
             date.setDate(weekStart.getDate() + k);
             const done = doneThisWeek.some((l) => new Date(l.date).toDateString() === date.toDateString());

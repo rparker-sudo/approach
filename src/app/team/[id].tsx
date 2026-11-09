@@ -75,14 +75,24 @@ export default function TeamScreen() {
           {team.joinCode}
         </Text>
         <Text style={{ fontSize: 13, color: colors.muted, textAlign: 'center' }}>
-          Athletes make an account and enter this code to join.
+          Athletes scan the QR code, or make an account and enter this code.
         </Text>
-        <Button
-          kind="secondary"
-          title="Invite athletes"
-          icon="square.and.arrow.up"
-          onPress={() => shareTeamInvite(team.name, team.joinCode, t.account?.name)}
-        />
+        <Row>
+          <View style={{ flex: 1 }}>
+            <Button
+              title="Show QR code"
+              onPress={() => router.push({ pathname: '/invite', params: { teamId: team.id } })}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button
+              kind="secondary"
+              title="Share link"
+              icon="square.and.arrow.up"
+              onPress={() => shareTeamInvite(team.name, team.joinCode, t.account?.name)}
+            />
+          </View>
+        </Row>
       </Card>
 
       <View style={{ gap: 8 }}>
@@ -106,6 +116,24 @@ export default function TeamScreen() {
               program={program}
               onPressSession={(sessionId) => router.push({ pathname: '/session', params: { programId: program.id, sessionId } })}
             />
+            <Row>
+              <View style={{ flex: 1 }}>
+                <Button
+                  kind="secondary"
+                  title="Season calendar"
+                  icon="calendar"
+                  onPress={() => router.push({ pathname: '/calendar', params: { programId: program.id } })}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  kind="secondary"
+                  title="Lift days"
+                  icon="dumbbell"
+                  onPress={() => router.push({ pathname: '/schedule', params: { programId: program.id } })}
+                />
+              </View>
+            </Row>
             <Button
               kind="ghost"
               title="Change schedule & rebuild"

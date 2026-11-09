@@ -1,15 +1,15 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Body, Button, Card, colors, Field, H1, H2, Label, OptionCard, Screen, Lockup, NetTape } from '../components/ui';
+import { Body, Button, Card, colors, Field, H1, H2, Label, Lockup, NetTape, Note, OptionCard, Screen } from '../components/ui';
 import AccountForm from '../components/AccountForm';
 import JoinTeamForm from '../components/JoinTeamForm';
-import { LiftDaysPicker, WeekEditor } from '../components/week';
+import { LiftDayPicker, WeekEditor } from '../components/week';
 import type { Team } from '../lib/backend';
 import { backend } from '../lib/backend';
 import { useTeams } from '../lib/team';
-import { generateProgram } from '../lib/generator';
+import { generateProgram, pickLiftDays } from '../lib/generator';
 import { useStore } from '../lib/store';
 import type { DayType, Experience, Phase, Position, Role } from '../lib/types';
 import { EXPERIENCE, PHASES, POSITIONS } from '../lib/types';
@@ -24,7 +24,8 @@ function useOnboardingAccount() {
   };
 }
 
-const DEFAULT_WEEK: DayType[] = ['practice', 'practice', 'game', 'practice', 'off', 'tournament', 'off'];
+// Practices only. Matches and tournaments go on the season calendar by date, since they change week to week.
+const DEFAULT_WEEK: DayType[] = ['practice', 'practice', 'practice', 'practice', 'practice', 'off', 'off'];
 
 type Step = 'role' | 'account' | 'join' | 'name' | 'position' | 'level' | 'week' | 'weight';
 
@@ -32,14 +33,25 @@ export default function Onboarding() {
   const { setProfile, saveProgram } = useStore();
   const { account, updatePosition } = useOnboardingAccount();
   const [stepIndex, setStepIndex] = useState(0);
-  const [role, setRole] = useState<Role | null>(null);
+  const { code: linkCode } = useLocalSearchParams<{ code?: string }>();
+  // Opened from a team QR code/link: they're an athlete joining that team.
+  const [role, setRole] = useState<Role | null>(linkCode ? 'athlete' : null);
   const [team, setTeam] = useState<Team | null>(null);
   const [name, setName] = useState('');
   const [position, setPosition] = useState<Position | null>(null);
   const [experience, setExperience] = useState<Experience>('beginner');
   const [phase, setPhase] = useState<Phase>('in');
-  const [week, setWeek] = useState<DayType[]>(DEFAULT_WEEK);
-  const [liftDays, setLiftDays] = useState(2);
+  const [week, setWeekState] = useState<DayType[]>(DEFAULT_WEEK);
+  const [liftDays, setLiftDaysState] = useState<number[]>(() => pickLiftDays(DEFAULT_WEEK, 2));
+  const [daysTouched, setDaysTouched] = useState(false);
+  const setLiftDays = (d: number[]) => {
+    setDaysTouched(true);
+    setLiftDaysState(d);
+  };
+  const setWeek = (w: DayType[]) => {
+    setWeekState(w);
+    if (!daysTouched) setLiftDaysState(pickLiftDays(w, liftDays.length || 2));
+  };
   const [weight, setWeight] = useState('');
 
   const effectiveRole: Role | null = account?.role ?? role;
@@ -71,7 +83,8 @@ export default function Onboarding() {
       experience,
       phase,
       bodyWeightLb: Number.isFinite(bw) && bw > 0 ? bw : null,
-      liftDaysPerWeek: liftDays,
+      liftDaysPerWeek: liftDays.length,
+      liftDays,
       volleyballWeek: week,
     };
     setProfile(profile);
@@ -80,7 +93,7 @@ export default function Onboarding() {
       // Team athletes follow the coach's posted workout. Solo athletes get their own program.
       if (!team) {
         saveProgram(
-          generateProgram({ position: profile.position, phase, experience, volleyballWeek: week, liftDaysPerWeek: liftDays }),
+          generateProgram({ position: profile.position, phase, experience, volleyballWeek: week, liftDaysPerWeek: liftDays.length, liftDays }),
           true,
         );
       }
@@ -93,7 +106,7 @@ export default function Onboarding() {
     (step === 'name' && name.trim().length > 0) ||
     (step === 'position' && !!position) ||
     step === 'level' ||
-    step === 'week' ||
+    (step === 'week' && liftDays.length > 0) ||
     step === 'weight';
 
   return (
@@ -109,6 +122,7 @@ export default function Onboarding() {
                   Lifting and fuel built around your volleyball week.
                 </Body>
               </View>
+              {linkCode ? <Note>{`You're joining a team (code ${linkCode.toUpperCase()}). Choose athlete, then make your account.`}</Note> : null}
               <Label>Who are you?</Label>
               <OptionCard
                 icon="dumbbell"
@@ -163,7 +177,7 @@ export default function Onboarding() {
                   {team.coachName ? <Body muted>Coach {team.coachName}</Body> : null}
                 </Card>
               ) : (
-                <JoinTeamForm onJoined={(t) => setTeam(t)} />
+                <JoinTeamForm onJoined={(t) => setTeam(t)} initialCode={linkCode} autoJoin={!!linkCode} />
               )}
               <Button kind={team ? 'primary' : 'ghost'} title={team ? 'Next' : 'Skip for now'} onPress={next} />
             </>
@@ -204,17 +218,17 @@ export default function Onboarding() {
             <>
               <H1>Your volleyball week</H1>
               <Body muted>
-                Set a typical week. Lifting days are planned around it: no lifting on match days and no heavy legs the day
-                before.
+                Set your usual practice week. Add match and tournament dates on the season calendar later; lifts move
+                around them automatically. Only mark a match here if it's the same night every week.
               </Body>
               <Card>
                 <WeekEditor value={week} onChange={setWeek} />
               </Card>
               <Card>
-                <H2>How many days a week can you lift?</H2>
-                <LiftDaysPicker value={liftDays} onChange={setLiftDays} />
+                <H2>Which days can you lift?</H2>
+                <LiftDayPicker week={week} value={liftDays} onChange={setLiftDays} />
                 <Body muted style={{ fontSize: 13 }}>
-                  In-season, 2 days is usually right. Off-season, 3–4.
+                  In-season, 2 days is usually right. Off-season, 3–4. You can change days anytime.
                 </Body>
               </Card>
             </>

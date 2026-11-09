@@ -9,6 +9,7 @@ import type {
   Session,
 } from './types';
 import { PHASES } from './types';
+import { addDays, dayTypeOn, planForDate } from './calendar';
 import { uid } from './util';
 
 export type GeneratorInput = {
@@ -20,9 +21,14 @@ export type GeneratorInput = {
   experience: Experience;
   volleyballWeek: DayType[];
   liftDaysPerWeek: number;
+  /** Weekdays to lift on (Monday = 0). When missing, the best days are picked automatically. */
+  liftDays?: number[];
 };
 
 const isMatch = (d: DayType) => d === 'game' || d === 'tournament';
+
+/** Each season phase has 4 session templates. */
+export const MAX_LIFT_DAYS = 4;
 
 /**
  * Pick which weekdays to lift on, working around the volleyball week:
@@ -316,7 +322,9 @@ const POSITION_EXTRAS: Record<ProgramPosition, ProgramExercise[]> = {
 };
 
 export function generateProgram(input: GeneratorInput): Program {
-  const days = pickLiftDays(input.volleyballWeek, input.liftDaysPerWeek);
+  const days = input.liftDays?.length
+    ? [...new Set(input.liftDays)].filter((d) => d >= 0 && d < 7).sort((a, b) => a - b).slice(0, MAX_LIFT_DAYS)
+    : pickLiftDays(input.volleyballWeek, input.liftDaysPerWeek);
   const templates = phaseTemplates(input.phase).slice(0, Math.max(days.length, 1));
 
   const sessions: Session[] = templates.map((t) => {
@@ -383,18 +391,18 @@ export function dayAdvice(week: DayType[], i: number, liftsToday: boolean, heavy
   return null;
 }
 
-/** One short line for the top of the Load screen, in the brand voice. */
-export function captainLine(program: Program, i: number): string {
-  const week = program.volleyballWeek;
-  const session = program.sessions.find((s) => s.id === program.liftSchedule[i]);
-  if (isMatch(week[i])) return week[i] === 'tournament' ? 'Tournament day. Fuel early, fuel often.' : 'Match day. Trust the work.';
+/** One short line for the top of the Load screen, in the brand voice. Uses real calendar dates. */
+export function captainLine(program: Program, date: Date): string {
+  const today = planForDate(program, date);
+  const session = program.sessions.find((s) => s.id === today.sessionId);
+  if (isMatch(today.dayType)) return today.dayType === 'tournament' ? 'Tournament day. Fuel early, fuel often.' : 'Match day. Trust the work.';
   if (session) {
     const legs = session.exercises.some((e) => ['back-squat', 'front-squat', 'goblet-squat', 'trap-bar-deadlift', 'split-squat', 'rdl', 'db-rdl', 'step-up', 'hip-thrust'].includes(e.exerciseId));
     const sets = session.exercises[0] ? session.exercises.find((e) => e.sets >= 3)?.sets ?? session.exercises[0].sets : 3;
     return legs ? `Legs today. ${sets} sets, you've got this.` : `Upper body today. ${sets} sets, stay sharp.`;
   }
   for (let d = 1; d <= 2; d++) {
-    if (isMatch(week[(i + d) % 7])) return d === 1 ? 'Match tomorrow. Carbs tonight.' : 'Match in 2 days. Carbs tonight.';
+    if (isMatch(dayTypeOn(program, addDays(date, d)))) return d === 1 ? 'Match tomorrow. Carbs tonight.' : 'Match in 2 days. Carbs tonight.';
   }
   return 'Recovery day. Sleep is training too.';
 }

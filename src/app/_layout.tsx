@@ -76,6 +76,9 @@ function ThemeStack() {
         <Stack.Screen name="team/[id]" options={{ title: 'Team' }} />
         <Stack.Screen name="join" options={{ title: 'Join a team', presentation: 'modal' }} />
         <Stack.Screen name="account" options={{ title: 'Account', presentation: 'modal' }} />
+        <Stack.Screen name="calendar" options={{ title: 'Season calendar' }} />
+        <Stack.Screen name="invite" options={{ title: 'Invite athletes' }} />
+        <Stack.Screen name="schedule" options={{ title: 'Lift days', presentation: 'modal' }} />
       </Stack>
       <DialogHost />
     </>

@@ -23,6 +23,9 @@ export const BRAND = {
 
 const P = tokens.color.palette;
 
+/** Fixed brand palette (same in both themes). */
+export const PALETTE = P;
+
 function build(mode: ThemeName) {
   const t = tokens.color[mode];
   return {

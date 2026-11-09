@@ -14,14 +14,6 @@
         "CFBundleDisplayName": "Load & Launch"
       }
     },
-    "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#0B0B0C",
-        "foregroundImage": "./assets/android-icon-foreground.png"
-      },
-      "package": "com.loadandlaunch.app",
-      "predictiveBackGestureEnabled": false
-    },
     "web": {
       "favicon": "./assets/favicon.png",
       "name": "Load & Launch",
@@ -53,6 +45,10 @@
       "expo-font"
     ],
     "scheme": "loadandlaunch",
-    "backgroundColor": "#0B0B0C"
+    "backgroundColor": "#0B0B0C",
+    "platforms": [
+      "ios",
+      "web"
+    ]
   }
 }

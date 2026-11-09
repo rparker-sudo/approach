@@ -1,8 +1,8 @@
 // Finishes the mobile-browser build of Load & Launch.
 //
 // Run after `expo export --platform web` (or just `npm run build:web`).
-//  1. dist/            → a normal website folder. Upload it to any static host
-//                         (Netlify Drop, GitHub Pages, Vercel, a school web server).
+//  1. dist/            → a normal website folder for GitHub Pages (or any static host).
+//                         Set EXPO_BASE_URL (e.g. /load-and-launch) when the site lives in a sub-folder.
 //  2. dist-single/load-and-launch.html
 //                       → the whole app in ONE file (scripts, fonts and images
 //                         inlined). Handy for previews and places that only take one file.
@@ -13,6 +13,8 @@ import path from 'node:path';
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const dist = path.join(root, 'dist');
 const singleDir = path.join(root, 'dist-single');
+const base = (process.env.EXPO_BASE_URL || '').replace(/\/+$/, '');
+const appStoreId = process.env.EXPO_PUBLIC_APP_STORE_ID || '';
 
 const HEAD_TAGS = `
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -21,8 +23,10 @@ const HEAD_TAGS = `
     <meta name="apple-mobile-web-app-title" content="Load &amp; Launch" />
     <meta name="application-name" content="Load &amp; Launch" />
     <meta name="color-scheme" content="dark light" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="${base}/apple-touch-icon.png" />
+    <link rel="manifest" href="${base}/manifest.webmanifest" />${
+      appStoreId ? `\n    <meta name="apple-itunes-app" content="app-id=${appStoreId}" />` : ''
+    }
     <style>
       html, body { background: #0B0B0C; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
       input, textarea { font-size: 16px; } /* stops iOS Safari zooming into fields */
@@ -33,7 +37,7 @@ const VIEWPORT =
 
 function patchHead(html) {
   html = html.replace(/<meta name="viewport"[^>]*>/, VIEWPORT);
-  html = html.replace(/<link rel="icon" href="\/favicon.ico"\/>/, '<link rel="icon" href="/favicon.ico" />');
+  html = html.replace(/<link rel="icon" href="[^"]*favicon.ico"\/?>/, `<link rel="icon" href="${base}/favicon.ico" />`);
   if (!html.includes('apple-mobile-web-app-capable')) html = html.replace('</head>', `${HEAD_TAGS}\n  </head>`);
   return html;
 }
@@ -54,7 +58,8 @@ function dataUri(file) {
 }
 
 function fromDist(urlPath) {
-  return path.join(dist, decodeURIComponent(urlPath.replace(/^\//, '')));
+  const p = base && urlPath.startsWith(base + '/') ? urlPath.slice(base.length) : urlPath;
+  return path.join(dist, decodeURIComponent(p.replace(/^\//, '')));
 }
 
 // ---- 1. Patch the website folder ----
@@ -65,7 +70,19 @@ if (!fs.existsSync(indexPath)) {
 }
 let html = patchHead(fs.readFileSync(indexPath, 'utf8'));
 fs.writeFileSync(indexPath, html);
-console.log('✓ dist/ is ready to upload to a static host');
+// GitHub Pages: serve the app for any path (e.g. /join?code=…) and don't hide the _expo folder.
+fs.writeFileSync(path.join(dist, '404.html'), html);
+fs.writeFileSync(path.join(dist, '.nojekyll'), '');
+// The home-screen manifest needs the sub-folder too.
+{
+  const mPath = path.join(dist, 'manifest.webmanifest');
+  const m = JSON.parse(fs.readFileSync(mPath, 'utf8'));
+  m.start_url = `${base}/`;
+  m.scope = `${base}/`;
+  m.icons = m.icons.map((i) => ({ ...i, src: `${base}/${i.src.replace(/^.*\//, '')}` }));
+  fs.writeFileSync(mPath, JSON.stringify(m, null, 2));
+}
+console.log(`✓ dist/ is ready for GitHub Pages${base ? ` at ${base}/` : ''}`);
 
 // ---- 2. Single-file version ----
 let single = html;
@@ -73,7 +90,7 @@ let single = html;
 // Inline scripts, swapping every "/assets/..." URL inside them for a data: URI.
 single = single.replace(/<script src="([^"]+)" defer><\/script>/g, (_, src) => {
   let js = fs.readFileSync(fromDist(src), 'utf8');
-  js = js.replace(/"(\/assets\/[^"]+\.(?:png|jpg|ttf|otf))"/g, (m, url) => {
+  js = js.replace(/"((?:\/[^"\/]+)?\/assets\/[^"]+\.(?:png|jpg|ttf|otf))"/g, (m, url) => {
     const file = fromDist(url);
     return fs.existsSync(file) ? JSON.stringify(dataUri(file)) : m;
   });
@@ -88,10 +105,10 @@ manifest.start_url = '.';
 manifest.scope = '.';
 manifest.icons = manifest.icons.map((i) => ({ ...i, src: dataUri(fromDist(i.src)) }));
 single = single
-  .replace('href="/apple-touch-icon.png"', `href="${dataUri(path.join(dist, 'apple-touch-icon.png'))}"`)
-  .replace('href="/favicon.ico"', `href="${dataUri(path.join(dist, 'favicon.ico'))}"`)
+  .replace(`href="${base}/apple-touch-icon.png"`, `href="${dataUri(path.join(dist, 'apple-touch-icon.png'))}"`)
+  .replace(`href="${base}/favicon.ico"`, `href="${dataUri(path.join(dist, 'favicon.ico'))}"`)
   .replace(
-    'href="/manifest.webmanifest"',
+    `href="${base}/manifest.webmanifest"`,
     `href="data:application/manifest+json;base64,${Buffer.from(JSON.stringify(manifest)).toString('base64')}"`,
   );
 

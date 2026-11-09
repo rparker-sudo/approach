@@ -9,7 +9,6 @@ import { useTeams } from '../lib/team';
 import { formatDate } from '../lib/util';
 import { Body, Button, Card, colors, Label, Pill, Row, Text } from './ui';
 import { ProgramWeek } from './week';
-import { weekdayIndex } from '../lib/util';
 
 export default function ProgramDetail({ program, afterDelete }: { program: Program; afterDelete?: () => void }) {
   const { data, setActiveProgram, deleteProgram } = useStore();
@@ -47,13 +46,26 @@ export default function ProgramDetail({ program, afterDelete }: { program: Progr
       </View>
       <ProgramWeek
         program={program}
-        highlight={coach ? undefined : weekdayIndex()}
         onPressSession={(sessionId) => router.push({ pathname: '/session', params: { programId: program.id, sessionId } })}
       />
 
       <Card>
         {!coach && !isActive ? (
           <Button title={team ? 'Follow team plan' : 'Use this program'} icon="checkmark" onPress={() => setActiveProgram(program.id)} />
+        ) : null}
+        <Button
+          kind="secondary"
+          title="Season calendar"
+          icon="calendar"
+          onPress={() => router.push({ pathname: '/calendar', params: { programId: program.id } })}
+        />
+        {!readOnly ? (
+          <Button
+            kind="ghost"
+            title="Edit lift days"
+            icon="dumbbell"
+            onPress={() => router.push({ pathname: '/schedule', params: { programId: program.id } })}
+          />
         ) : null}
         {coach && team && program.unposted ? (
           <Button

@@ -2,7 +2,8 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { weekStart } from '../../components/TeamHome';
-import { Body, Button, Card, colors, display, Field, H2, Label, Pill, Row, Text } from '../../components/ui';
+import { Body, Button, Card, colors, display, Field, H2, Label, Note, Pill, Row, Text } from '../../components/ui';
+import { isDemoMode } from '../../lib/backend';
 import { ProgramWeek } from '../../components/week';
 import { showAlert } from '../../lib/dialog';
 import { shareTeamInvite } from '../../lib/share';
@@ -77,6 +78,7 @@ export default function TeamScreen() {
         <Text style={{ fontSize: 13, color: colors.muted, textAlign: 'center' }}>
           Athletes scan the QR code, or make an account and enter this code.
         </Text>
+        {isDemoMode ? <Note>Demo mode: athletes on other phones can't join yet. Connect Supabase first (see the README).</Note> : null}
         <Row>
           <View style={{ flex: 1 }}>
             <Button

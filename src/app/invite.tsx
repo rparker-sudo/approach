@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { ScrollView, useWindowDimensions, View } from 'react-native';
 import QRCode from '../components/QRCode';
 import { Body, Button, Card, colors, display, H2, Note, Text } from '../components/ui';
+import { isDemoMode } from '../lib/backend';
 import { joinUrl } from '../lib/links';
 import { shareTeamInvite } from '../lib/share';
 import { useTeams } from '../lib/team';
@@ -23,6 +24,11 @@ export default function InviteScreen() {
       contentInsetAdjustmentBehavior="automatic"
     >
       <Stack.Screen options={{ title: `Join ${team.name}` }} />
+      {isDemoMode ? (
+        <View style={{ alignSelf: 'stretch' }}>
+          <Note>Demo mode: athletes on other phones can't join yet. Connect Supabase first (see the README).</Note>
+        </View>
+      ) : null}
       {link ? (
         <>
           <Text style={[display(20), { textAlign: 'center' }]}>{team.name}</Text>

@@ -52,6 +52,9 @@ export default function Settings() {
 
       <Card>
         <H2>Account</H2>
+        <Text style={{ fontSize: 13, color: isDemoMode ? colors.warning : colors.muted }}>
+          {isDemoMode ? 'Team sync: Demo mode (this device only)' : 'Team sync: On'}
+        </Text>
         {account ? (
           <>
             <Body muted>

@@ -33,6 +33,13 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Check team sync keys
+        run: |
+          if [ -n "$EXPO_PUBLIC_SUPABASE_URL" ] && [ -n "$EXPO_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "Team sync keys found: the site will use Supabase."
+          else
+            echo "::warning::SUPABASE_URL or SUPABASE_ANON_KEY secret is missing, so the site runs in demo mode."
+          fi
       - run: npx expo export --platform web --clear
       - run: node scripts/postbuild-web.mjs
       - uses: actions/upload-pages-artifact@v3

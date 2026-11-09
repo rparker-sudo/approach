@@ -189,7 +189,11 @@ export const localBackend: Backend = {
   async joinTeam(code) {
     const { db, user } = await me();
     const team = db.teams.find((t) => t.joinCode === normalizeCode(code));
-    if (!team) throw new BackendError('No team has that code. Check it with your coach.');
+    if (!team) {
+      throw new BackendError(
+        "Teams aren't shared between phones yet: this app is in demo mode. Ask your coach to connect team sync (Supabase), then try the code again.",
+      );
+    }
     if (!db.members.some((m) => m.teamId === team.id && m.userId === user.id)) {
       db.members.push({ teamId: team.id, userId: user.id, joinedAt: new Date().toISOString() });
       await save(db);

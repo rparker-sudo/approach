@@ -9,9 +9,11 @@ import { LiftDayPicker, WeekEditor } from '../components/week';
 import type { Team } from '../lib/backend';
 import { backend } from '../lib/backend';
 import { useTeams } from '../lib/team';
+import EquipmentPicker from '../components/EquipmentPicker';
+import { ALL_EQUIPMENT } from '../lib/exercises';
 import { generateProgram, pickLiftDays } from '../lib/generator';
 import { useStore } from '../lib/store';
-import type { DayType, Experience, Phase, Position, Role } from '../lib/types';
+import type { DayType, Equipment, Experience, Phase, Position, Role } from '../lib/types';
 import { EXPERIENCE, PHASES, POSITIONS } from '../lib/types';
 
 function useOnboardingAccount() {
@@ -43,6 +45,7 @@ export default function Onboarding() {
   const [phase, setPhase] = useState<Phase>('in');
   const [week, setWeekState] = useState<DayType[]>(DEFAULT_WEEK);
   const [liftDays, setLiftDaysState] = useState<number[]>(() => pickLiftDays(DEFAULT_WEEK, 2));
+  const [equipment, setEquipment] = useState<Equipment[]>(ALL_EQUIPMENT);
   const [daysTouched, setDaysTouched] = useState(false);
   const setLiftDays = (d: number[]) => {
     setDaysTouched(true);
@@ -86,6 +89,7 @@ export default function Onboarding() {
       liftDaysPerWeek: liftDays.length,
       liftDays,
       volleyballWeek: week,
+      equipment,
     };
     setProfile(profile);
     if (r === 'athlete') {
@@ -93,7 +97,7 @@ export default function Onboarding() {
       // Team athletes follow the coach's posted workout. Solo athletes get their own program.
       if (!team) {
         saveProgram(
-          generateProgram({ position: profile.position, phase, experience, volleyballWeek: week, liftDaysPerWeek: liftDays.length, liftDays }),
+          generateProgram({ position: profile.position, phase, experience, volleyballWeek: week, liftDaysPerWeek: liftDays.length, liftDays, equipment }),
           true,
         );
       }
@@ -226,10 +230,14 @@ export default function Onboarding() {
               </Card>
               <Card>
                 <H2>Which days can you lift?</H2>
-                <LiftDayPicker week={week} value={liftDays} onChange={setLiftDays} />
+                <LiftDayPicker week={week} value={liftDays} onChange={setLiftDays} phase={phase} />
                 <Body muted style={{ fontSize: 13 }}>
                   In-season, 2 days is usually right. Off-season, 3–4. You can change days anytime.
                 </Body>
+              </Card>
+              <Card>
+                <H2>What's in your gym?</H2>
+                <EquipmentPicker value={equipment} onChange={setEquipment} />
               </Card>
             </>
           )}

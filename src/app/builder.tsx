@@ -2,10 +2,12 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Body, Button, Card, Chip, ChipRow, Field, H2, Label, Screen } from '../components/ui';
 import { LiftDayPicker, WeekEditor } from '../components/week';
+import EquipmentPicker from '../components/EquipmentPicker';
+import { ALL_EQUIPMENT } from '../lib/exercises';
 import { generateProgram, pickLiftDays } from '../lib/generator';
 import { useStore } from '../lib/store';
 import { teamProgramId, useTeams } from '../lib/team';
-import type { DayType, Experience, Phase, ProgramPosition } from '../lib/types';
+import type { DayType, Equipment, Experience, Phase, ProgramPosition } from '../lib/types';
 import { EXPERIENCE, PHASES, POSITIONS } from '../lib/types';
 
 export default function Builder() {
@@ -33,6 +35,7 @@ function BuilderForm() {
     return profile.liftDays?.length ? profile.liftDays : pickLiftDays(week, profile.liftDaysPerWeek);
   });
   // Until the user taps a day, changing the volleyball week re-suggests lift days.
+  const [equipment, setEquipment] = useState<Equipment[]>(existing?.equipment ?? profile.equipment ?? ALL_EQUIPMENT);
   const [daysTouched, setDaysTouched] = useState(!!existing || !!profile.liftDays?.length);
   const setLiftDays = (d: number[]) => {
     setDaysTouched(true);
@@ -55,20 +58,22 @@ function BuilderForm() {
       volleyballWeek: week,
       liftDaysPerWeek: liftDays.length,
       liftDays,
+      equipment,
     });
     let program = existing ? { ...generated, id: existing.id } : generated;
     if (existing) {
       // Keep the season calendar. Date choices that pointed at old sessions go back to automatic; chosen rest days stay.
       const overrides = Object.fromEntries(Object.entries(existing.overrides ?? {}).filter(([, v]) => v === null));
-      program = { ...program, events: existing.events, overrides };
+      program = { ...program, events: existing.events, overrides, lightDates: existing.lightDates };
     }
     if (team) {
       // The coach's working copy of the team workout. Posting sends it to the roster.
       program = { ...program, id: teamProgramId(team.id), teamId: team.id, teamName: team.name, postedAt: existing?.postedAt, unposted: true };
     }
     saveProgram(program, !coach);
+    if (coach) setProfile({ ...profile, equipment });
     if (!coach) {
-      setProfile({ ...profile, position: position === 'All positions' ? profile.position : position, phase, experience, volleyballWeek: week, liftDaysPerWeek: liftDays.length, liftDays });
+      setProfile({ ...profile, position: position === 'All positions' ? profile.position : position, phase, experience, volleyballWeek: week, liftDaysPerWeek: liftDays.length, liftDays, equipment });
     }
     router.back();
     if (coach && !existing && !team) router.push(`/program/${program.id}`);
@@ -121,8 +126,13 @@ function BuilderForm() {
       </Card>
 
       <Card>
+        <H2>What's in your gym?</H2>
+        <EquipmentPicker value={equipment} onChange={setEquipment} />
+      </Card>
+
+      <Card>
         <H2>Lift days</H2>
-        <LiftDayPicker week={week} value={liftDays} onChange={setLiftDays} />
+        <LiftDayPicker week={week} value={liftDays} onChange={setLiftDays} phase={phase} />
       </Card>
 
       <Button

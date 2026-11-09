@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { showAlert } from '../lib/dialog';
 import { View } from 'react-native';
+import { blockInfo } from '../lib/progression';
 import { useStore } from '../lib/store';
 import type { Program } from '../lib/types';
 import { EXPERIENCE, PHASES } from '../lib/types';
@@ -25,6 +26,7 @@ export default function ProgramDetail({ program, afterDelete }: { program: Progr
         <Text style={{ fontSize: 24, fontWeight: '600' }}>{program.name}</Text>
         <Row style={{ flexWrap: 'wrap', gap: 6 }}>
           <Pill text={phase.label} bg={colors.day.game} />
+          <Pill text={blockInfo(program).label} />
           <Pill text={program.position} />
           <Pill text={EXPERIENCE.find((e) => e.id === program.experience)!.label} />
           {program.teamName ? <Pill text={`Team: ${program.teamName}`} achievement={!coach} /> : program.forName ? <Pill text={`For ${program.forName}`} /> : null}

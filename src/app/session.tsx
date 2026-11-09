@@ -2,7 +2,8 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { Body, Button, Card, colors, Field, H2, Label, Row, Screen, Stepper, Text, TextInput, display, Icon } from '../components/ui';
-import { CATEGORY_LABEL, EXERCISES, getExercise } from '../lib/exercises';
+import { ALL_EQUIPMENT, CATEGORY_LABEL, EXERCISES, fits, getExercise } from '../lib/exercises';
+import { formatRest, restSecFor } from '../lib/generator';
 import { useStore } from '../lib/store';
 import type { ExerciseCategory, ProgramExercise, Session } from '../lib/types';
 
@@ -37,9 +38,11 @@ export default function SessionScreen() {
           return (
             <Card key={`${e.exerciseId}-${i}`} style={{ gap: 6 }}>
               <Text style={[display(12), { color: colors.muted }]}>{CATEGORY_LABEL[info.category]}</Text>
-              <H2>{info.name}</H2>
+              <Pressable accessibilityRole="link" onPress={() => router.push(`/exercise/${info.id}`)}>
+                <H2>{info.name}</H2>
+              </Pressable>
               <Text style={{ fontSize: 16, fontWeight: '600' }}>
-                {e.sets} × {e.reps} <Text style={{ fontSize: 13, color: colors.muted }}>· {e.effort}</Text>
+                {e.sets} × {e.reps} <Text style={{ fontSize: 13, color: colors.muted }}>· {e.effort} · Rest {formatRest(restSecFor(e))}</Text>
               </Text>
               {e.notes ? <Text style={{ fontSize: 13 }}>Coach: {e.notes}</Text> : null}
               <Body muted style={{ fontSize: 13 }}>{info.cue}</Body>
@@ -49,6 +52,18 @@ export default function SessionScreen() {
       </Screen>
     );
   }
+
+  const gym = program.equipment ?? ALL_EQUIPMENT;
+  const swapping = picker?.replaceIndex != null ? getExercise(session.exercises[picker.replaceIndex].exerciseId) : null;
+  const usable = EXERCISES.filter((x) => fits(x, gym));
+  const pickerGroups: { title: string; items: typeof EXERCISES; dim?: boolean }[] = [
+    ...(swapping ? [{ title: 'Same movement', items: usable.filter((x) => x.pattern === swapping.pattern && x.id !== swapping.id) }] : []),
+    ...CATS.map((c) => ({
+      title: CATEGORY_LABEL[c],
+      items: usable.filter((x) => x.category === c && (!swapping || x.pattern !== swapping.pattern)),
+    })),
+    { title: 'Needs other equipment', items: EXERCISES.filter((x) => !fits(x, gym)), dim: true },
+  ];
 
   function update(next: Session) {
     saveProgram({
@@ -75,7 +90,7 @@ export default function SessionScreen() {
     if (picker?.replaceIndex != null) {
       setEx(picker.replaceIndex, { exerciseId });
     } else {
-      update({ ...session!, exercises: [...session!.exercises, { exerciseId, sets: 3, reps: '8', effort: 'RPE 7' }] });
+      update({ ...session!, exercises: [...session!.exercises, { exerciseId, sets: 3, reps: '8', effort: 'RPE 7', role: 'accessory', restSec: 60 }] });
     }
     setPicker(null);
   }
@@ -106,8 +121,11 @@ export default function SessionScreen() {
             <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <View style={{ flex: 1 }}>
                 <Text style={[display(12), { color: colors.muted }]}>{CATEGORY_LABEL[info.category]}</Text>
-                <H2>{info.name}</H2>
+                <Pressable accessibilityRole="link" onPress={() => router.push(`/exercise/${info.id}`)}>
+                  <H2>{info.name}</H2>
+                </Pressable>
                 <Body muted style={{ fontSize: 13 }}>{info.cue}</Body>
+                {!fits(info, gym) ? <Text style={{ fontSize: 12, color: colors.warning }}>Needs equipment this program doesn't have.</Text> : null}
               </View>
               <View style={{ gap: 2 }}>
                 <Pressable accessibilityLabel="Move up" onPress={() => move(i, -1)} hitSlop={6}>
@@ -131,6 +149,14 @@ export default function SessionScreen() {
                 <Label>Effort</Label>
                 <TextInput style={{ minWidth: 0 }} value={e.effort} onChangeText={(t) => setEx(i, { effort: t })} />
               </View>
+            </Row>
+            <Row style={{ justifyContent: 'space-between' }}>
+              <Label>Rest</Label>
+              <Row style={{ gap: 6 }}>
+                <Button small kind="ghost" title="−15s" onPress={() => setEx(i, { restSec: Math.max(0, restSecFor(e) - 15) })} />
+                <Text style={{ minWidth: 64, textAlign: 'center', fontWeight: '600' }}>{formatRest(restSecFor(e))}</Text>
+                <Button small kind="ghost" title="+15s" onPress={() => setEx(i, { restSec: Math.min(600, restSecFor(e) + 15) })} />
+              </Row>
             </Row>
             <TextInput
               style={{ fontSize: 14 }}
@@ -169,19 +195,21 @@ export default function SessionScreen() {
             </Pressable>
           </Row>
           <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 0, gap: 8, paddingBottom: 48 }}>
-            {CATS.map((c) => (
-              <View key={c} style={{ gap: 8 }}>
-                <Label>{CATEGORY_LABEL[c]}</Label>
-                {EXERCISES.filter((x) => x.category === c).map((x) => (
-                  <Pressable key={x.id} onPress={() => pick(x.id)}>
-                    <Card style={{ padding: 12, gap: 2 }}>
-                      <Text style={{ fontWeight: '600', fontSize: 16 }}>{x.name}</Text>
-                      <Text style={{ color: colors.muted, fontSize: 13 }}>{x.cue}</Text>
-                    </Card>
-                  </Pressable>
-                ))}
-              </View>
-            ))}
+            {pickerGroups.map((g) =>
+              g.items.length ? (
+                <View key={g.title} style={{ gap: 8 }}>
+                  <Label>{g.title}</Label>
+                  {g.items.map((x) => (
+                    <Pressable key={x.id} onPress={() => pick(x.id)}>
+                      <Card style={{ padding: 12, gap: 2, opacity: g.dim ? 0.6 : 1 }}>
+                        <Text style={{ fontWeight: '600', fontSize: 16 }}>{x.name}</Text>
+                        <Text style={{ color: colors.muted, fontSize: 13 }}>{x.cue}</Text>
+                      </Card>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null,
+            )}
           </ScrollView>
         </View>
       </Modal>

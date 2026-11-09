@@ -70,6 +70,8 @@ export type DayPlan = {
   note?: string;
   /** 'plan' = default week, 'auto' = moved by the app, 'override' = chosen for this date. */
   source: 'plan' | 'auto' | 'override';
+  /** The coach lightened this date (readiness). */
+  light?: boolean;
 };
 
 const MATCH_WORD: Record<DayType, string> = { game: 'match', tournament: 'tournament', practice: 'practice', off: 'day off' };
@@ -128,6 +130,9 @@ export function weekPlan(program: Program, monday: Date): DayPlan[] {
     plan[j] = { ...plan[j], sessionId: plan[i].sessionId, source: 'auto', note: `Swapped with ${WEEKDAYS[i]}: legs stay fresh for the ${MATCH_WORD[nextType(i)]}` };
     plan[i] = { ...plan[i], sessionId: light, source: 'auto', note: `Lighter lift: ${MATCH_WORD[nextType(i)]} tomorrow` };
   }
+
+  // Coach-lightened dates.
+  for (const p of plan) if (program.lightDates?.includes(p.date)) p.light = true;
 
   // 3. Choices for a specific date always win.
   for (const p of plan) {

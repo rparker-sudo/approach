@@ -50,14 +50,67 @@ export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export type ExerciseCategory = 'lower' | 'upper' | 'core' | 'power' | 'prehab';
 
+export type Equipment =
+  | 'barbell'
+  | 'trap-bar'
+  | 'dumbbells'
+  | 'kettlebells'
+  | 'bench'
+  | 'cable'
+  | 'pullup-bar'
+  | 'box'
+  | 'med-ball'
+  | 'bands';
+
+/** Movement families. The generator fills session slots by pattern. */
+export type Pattern =
+  | 'squat'
+  | 'hinge'
+  | 'single-leg'
+  | 'h-push'
+  | 'v-push'
+  | 'h-pull'
+  | 'v-pull'
+  | 'jump'
+  | 'olympic'
+  | 'throw'
+  | 'core-ext'
+  | 'core-rot'
+  | 'carry'
+  | 'shoulder-care'
+  | 'knee-care'
+  | 'ankle-care'
+  | 'hand-care'
+  | 'mobility';
+
+export type HowTo = {
+  /** Why it matters for volleyball, one sentence. */
+  why: string;
+  steps: string[];
+  cues: string[];
+  mistakes: string[];
+};
+
 export type Exercise = {
   id: string;
   name: string;
   category: ExerciseCategory;
+  pattern: Pattern;
   /** True when the movement is loaded (weight is logged). */
   weighted: boolean;
+  /** 1 = beginner-friendly, 2 = some experience, 3 = experienced lifters. */
+  level: 1 | 2 | 3;
+  /** Ways to set it up: the exercise fits when ANY one list is fully available. [] = no equipment. */
+  equipment: Equipment[][];
+  /** One-line cue shown in lists. */
   cue: string;
+  easier?: string;
+  harder?: string;
+  howTo: HowTo;
 };
+
+/** What an exercise does in a session. Sets the prescription and default rest. */
+export type SlotRole = 'power' | 'main' | 'secondary' | 'accessory' | 'core' | 'care' | 'mobility';
 
 export type ProgramExercise = {
   exerciseId: string;
@@ -66,6 +119,9 @@ export type ProgramExercise = {
   /** e.g. "RPE 7", "Light", "Bodyweight" */
   effort: string;
   notes?: string;
+  role?: SlotRole;
+  /** Rest between sets, seconds. 0 = no timer. */
+  restSec?: number;
 };
 
 export type Session = {
@@ -101,6 +157,14 @@ export type Program = {
   events?: CalendarEvent[];
   /** Per-date lift choice: session id, or null for rest. Wins over the automatic plan. */
   overrides?: Record<string, string | null>;
+  /** What the gym has. Missing = full weight room (programs from 1.0). */
+  equipment?: Equipment[];
+  /** Start of the current training block (YYYY-MM-DD). Missing = createdAt. */
+  blockStart?: string;
+  /** Weeks per block; the last week is a deload. Default 4. */
+  blockWeeks?: number;
+  /** Dates the coach lightened (readiness). */
+  lightDates?: string[];
 };
 
 /** A dated volleyball event. date is local 'YYYY-MM-DD'. */
@@ -117,6 +181,8 @@ export type Profile = {
   volleyballWeek: DayType[];
   /** Weekdays (Monday = 0) the user chose to lift on. */
   liftDays?: number[];
+  /** Default gym equipment for new programs. */
+  equipment?: Equipment[];
 };
 
 export type LoggedSet = { weight: string; reps: string; done: boolean };

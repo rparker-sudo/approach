@@ -22,6 +22,7 @@ import { addDays, dayTypeOn, isHeavyLegs, mondayOf, today, weekPlan } from '../.
 import { getExercise } from '../../lib/exercises';
 import { captainLine, dayAdvice } from '../../lib/generator';
 import { fuelDay, fuelTargets } from '../../lib/nutrition';
+import { sessionForDate } from '../../lib/progression';
 import { useStore } from '../../lib/store';
 import { useTeams } from '../../lib/team';
 import { DAY_TYPES, WEEKDAYS } from '../../lib/types';
@@ -78,6 +79,7 @@ function Today() {
   const todayPlan = week[i];
   const vb = todayPlan.dayType;
   const session = activeProgram.sessions.find((s) => s.id === todayPlan.sessionId);
+  const todaySession = session ? sessionForDate(activeProgram, session, day) : null;
   const advice = todayPlan.note ?? dayAdvice(week.map((p) => p.dayType), i, !!session, isHeavyLegs(session));
   const nextVb = dayTypeOn(activeProgram, addDays(day, 1));
   const fuel = fuelDay(vb, !!session, nextVb === 'game' || nextVb === 'tournament');
@@ -102,14 +104,20 @@ function Today() {
           <>
             <H2>{session.name}</H2>
             <Body muted>{session.focus}</Body>
+            <Row style={{ gap: 6, flexWrap: 'wrap' }}>
+              <Pill text={todaySession!.block.label} />
+              {todaySession!.light ? <Pill text="Lightened by coach" bg={colors.day.game} /> : null}
+            </Row>
+            {todaySession!.light ? <Note>Coach lightened today's lift. Same exercises, fewer sets, easy effort.</Note> : null}
+            {!todaySession!.light && todaySession!.block.deload ? <Note>Deload week: fewer sets, easy effort. Let your body catch up.</Note> : null}
             <View style={{ gap: 4 }}>
-              {session.exercises.slice(0, 4).map((e, k) => (
+              {todaySession!.exercises.slice(0, 4).map((e, k) => (
                 <Text key={k} style={{ fontSize: 13 }}>
                   {getExercise(e.exerciseId).name} <Text style={{ color: colors.muted, fontSize: 13 }}>{e.sets} × {e.reps}</Text>
                 </Text>
               ))}
-              {session.exercises.length > 4 ? (
-                <Text style={{ fontSize: 13, color: colors.muted }}>+ {session.exercises.length - 4} more</Text>
+              {todaySession!.exercises.length > 4 ? (
+                <Text style={{ fontSize: 13, color: colors.muted }}>+ {todaySession!.exercises.length - 4} more</Text>
               ) : null}
             </View>
             {doneToday ? <Pill text="Done today" achievement /> : null}

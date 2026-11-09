@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { dateKey, fromKey, isHeavyLegs, mondayOf, today, weekPlan } from '../lib/calendar';
 import { dayAdvice, MAX_LIFT_DAYS, pickLiftDays } from '../lib/generator';
-import type { DayType, Program } from '../lib/types';
+import type { DayType, Phase, Program } from '../lib/types';
 import { DAY_TYPES, WEEKDAYS } from '../lib/types';
 import { Body, Button, colors, Icon, Note, Row, Text } from './ui';
 
@@ -57,10 +57,13 @@ export function LiftDayPicker({
   week,
   value,
   onChange,
+  phase,
 }: {
   week: DayType[];
   value: number[];
   onChange: (days: number[]) => void;
+  /** Used for a gentle in-season note when picking 5+ days. */
+  phase?: Phase;
 }) {
   const [tooMany, setTooMany] = useState(false);
   const toggle = (i: number) => {
@@ -118,6 +121,9 @@ export function LiftDayPicker({
         <Button small kind="ghost" title="Suggest days" onPress={() => onChange(pickLiftDays(week, Math.max(value.length, 2)))} />
       </Row>
       {tooMany ? <Note>{`Up to ${MAX_LIFT_DAYS} lift days. Tap a day to turn it off first.`}</Note> : null}
+      {phase === 'in' && value.length >= 5 ? (
+        <Note>In-season, 2–3 lift days is usually enough. More days are fine; each session gets shorter.</Note>
+      ) : null}
       {warnings.map((w) => (
         <Note key={w.i}>{`${WEEKDAYS[w.i]}: ${w.text}`}</Note>
       ))}

@@ -23,12 +23,27 @@ The app has four areas: **Load** (training), **Refuel** (meals and hydration), *
 - Refuel tab: carb, protein and water targets that change with the type of day (rest, lift, practice, match, tournament, day before a match), plus meal timing and food ideas. Calories are left out on purpose, since many users are teens.
 - Launch tab: **Above the net**, your approach touch height minus the net height (women's 2.24 m, men's 2.43 m, or a custom youth height), plus strength gains, body weight and workout history
 
-**Coach mode**
-- Add athletes and build a program for each athlete or for a group
-- Edit any session: swap, add, remove or reorder exercises and change sets, reps and effort
-- Tap **Send** to share a program by text, email or AirDrop. Athletes paste it in under **Plan → Import from coach**.
+**Coach mode (teams)**
+- Create teams (for example Varsity and JV). Each team gets a 6-character join code.
+- Build one workout per team and tap **Post**. Every athlete on the roster gets it. Edit later and post again to update everyone.
+- See the roster, who trained this week, and each athlete's recent lifts and notes.
 
-All data stays on the phone. There are no accounts, no servers and no data collection.
+**Athletes on a team** make an account, enter the team code once, and the team workout becomes their plan. Logged workouts go to the coach. **Solo athletes** can skip accounts and build their own program.
+
+## Team sync (Supabase)
+
+Team sync needs a free Supabase project. Until you connect one, the app runs in **demo mode**: accounts and teams are saved on that one device, which is handy for trying the coach and athlete sides by signing out and back in.
+
+1. Create a free account at https://supabase.com and click **New project**.
+2. Open **SQL Editor → New query**, paste everything in `supabase/schema.sql`, and click **Run**.
+3. Open **Authentication → Sign In / Providers → Email**. For school use, turn **Confirm email** off so students can sign in right away. If you leave it on, athletes must tap a link in an email before their first sign-in.
+4. Open **Project Settings → API**. Copy the **Project URL** and the **anon public** key.
+5. In the project folder, copy `.env.example` to `.env` and paste in those two values.
+6. Restart the app (`npx expo start`). The demo-mode notes disappear when sync is on.
+
+What is stored online: name, email, role, position, team membership, posted team workouts, and the workouts athletes log for a team. Body weight, touch height and fuel targets stay on the phone. Coaches see only their own teams; athletes see only their team's workout and their coach's name. Check with your district before collecting student data, especially for athletes under 13.
+
+The claude.ai preview link can't reach Supabase, so it always runs in demo mode. Use the app in Expo Go or a hosted website (`npm run build:web`) for live sync.
 
 ---
 

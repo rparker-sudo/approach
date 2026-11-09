@@ -17,9 +17,46 @@ export default function SessionScreen() {
 
   if (!program || !session) return <Screen><Body muted>Session not found.</Body></Screen>;
   const coach = data.profile?.role === 'coach';
+  const canStart = !coach && data.activeProgramId === program.id;
+
+  // Athletes see their team's workout exactly as the coach posted it.
+  if (program.teamId && !coach) {
+    return (
+      <Screen>
+        <Stack.Screen options={{ title: session.name }} />
+        {canStart ? (
+          <Button
+            title="Start this workout"
+            icon="play.fill"
+            onPress={() => router.push({ pathname: '/workout', params: { programId: program.id, sessionId: session.id } })}
+          />
+        ) : null}
+        <Body muted style={{ fontSize: 13 }}>{session.focus}</Body>
+        {session.exercises.map((e, i) => {
+          const info = getExercise(e.exerciseId);
+          return (
+            <Card key={`${e.exerciseId}-${i}`} style={{ gap: 6 }}>
+              <Text style={[display(12), { color: colors.muted }]}>{CATEGORY_LABEL[info.category]}</Text>
+              <H2>{info.name}</H2>
+              <Text style={{ fontSize: 16, fontWeight: '600' }}>
+                {e.sets} × {e.reps} <Text style={{ fontSize: 13, color: colors.muted }}>· {e.effort}</Text>
+              </Text>
+              {e.notes ? <Text style={{ fontSize: 13 }}>Coach: {e.notes}</Text> : null}
+              <Body muted style={{ fontSize: 13 }}>{info.cue}</Body>
+            </Card>
+          );
+        })}
+      </Screen>
+    );
+  }
 
   function update(next: Session) {
-    saveProgram({ ...program!, sessions: program!.sessions.map((s) => (s.id === next.id ? next : s)) });
+    saveProgram({
+      ...program!,
+      sessions: program!.sessions.map((s) => (s.id === next.id ? next : s)),
+      // Coach edits to a team workout wait for "Post to team".
+      ...(program!.teamId ? { unposted: true } : null),
+    });
   }
   function setEx(i: number, patch: Partial<ProgramExercise>) {
     update({ ...session!, exercises: session!.exercises.map((e, k) => (k === i ? { ...e, ...patch } : e)) });
@@ -46,7 +83,12 @@ export default function SessionScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: session.name }} />
-      {!coach && data.activeProgramId === program.id ? (
+      {program.teamId ? (
+        <Body muted style={{ fontSize: 13 }}>
+          Changes save on this phone. Post the team workout to send them to {program.teamName ?? 'the team'}.
+        </Body>
+      ) : null}
+      {canStart ? (
         <Button
           title="Start this workout"
           icon="play.fill"

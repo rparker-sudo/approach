@@ -11,6 +11,7 @@ import { useEffect } from 'react';
 import DialogHost from '../components/DialogHost';
 import { colors, DisplayTitle } from '../components/ui';
 import { StoreProvider, useStore } from '../lib/store';
+import { TeamProvider } from '../lib/team';
 import { applyTheme } from '../lib/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -44,7 +45,9 @@ function ThemedApp() {
 
   // Keyed on the theme so every screen re-renders with the new colors.
   return (
-    <ThemeStack key={mode} />
+    <TeamProvider>
+      <ThemeStack key={mode} />
+    </TeamProvider>
   );
 }
 
@@ -70,6 +73,9 @@ function ThemeStack() {
         <Stack.Screen name="workout" options={{ title: 'Load', gestureEnabled: false }} />
         <Stack.Screen name="import" options={{ title: 'Import program', presentation: 'modal' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="team/[id]" options={{ title: 'Team' }} />
+        <Stack.Screen name="join" options={{ title: 'Join a team', presentation: 'modal' }} />
+        <Stack.Screen name="account" options={{ title: 'Account', presentation: 'modal' }} />
       </Stack>
       <DialogHost />
     </>

@@ -22,6 +22,7 @@ import { getExercise } from '../../lib/exercises';
 import { captainLine, dayAdvice } from '../../lib/generator';
 import { fuelDay, fuelTargets } from '../../lib/nutrition';
 import { useStore } from '../../lib/store';
+import { useTeams } from '../../lib/team';
 import { DAY_TYPES, WEEKDAYS } from '../../lib/types';
 import { weekdayIndex } from '../../lib/util';
 
@@ -40,6 +41,7 @@ function startOfWeek(d = new Date()) {
 
 function Today() {
   const { data, activeProgram } = useStore();
+  const { account, teams } = useTeams();
   const profile = data.profile!;
   const i = weekdayIndex();
   const now = new Date();
@@ -52,12 +54,19 @@ function Today() {
       <Screen tab>
         <ScreenHeader title="Load" subtitle={dateLine} />
         <NetTape />
-        <Card>
-          <H2>No program yet</H2>
-          <Body muted>Build one in a minute, or import the one your coach sent.</Body>
-          <Button title="Build my program" icon="wand.and.stars" onPress={() => router.push('/builder')} />
-          <Button kind="ghost" title="Import from coach" onPress={() => router.push('/import')} />
-        </Card>
+        {teams.length ? (
+          <Card>
+            <H2>You're on {teams[0].name}</H2>
+            <Body muted>Your coach hasn't posted a workout yet. It shows up here as soon as they do.</Body>
+          </Card>
+        ) : (
+          <Card>
+            <H2>No program yet</H2>
+            <Body muted>Join your team with its code, or build your own program.</Body>
+            <Button title="Join my team" icon="person.3" onPress={() => router.push(account ? '/join' : '/account')} />
+            <Button kind="ghost" title="Build my own program" icon="wand.and.stars" onPress={() => router.push('/builder')} />
+          </Card>
+        )}
       </Screen>
     );
   }

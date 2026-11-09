@@ -1,163 +1,134 @@
 import { router } from 'expo-router';
-import { showAlert, shareText } from '../lib/dialog';
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
-import { encodeProgram, useStore } from '../lib/store';
-import type { Athlete, Position } from '../lib/types';
-import { POSITIONS } from '../lib/types';
-import { uid } from '../lib/util';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { isDemoMode } from '../lib/backend';
+import { useStore } from '../lib/store';
+import { teamProgramId, useTeams } from '../lib/team';
+import { formatDate } from '../lib/util';
 import ScreenHeader from './ScreenHeader';
-import { Body, Button, Card, Chip, ChipRow, colors, Field, H2, Icon, Label, NetTape, Row, Screen, Text } from './ui';
+import { Body, Button, Card, colors, Field, H2, Icon, NetTape, Note, Pill, Row, Text } from './ui';
 
-export async function shareProgram(programId: string, programs: ReturnType<typeof useStore>['data']['programs'], coachName?: string) {
-  const p = programs.find((x) => x.id === programId);
-  if (!p) return;
-  const intro =
-    `${coachName ? coachName + ' sent you' : 'Here is'} a training program: "${p.name}".\n\n` +
-    'To open it in Load & Launch: go to Plan, tap Import from coach, then paste this whole message.\n\n';
-  await shareText(intro + encodeProgram(p), `Load & Launch: ${p.name}`);
+/** Monday 00:00 of this week. */
+export function weekStart(d = new Date()) {
+  const s = new Date(d);
+  s.setHours(0, 0, 0, 0);
+  s.setDate(s.getDate() - ((s.getDay() + 6) % 7));
+  return s;
 }
 
+/** Coach home: the teams this coach manages. */
 export default function TeamHome() {
-  const { data, saveAthlete, deleteAthlete } = useStore();
+  const { data } = useStore();
+  const { account, teams, members, logs, posted, syncing, lastError, refresh, createTeam } = useTeams();
+  const insets = useSafeAreaInsets();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
-  const [position, setPosition] = useState<Position>('Outside Hitter');
-  const [open, setOpen] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function add() {
-    if (!name.trim()) return;
-    saveAthlete({ id: uid(), name: name.trim(), position, programId: null });
-    setName('');
-    setAdding(false);
+  async function add() {
+    setBusy(true);
+    setError(null);
+    try {
+      const t = await createTeam(name);
+      setName('');
+      setAdding(false);
+      router.push(`/team/${t.id}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't create the team.");
+    } finally {
+      setBusy(false);
+    }
   }
 
+  const since = weekStart().toISOString();
+
   return (
-    <Screen tab>
-      <ScreenHeader title="Team" subtitle={data.profile?.name} />
+    <ScrollView
+      style={{ flex: 1, backgroundColor: colors.bg }}
+      contentContainerStyle={{ padding: 16, paddingTop: insets.top + 12, paddingBottom: 48, gap: 16 }}
+      refreshControl={<RefreshControl refreshing={syncing} onRefresh={refresh} tintColor={colors.muted} />}
+      keyboardShouldPersistTaps="handled"
+    >
+      <ScreenHeader title="Team" subtitle={account ? `Coach ${account.name}` : data.profile?.name} />
 
-      <Card style={{ backgroundColor: colors.raised }}>
-        <Label>How it works</Label>
-        <Text style={{ lineHeight: 22 }}>
-          Add your athletes. Build a program for each one, or one for a group. Tap Send. Players paste it into the app.
-        </Text>
-      </Card>
-
-      {data.athletes.length === 0 && !adding ? (
+      {!account ? (
         <Card>
           <NetTape />
-          <H2>No athletes yet</H2>
-          <Body muted>Add your players to track who has which program.</Body>
-        </Card>
-      ) : null}
-
-      {data.athletes.map((a) => (
-        <AthleteCard
-          key={a.id}
-          athlete={a}
-          open={open === a.id}
-          onToggle={() => setOpen(open === a.id ? null : a.id)}
-          onAssign={(programId) => saveAthlete({ ...a, programId })}
-          onDelete={() =>
-            showAlert(`Remove ${a.name}?`, 'Their programs stay in your Programs list.', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Remove', style: 'destructive', onPress: () => deleteAthlete(a.id) },
-            ])
-          }
-        />
-      ))}
-
-      {adding ? (
-        <Card>
-          <H2>Add athlete</H2>
-          <Field placeholder="Name" value={name} onChangeText={setName} autoFocus />
-          <Label>Position</Label>
-          <ChipRow>
-            {POSITIONS.map((p) => (
-              <Chip key={p} label={p} selected={position === p} onPress={() => setPosition(p)} />
-            ))}
-          </ChipRow>
-          <Row>
-            <View style={{ flex: 1 }}>
-              <Button kind="ghost" title="Cancel" onPress={() => setAdding(false)} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Button title="Add" disabled={!name.trim()} onPress={add} />
-            </View>
-          </Row>
+          <H2>Sign in to manage teams</H2>
+          <Body muted>Teams need a coach account so athletes can join and get your workouts on their phones.</Body>
+          <Button title="Sign in or create account" onPress={() => router.push('/account')} />
         </Card>
       ) : (
-        <Button title="Add athlete" icon="plus" onPress={() => setAdding(true)} />
-      )}
-    </Screen>
-  );
-}
+        <>
+          {isDemoMode ? (
+            <Note>Demo mode: teams live on this device only. Connect Supabase to sync with athletes' phones.</Note>
+          ) : null}
+          {lastError ? <Text style={{ color: colors.error, fontSize: 13 }}>{lastError}</Text> : null}
 
-function AthleteCard({
-  athlete,
-  open,
-  onToggle,
-  onAssign,
-  onDelete,
-}: {
-  athlete: Athlete;
-  open: boolean;
-  onToggle: () => void;
-  onAssign: (programId: string | null) => void;
-  onDelete: () => void;
-}) {
-  const { data } = useStore();
-  const program = data.programs.find((p) => p.id === athlete.programId);
-  return (
-    <Card>
-      <Pressable onPress={onToggle}>
-        <Row style={{ justifyContent: 'space-between' }}>
-          <View style={{ flex: 1 }}>
-            <H2>{athlete.name}</H2>
-            <Body muted style={{ fontSize: 14 }}>
-              {athlete.position} · {program ? program.name : 'No program yet'}
-            </Body>
-          </View>
-          <Icon name={open ? 'chevron.up' : 'chevron.down'} size={14} color={colors.faint} />
-        </Row>
-      </Pressable>
-      {open ? (
-        <View style={{ gap: 10 }}>
-          {program ? (
-            <Row>
-              <View style={{ flex: 1 }}>
-                <Button
-                  kind="secondary"
-                  small
-                  title="Send"
-                  icon="square.and.arrow.up"
-                  onPress={() => shareProgram(program.id, data.programs, data.profile?.name)}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Button kind="ghost" small title="View" onPress={() => router.push(`/program/${program.id}`)} />
-              </View>
-            </Row>
+          {teams.length === 0 && !adding ? (
+            <Card>
+              <NetTape />
+              <H2>No teams yet</H2>
+              <Body muted>Make a team for each roster, like Varsity or JV. Athletes join with the team's code.</Body>
+            </Card>
           ) : null}
-          <Button
-            small
-            title={program ? 'Build a new program' : 'Build a program'}
-            icon="wand.and.stars"
-            onPress={() => router.push({ pathname: '/builder', params: { athleteId: athlete.id } })}
-          />
-          {data.programs.length > 0 ? (
-            <>
-              <Label>Or assign an existing program</Label>
-              <ChipRow>
-                {data.programs.map((p) => (
-                  <Chip key={p.id} label={p.name} selected={p.id === athlete.programId} onPress={() => onAssign(p.id)} />
-                ))}
-              </ChipRow>
-            </>
-          ) : null}
-          <Button small kind="danger" title="Remove athlete" onPress={onDelete} />
-        </View>
-      ) : null}
-    </Card>
+
+          {teams.map((t) => {
+            const roster = members[t.id] ?? [];
+            const weekLogs = (logs[t.id] ?? []).filter((l) => l.date >= since);
+            const trained = new Set(weekLogs.map((l) => l.userId)).size;
+            const local = data.programs.find((p) => p.id === teamProgramId(t.id));
+            const tp = posted[t.id];
+            const status = local?.unposted ? 'Changes not posted' : tp ? `Posted ${formatDate(tp.updatedAt)}` : 'No workout posted';
+            const programName = local?.name ?? tp?.program.name;
+            return (
+              <Pressable key={t.id} accessibilityRole="button" onPress={() => router.push(`/team/${t.id}`)}>
+                <Card>
+                  <Row style={{ justifyContent: 'space-between' }}>
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <H2>{t.name}</H2>
+                      <Text style={{ fontSize: 13, color: colors.muted }}>
+                        {roster.length} {roster.length === 1 ? 'athlete' : 'athletes'} · Code {t.joinCode}
+                      </Text>
+                    </View>
+                    <Icon name="chevron.right" size={14} color={colors.faint} />
+                  </Row>
+                  <Row style={{ gap: 6, flexWrap: 'wrap' }}>
+                    <Pill text={status} bg={local?.unposted ? colors.day.game : undefined} />
+                    {roster.length ? (
+                      <Pill
+                        text={`${trained}/${roster.length} trained this week`}
+                        achievement={trained > 0 && trained === roster.length}
+                      />
+                    ) : null}
+                  </Row>
+                  {programName ? <Text style={{ fontSize: 13, color: colors.muted }}>{programName}</Text> : null}
+                </Card>
+              </Pressable>
+            );
+          })}
+
+          {adding ? (
+            <Card>
+              <H2>New team</H2>
+              <Field placeholder="Team name, e.g. Varsity" value={name} onChangeText={setName} autoFocus maxLength={60} />
+              {error ? <Text style={{ color: colors.error, fontSize: 13 }}>{error}</Text> : null}
+              <Row>
+                <View style={{ flex: 1 }}>
+                  <Button kind="ghost" title="Cancel" onPress={() => setAdding(false)} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button title={busy ? 'Creating…' : 'Create'} disabled={!name.trim() || busy} onPress={add} />
+                </View>
+              </Row>
+            </Card>
+          ) : (
+            <Button title="New team" icon="plus" onPress={() => setAdding(true)} />
+          )}
+        </>
+      )}
+    </ScrollView>
   );
 }

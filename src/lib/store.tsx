@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import type { AppData, Athlete, BodyLog, Profile, Program, TouchLog, WorkoutLog } from './types';
+import type { AppData, BodyLog, Profile, Program, TouchLog, WorkoutLog } from './types';
 import { uid } from './util';
 
 const KEY = 'volley-strength/data/v1';
@@ -26,13 +26,13 @@ type Store = {
   addLog: (l: WorkoutLog) => void;
   deleteLog: (id: string) => void;
   addBodyLog: (b: BodyLog) => void;
-  saveAthlete: (a: Athlete) => void;
-  deleteAthlete: (id: string) => void;
   resetAll: () => void;
   setTheme: (t: 'dark' | 'light') => void;
   addTouchLog: (t: TouchLog) => void;
   deleteTouchLog: (date: string) => void;
   setNetHeight: (inches: number) => void;
+  /** Low-level update used by team sync. */
+  mutate: (fn: (d: AppData) => AppData) => void;
 };
 
 const Ctx = createContext<Store | null>(null);
@@ -94,17 +94,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ),
           profile: d.profile ? { ...d.profile, bodyWeightLb: b.weightLb } : d.profile,
         })),
-      saveAthlete: (a) =>
-        update((d) => {
-          const exists = d.athletes.some((x) => x.id === a.id);
-          return { ...d, athletes: exists ? d.athletes.map((x) => (x.id === a.id ? a : x)) : [...d.athletes, a] };
-        }),
-      deleteAthlete: (id) => update((d) => ({ ...d, athletes: d.athletes.filter((a) => a.id !== id) })),
       resetAll: () => setData((d) => ({ ...EMPTY, theme: d.theme })),
       setTheme: (theme) => update((d) => ({ ...d, theme })),
       addTouchLog: (t) => update((d) => ({ ...d, touchLogs: [...(d.touchLogs ?? []), t] })),
       deleteTouchLog: (date) => update((d) => ({ ...d, touchLogs: (d.touchLogs ?? []).filter((x) => x.date !== date) })),
       setNetHeight: (netHeightIn) => update((d) => ({ ...d, netHeightIn })),
+      mutate: update,
     }),
     [data, ready, update],
   );

@@ -7,6 +7,9 @@ export type Position =
   | 'Setter'
   | 'Libero / DS';
 
+/** Team workouts can cover every position. */
+export type ProgramPosition = Position | 'All positions';
+
 export const POSITIONS: Position[] = [
   'Outside Hitter',
   'Opposite',
@@ -78,7 +81,7 @@ export type Program = {
   /** Name of the athlete or group this program is for (coach programs). */
   forName?: string;
   author?: string;
-  position: Position;
+  position: ProgramPosition;
   phase: Phase;
   experience: Experience;
   /** Volleyball schedule, Monday first. */
@@ -87,6 +90,13 @@ export type Program = {
   liftSchedule: (string | null)[];
   sessions: Session[];
   createdAt: string;
+  /** Set when this is a team's posted workout. */
+  teamId?: string;
+  teamName?: string;
+  /** When the coach last posted it. */
+  postedAt?: string;
+  /** Coach only: edited since the last post. */
+  unposted?: boolean;
 };
 
 export type Profile = {
@@ -110,6 +120,10 @@ export type WorkoutLog = {
   sessionName: string;
   entries: { exerciseId: string; sets: LoggedSet[] }[];
   note?: string;
+  /** Team this workout counts for (sent to the coach). */
+  teamId?: string;
+  /** True once the coach's server has it. */
+  synced?: boolean;
 };
 
 export type BodyLog = { date: string; weightLb: number };

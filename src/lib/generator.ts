@@ -4,6 +4,7 @@ import type {
   Phase,
   Position,
   Program,
+  ProgramPosition,
   ProgramExercise,
   Session,
 } from './types';
@@ -14,7 +15,7 @@ export type GeneratorInput = {
   name?: string;
   forName?: string;
   author?: string;
-  position: Position;
+  position: ProgramPosition;
   phase: Phase;
   experience: Experience;
   volleyballWeek: DayType[];
@@ -305,7 +306,8 @@ const BEGINNER_EFFORT: Record<string, string> = {
 };
 
 /** Extra injury-prevention work by position, added to the end of a session. */
-const POSITION_EXTRAS: Record<Position, ProgramExercise[]> = {
+const POSITION_EXTRAS: Record<ProgramPosition, ProgramExercise[]> = {
+  'All positions': [ex('band-er', 2, '15 each', 'Light', 'Shoulder health for everyone who hits and serves'), ex('spanish-squat', 2, '30s', 'Steady', 'Knee health for jumpers'), ex('ankle-balance', 2, '6 each', 'Bodyweight', 'Ankle stability')],
   'Outside Hitter': [ex('band-er', 2, '15 each', 'Light', 'Hitting shoulder health'), ex('spanish-squat', 2, '30s', 'Steady', 'Knee health for jumpers')],
   Opposite: [ex('band-er', 2, '15 each', 'Light', 'Hitting shoulder health'), ex('spanish-squat', 2, '30s', 'Steady', 'Knee health for jumpers')],
   'Middle Blocker': [ex('spanish-squat', 2, '30s', 'Steady', 'Knee health for jumpers'), ex('calf-raise', 2, '12 each', 'RPE 6', 'Landing strength')],

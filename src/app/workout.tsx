@@ -67,9 +67,14 @@ export default function Workout() {
       sessionName: session!.name,
       entries,
       note: note.trim() || undefined,
+      teamId: program!.teamId,
+      synced: false,
     };
     addLog(log);
-    showAlert('Workout saved', `${done} of ${total} sets in. Refuel within an hour: protein and carbs.`);
+    showAlert(
+      'Workout saved',
+      `${done} of ${total} sets in.${program!.teamId ? ' Your coach can see it.' : ''} Refuel within an hour: protein and carbs.`,
+    );
     router.back();
   }
 

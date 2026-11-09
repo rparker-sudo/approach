@@ -74,7 +74,8 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
     return { id, email, name: data.name, role: data.role, position: (data.position as Position) ?? null };
   }
 
-  const TEAM_SELECT = 'id,name,join_code,coach_id,created_at,coach:profiles(name)';
+  // teams↔profiles has several links (coach, roster, workout logs); name the coach one explicitly.
+  const TEAM_SELECT = 'id,name,join_code,coach_id,created_at,coach:profiles!teams_coach_id_fkey(name)';
 
   return {
     mode: 'supabase',

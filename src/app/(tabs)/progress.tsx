@@ -10,7 +10,7 @@ import { estimate1RM, formatDate, parseNum } from '../../lib/util';
 
 type LiftPoint = { date: string; e1rm: number; best: string };
 
-export default function Launch() {
+export default function Progress() {
   const { data, addBodyLog, deleteLog } = useStore();
   const [bw, setBw] = useState('');
 
@@ -47,7 +47,7 @@ export default function Launch() {
 
   return (
     <Screen tab>
-      <ScreenHeader title="Launch" subtitle="Touch height and progress" />
+      <ScreenHeader title="Progress" subtitle="Touch height and strength" />
       <AboveTheNet />
       <Row style={{ gap: 12 }}>
         <Big label="Workouts" value={String(data.logs.length)} />

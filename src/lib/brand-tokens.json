@@ -55,10 +55,10 @@
   "radius": { "sm": 8, "md": 12, "lg": 16, "pill": 999 },
   "spacing": [4, 8, 12, 16, 24, 32, 48],
   "modules": [
-    { "id": "load", "label": "Load", "description": "Lifting and plyometrics", "icon": "barbell" },
-    { "id": "refuel", "label": "Refuel", "description": "Meals and hydration", "icon": "bowl" },
+    { "id": "lift", "label": "Lift", "description": "Lifting and plyometrics", "icon": "barbell" },
+    { "id": "fuel", "label": "Fuel", "description": "Meals and hydration", "icon": "bowl" },
     { "id": "plan", "label": "Plan", "description": "Season, week, and match days", "icon": "calendar" },
-    { "id": "launch", "label": "Launch", "description": "Touch height and progress", "icon": "volleyball" }
+    { "id": "progress", "label": "Progress", "description": "Touch height and strength", "icon": "volleyball" }
   ],
   "netHeights": {
     "_note": "Used for the 'Above the net' stat. Let users pick; youth heights vary by age group.",

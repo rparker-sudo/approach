@@ -6,7 +6,7 @@ import { colors, fonts, Icon } from '../../components/ui';
 import { useStore } from '../../lib/store';
 
 /**
- * Brand modules: Load (training), Refuel (nutrition), Plan (season/week), Launch (progress).
+ * Tabs: Lift (training), Fuel (nutrition), Plan (season/week), Progress (touch height and strength).
  * Route files keep their original names; only the labels changed.
  */
 export default function TabsLayout() {
@@ -34,14 +34,14 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: coach ? 'Team' : 'Load',
+          title: coach ? 'Team' : 'Lift',
           tabBarIcon: ({ color }) => <Icon name={coach ? 'person.3' : 'dumbbell'} color={color as string} />,
         }}
       />
       <Tabs.Screen
         name="fuel"
         options={{
-          title: 'Refuel',
+          title: 'Fuel',
           tabBarIcon: ({ color }) => <Icon name="fork.knife" color={color as string} />,
         }}
       />
@@ -55,7 +55,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="progress"
         options={{
-          title: 'Launch',
+          title: 'Progress',
           href: coach ? null : undefined,
           tabBarIcon: ({ color }) => <Icon name="volleyball" color={color as string} />,
         }}

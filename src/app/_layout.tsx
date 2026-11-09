@@ -70,7 +70,7 @@ function ThemeStack() {
         <Stack.Screen name="builder" options={{ title: 'Build a program', presentation: 'modal' }} />
         <Stack.Screen name="program/[id]" options={{ title: 'Plan' }} />
         <Stack.Screen name="session" options={{ title: 'Edit session' }} />
-        <Stack.Screen name="workout" options={{ title: 'Load', gestureEnabled: false }} />
+        <Stack.Screen name="workout" options={{ title: 'Lift', gestureEnabled: false }} />
         <Stack.Screen name="import" options={{ title: 'Import program', presentation: 'modal' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="team/[id]" options={{ title: 'Team' }} />

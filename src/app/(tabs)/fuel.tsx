@@ -16,7 +16,7 @@ const OPTIONS: { id: string; day: DayType; lift: boolean; label: string }[] = [
   { id: 'tournament', day: 'tournament', lift: false, label: 'Tournament' },
 ];
 
-export default function Refuel() {
+export default function Fuel() {
   const { data, activeProgram } = useStore();
   const coach = data.profile?.role === 'coach';
   const day = today();
@@ -34,7 +34,7 @@ export default function Refuel() {
 
   return (
     <Screen tab>
-      <ScreenHeader title="Refuel" subtitle="Meals and hydration" />
+      <ScreenHeader title="Fuel" subtitle="Meals and hydration" />
       <Body muted>Bigger day, more fuel. Pick the day to see the plan.</Body>
       <ChipRow>
         {OPTIONS.map((o) => (

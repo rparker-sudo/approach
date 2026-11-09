@@ -391,7 +391,7 @@ export function dayAdvice(week: DayType[], i: number, liftsToday: boolean, heavy
   return null;
 }
 
-/** One short line for the top of the Load screen, in the brand voice. Uses real calendar dates. */
+/** One short line for the top of the Lift screen, in the brand voice. Uses real calendar dates. */
 export function captainLine(program: Program, date: Date): string {
   const today = planForDate(program, date);
   const session = program.sessions.find((s) => s.id === today.sessionId);

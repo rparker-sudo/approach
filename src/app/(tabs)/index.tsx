@@ -53,7 +53,7 @@ function Today() {
   if (!activeProgram) {
     return (
       <Screen tab>
-        <ScreenHeader title="Load" subtitle={dateLine} />
+        <ScreenHeader title="Lift" subtitle={dateLine} />
         <NetTape />
         {teams.length ? (
           <Card>
@@ -90,7 +90,7 @@ function Today() {
 
   return (
     <Screen tab>
-      <ScreenHeader title="Load" subtitle={dateLine} />
+      <ScreenHeader title="Lift" subtitle={dateLine} />
       <Text style={{ fontSize: 20, fontWeight: '600' }}>{captainLine(activeProgram, day)}</Text>
 
       <Card>
@@ -135,7 +135,7 @@ function Today() {
       <Pressable onPress={() => router.navigate('/fuel')}>
         <Card>
           <Row style={{ justifyContent: 'space-between' }}>
-            <Label>Refuel</Label>
+            <Label>Fuel</Label>
             <Icon name="chevron.right" size={14} color={colors.faint} />
           </Row>
           <H2>{fuel.title}</H2>

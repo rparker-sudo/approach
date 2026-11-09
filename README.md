@@ -2,9 +2,9 @@
 
 **Build it under the bar. Use it above the net.**
 
-An iPhone app (plus a mobile browser version) for volleyball athletes and coaches: weight training, fuel and planning built around the volleyball schedule. App Store subtitle suggestion: *Volleyball Strength and Fuel*.
+An iPhone app (plus a mobile browser version) for volleyball athletes and coaches: weight training, fuel and planning built around the volleyball schedule. App Store name: **Approach: Volleyball Fitness** (set in App Store Connect; the home-screen name stays **Approach**).
 
-The app has four areas: **Load** (training), **Refuel** (meals and hydration), **Plan** (season, week and match days) and **Launch** (touch height and progress). Coaches also get a **Team** tab.
+The app has four tabs: **Lift** (today's training), **Fuel** (meals and hydration), **Plan** (season, week and match days) and **Progress** (touch height and strength). Coaches also get a **Team** tab.
 
 ## Brand
 - Brand kit: `assets/brand/source/` (SVG originals) and `src/lib/brand-tokens.json`, the source of truth for colors and type
@@ -22,8 +22,8 @@ The app has four areas: **Load** (training), **Refuel** (meals and hydration), *
 - Adds injury-prevention work for each position (shoulders for hitters, knees for middles, hands and wrists for setters, ankles and low positions for liberos)
 - Today screen: today's lift, today's fuel targets and the week at a glance
 - Logs workouts set by set and pre-fills the weight you used last time
-- Refuel tab: carb, protein and water targets that change with the type of day (rest, lift, practice, match, tournament, day before a match), plus meal timing and food ideas. Calories are left out on purpose, since many users are teens.
-- Launch tab: **Above the net**, your approach touch height minus the net height (women's 2.24 m, men's 2.43 m, or a custom youth height), plus strength gains, body weight and workout history
+- Fuel tab: carb, protein and water targets that change with the type of day (rest, lift, practice, match, tournament, day before a match), plus meal timing and food ideas. Calories are left out on purpose, since many users are teens.
+- Progress tab: **Above the net**, your approach touch height minus the net height (women's 2.24 m, men's 2.43 m, or a custom youth height), plus strength gains, body weight and workout history
 
 **Coach mode (teams)**
 - Create teams (for example Varsity and JV). Each team gets a 6-character join code.
@@ -110,6 +110,7 @@ As you edit the code, the app on your phone refreshes on its own.
 
 6. **Test it with TestFlight.** The build appears in TestFlight in App Store Connect (https://appstoreconnect.apple.com). Install it on your phone and invite athletes to test it before the public release.
 7. **Fill out the App Store listing** in App Store Connect:
+   - App name: **Approach: Volleyball Fitness** (when you create the app in App Store Connect under **Apps → +**)
    - Screenshots from a 6.9" or 6.7" iPhone (take them on your phone from the TestFlight build)
    - Description, keywords and support URL
    - **Privacy policy URL** (required; a free Google Site works)
@@ -127,7 +128,7 @@ As you edit the code, the app on your phone refreshes on its own.
 
 ```
 src/app/            Screens (each file is a screen)
-  (tabs)/           index = Load (Team for coaches), fuel = Refuel, program = Plan, progress = Launch
+  (tabs)/           index = Lift (Team for coaches), fuel = Fuel, program = Plan, progress = Progress
   onboarding.tsx    First-launch setup
   calendar.tsx      Season calendar (dates, per-date lift choices)
   schedule.tsx      Edit lift days (the usual week)

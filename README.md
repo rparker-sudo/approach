@@ -1,4 +1,4 @@
-# Load & Launch
+# Approach
 
 **Build it under the bar. Use it above the net.**
 
@@ -53,16 +53,16 @@ The claude.ai preview link can't reach Supabase, so it always runs in demo mode.
 
 The repository includes `.github/workflows/deploy-web.yml`, which builds the browser version and publishes it every time you push to `main`. Team QR codes point at this site.
 
-1. Create a free GitHub account and a new repository (for example `load-and-launch`), and push this project to it.
+1. Create a free GitHub account and a new repository (for example `approach`), and push this project to it.
 2. In the repository: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 3. **Settings → Secrets and variables → Actions → New repository secret**: add `SUPABASE_URL` and `SUPABASE_ANON_KEY` (same values as your `.env`). Skip this to publish in demo mode.
-4. Push to `main` (or open **Actions → Deploy web app → Run workflow**). The site appears at `https://<your-username>.github.io/load-and-launch/`.
+4. Push to `main` (or open **Actions → Deploy web app → Run workflow**). The site appears at `https://<your-username>.github.io/approach/`.
 5. Put that address in `.env` as `EXPO_PUBLIC_APP_URL` (and in the EAS build settings) so QR codes in the iPhone app point to it. The GitHub build sets it automatically.
 6. After the App Store launch, add a repository **variable** `APP_STORE_ID` (the number in your App Store link) so Safari shows a "Get the app" banner on the site.
 
 **Using your own domain** (for example `https://lift.yourschool.org`): add the domain under Settings → Pages, then add two repository variables: `APP_URL` set to the full address, and `BASE_PATH` set to `/`.
 
-To build the site yourself: `EXPO_BASE_URL=/load-and-launch npm run build:web`, then upload `dist/`.
+To build the site yourself: `EXPO_BASE_URL=/approach npm run build:web`, then upload `dist/`.
 
 ---
 
@@ -90,7 +90,7 @@ As you edit the code, the app on your phone refreshes on its own.
 
 1. **Join the Apple Developer Program** at https://developer.apple.com/programs/ ($99/year). Approval can take 1–2 days.
 2. **Create a free Expo account** at https://expo.dev/signup.
-3. **Pick a unique app ID.** In `app.json`, change `"bundleIdentifier": "com.loadandlaunch.app"` to something only you own, for example `com.yourname.loadandlaunch`.
+3. **Pick a unique app ID.** In `app.json`, change `"bundleIdentifier": "com.approachvolleyball.app"` to something only you own, for example `com.yourname.approach`.
 4. **Build the app in the cloud** (no Mac needed):
 
    ```bash

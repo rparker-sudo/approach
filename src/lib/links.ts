@@ -1,6 +1,6 @@
 /**
  * Public links for invites. Set in .env (or the GitHub Pages build settings):
- *   EXPO_PUBLIC_APP_URL       e.g. https://yourname.github.io/load-and-launch
+ *   EXPO_PUBLIC_APP_URL       e.g. https://yourname.github.io/approach
  *   EXPO_PUBLIC_APP_STORE_ID  the App Store app id (numbers only), once the app is published
  */
 export const APP_URL = (process.env.EXPO_PUBLIC_APP_URL ?? '').replace(/\/+$/, '');

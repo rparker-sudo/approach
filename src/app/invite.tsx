@@ -41,7 +41,7 @@ export default function InviteScreen() {
         <Card style={{ alignSelf: 'stretch' }}>
           <H2>QR code needs your web address</H2>
           <Body muted>
-            The QR code opens the browser version of Load & Launch. Once it's on GitHub Pages, set EXPO_PUBLIC_APP_URL
+            The QR code opens the browser version of Approach. Once it's on GitHub Pages, set EXPO_PUBLIC_APP_URL
             to its address (see the README) and the QR code appears here.
           </Body>
           <Note>{`Until then, athletes can enter team code ${team.joinCode} in the app.`}</Note>

@@ -1,23 +1,23 @@
 {
   "expo": {
-    "name": "Load & Launch",
-    "slug": "load-and-launch",
+    "name": "Approach",
+    "slug": "approach",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.loadandlaunch.app",
+      "bundleIdentifier": "com.approachvolleyball.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "CFBundleDisplayName": "Load & Launch"
+        "CFBundleDisplayName": "Approach"
       }
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "name": "Load & Launch",
-      "shortName": "Load & Launch",
+      "name": "Approach",
+      "shortName": "Approach",
       "themeColor": "#0B0B0C",
       "backgroundColor": "#0B0B0C",
       "description": "Build it under the bar. Use it above the net."
@@ -44,7 +44,7 @@
       ],
       "expo-font"
     ],
-    "scheme": "loadandlaunch",
+    "scheme": "approach",
     "backgroundColor": "#0B0B0C",
     "platforms": [
       "ios",

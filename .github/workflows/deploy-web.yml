@@ -1,4 +1,4 @@
-# Builds the browser version of Load & Launch and publishes it to GitHub Pages
+# Builds the browser version of Approach and publishes it to GitHub Pages
 # on every push to main. Setup steps are in the README ("Browser version on GitHub Pages").
 name: Deploy web app
 

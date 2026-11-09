@@ -11,6 +11,6 @@
 <line x1="6" y1="48" x2="58" y2="48" stroke="#0B0B0C" stroke-width="3"/>
 <rect x="11" y="39" width="5" height="18" fill="#0B0B0C"/><rect x="17" y="42" width="3" height="12" fill="#0B0B0C"/>
 <rect x="48" y="39" width="5" height="18" fill="#0B0B0C"/><rect x="44" y="42" width="3" height="12" fill="#0B0B0C"/></g>
-<text x="120" y="56" font-family="'Inter Tight', Inter, 'Helvetica Neue', Arial, sans-serif" font-size="34" font-weight="600" letter-spacing="6" fill="#0B0B0C">LOAD <tspan fill="#6B7078">&amp;</tspan> LAUNCH</text>
+<text x="120" y="56" font-family="'Inter Tight', Inter, 'Helvetica Neue', Arial, sans-serif" font-size="34" font-weight="600" letter-spacing="6" fill="#0B0B0C">APPROACH</text>
 <text x="121" y="80" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="13" letter-spacing="2" fill="#6B7078">Build it under the bar. Use it above the net.</text>
 </svg>

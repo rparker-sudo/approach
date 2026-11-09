@@ -1,4 +1,4 @@
--- Load & Launch: team sync database
+-- Approach: team sync database
 -- Paste this whole file into Supabase → SQL Editor → New query → Run.
 -- Safe to run once on a new project.
 

@@ -1,9 +1,9 @@
-// Finishes the mobile-browser build of Load & Launch.
+// Finishes the mobile-browser build of Approach.
 //
 // Run after `expo export --platform web` (or just `npm run build:web`).
 //  1. dist/            → a normal website folder for GitHub Pages (or any static host).
-//                         Set EXPO_BASE_URL (e.g. /load-and-launch) when the site lives in a sub-folder.
-//  2. dist-single/load-and-launch.html
+//                         Set EXPO_BASE_URL (e.g. /approach) when the site lives in a sub-folder.
+//  2. dist-single/approach.html
 //                       → the whole app in ONE file (scripts, fonts and images
 //                         inlined). Handy for previews and places that only take one file.
 
@@ -20,8 +20,8 @@ const HEAD_TAGS = `
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-    <meta name="apple-mobile-web-app-title" content="Load &amp; Launch" />
-    <meta name="application-name" content="Load &amp; Launch" />
+    <meta name="apple-mobile-web-app-title" content="Approach" />
+    <meta name="application-name" content="Approach" />
     <meta name="color-scheme" content="dark light" />
     <link rel="apple-touch-icon" href="${base}/apple-touch-icon.png" />
     <link rel="manifest" href="${base}/manifest.webmanifest" />${
@@ -119,18 +119,18 @@ single = single.replace('<div id="root"></div>', `<div id="root"></div>\n  ${ROU
 
 // Scripts were "defer"; inline scripts run immediately, so keep them after #root.
 fs.mkdirSync(singleDir, { recursive: true });
-const out = path.join(singleDir, 'load-and-launch.html');
+const out = path.join(singleDir, 'approach.html');
 fs.writeFileSync(out, single);
 const mb = (fs.statSync(out).size / 1024 / 1024).toFixed(1);
-console.log(`✓ dist-single/load-and-launch.html (${mb} MB)`);
+console.log(`✓ dist-single/approach.html (${mb} MB)`);
 
 // ---- 3. Embed version (page content only, no <html>/<head>/<body> wrapper) ----
 // For hosts that wrap the page in their own document skeleton (e.g. a claude.ai artifact preview).
 {
   const head = single.match(/<head>([\s\S]*?)<\/head>/)[1].replace(/<meta name="viewport"[^>]*>/, '');
   const body = single.match(/<body>([\s\S]*?)<\/body>/)[1];
-  const embed = `<title>Load &amp; Launch</title>\n${head.replace(/<title>[^<]*<\/title>/, '')}\n<style>:root{color-scheme:dark}</style>\n${body}`;
-  const embedOut = path.join(singleDir, 'load-and-launch-embed.html');
+  const embed = `<title>Approach</title>\n${head.replace(/<title>[^<]*<\/title>/, '')}\n<style>:root{color-scheme:dark}</style>\n${body}`;
+  const embedOut = path.join(singleDir, 'approach-embed.html');
   fs.writeFileSync(embedOut, embed);
-  console.log(`✓ dist-single/load-and-launch-embed.html (${(fs.statSync(embedOut).size / 1024 / 1024).toFixed(1)} MB)`);
+  console.log(`✓ dist-single/approach-embed.html (${(fs.statSync(embedOut).size / 1024 / 1024).toFixed(1)} MB)`);
 }

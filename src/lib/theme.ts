@@ -1,7 +1,7 @@
 import tokens from './brand-tokens.json';
 
 /**
- * Load & Launch theme, generated from brand-tokens.json (the brand source of truth).
+ * Approach theme, generated from brand-tokens.json (the brand source of truth).
  * Components read from the mutable `colors` object; ThemeRoot swaps it and
  * re-mounts the tree when the user changes between dark (default) and light.
  */

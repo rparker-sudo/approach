@@ -82,11 +82,11 @@ export function BrandBadge({ size = 120 }: { size?: number }) {
   return <Image source={BADGE[colors.mode]} style={{ width: size, height: size }} accessibilityLabel={BRAND.name} />;
 }
 
-/** "LOAD & LAUNCH" with the ampersand in steel. */
+/** "APPROACH" in the display style. */
 export function Wordmark({ size = 24 }: { size?: number }) {
   return (
     <Text style={display(size)} accessibilityLabel={BRAND.name}>
-      LOAD <Text style={[display(size), { color: colors.muted }]}>&amp;</Text> LAUNCH
+      APPROACH
     </Text>
   );
 }

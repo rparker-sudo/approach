@@ -133,7 +133,7 @@ export default function Settings() {
 
       <Card style={{ alignItems: 'center', paddingVertical: 24 }}>
         <Lockup badge={96} />
-        <Text style={{ fontSize: 12, color: colors.faint }}>Version {Constants.expoConfig?.version ?? '1.0.0'}</Text>
+        <Text style={{ fontSize: 12, color: colors.faint }}>Version {(Constants.expoConfig?.version ?? '1.0.0').replace(/\.0$/, '')}</Text>
       </Card>
 
       <Body muted style={{ fontSize: 12 }}>

@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 import Constants from 'expo-constants';
 import { Body, Button, Card, Chip, ChipRow, colors, Field, H2, Label, Lockup, Row, Screen, Text } from '../components/ui';
-import { isDemoMode } from '../lib/backend';
+import { isDemoMode, syncConfigProblem } from '../lib/backend';
 import { useStore } from '../lib/store';
 import { useTeams } from '../lib/team';
 import { POSITIONS } from '../lib/types';
@@ -53,7 +53,11 @@ export default function Settings() {
       <Card>
         <H2>Account</H2>
         <Text style={{ fontSize: 13, color: isDemoMode ? colors.warning : colors.muted }}>
-          {isDemoMode ? 'Team sync: Demo mode (this device only)' : 'Team sync: On'}
+          {syncConfigProblem
+            ? `Team sync: Off (${syncConfigProblem})`
+            : isDemoMode
+              ? 'Team sync: Demo mode (this device only)'
+              : 'Team sync: On'}
         </Text>
         {account ? (
           <>

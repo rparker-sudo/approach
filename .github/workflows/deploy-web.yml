@@ -34,12 +34,30 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Check team sync keys
+        # Describes the secrets' shape without printing their values.
         run: |
-          if [ -n "$EXPO_PUBLIC_SUPABASE_URL" ] && [ -n "$EXPO_PUBLIC_SUPABASE_ANON_KEY" ]; then
-            echo "Team sync keys found: the site will use Supabase."
-          else
+          U="$(printf '%s' "$EXPO_PUBLIC_SUPABASE_URL" | tr -d '[:space:]')"
+          K="$(printf '%s' "$EXPO_PUBLIC_SUPABASE_ANON_KEY" | tr -d '[:space:]')"
+          if [ -z "$U" ] || [ -z "$K" ]; then
             echo "::warning::SUPABASE_URL or SUPABASE_ANON_KEY secret is missing, so the site runs in demo mode."
+            exit 0
           fi
+          echo "Team sync keys found: the site will use Supabase."
+          if [ "$U" != "$EXPO_PUBLIC_SUPABASE_URL" ]; then echo "URL check: the URL secret has spaces or line breaks (the app trims them)."; fi
+          if printf '%s' "$U" | grep -Eq '^https://[a-z0-9]+\.supabase\.co$'; then
+            echo "URL check: looks right (https://<project>.supabase.co)."
+          elif printf '%s' "$U" | grep -Eq '^https://[a-z0-9]+\.supabase\.co/'; then
+            echo "::warning::URL check: SUPABASE_URL has extra text after .supabase.co (for example /rest/v1/). The app trims it, but the secret should be just https://<project>.supabase.co"
+          elif printf '%s' "$U" | grep -q 'supabase.com/dashboard'; then
+            echo "::warning::URL check: SUPABASE_URL is a dashboard link. The app converts it, but the secret should be https://<project>.supabase.co"
+          else
+            echo "::warning::URL check: SUPABASE_URL doesn't look like https://<project>.supabase.co"
+          fi
+          case "$K" in
+            eyJ*|sb_publishable_*) echo "Key check: looks like a public (anon/publishable) key." ;;
+            sb_secret_*) echo "::error::Key check: SUPABASE_ANON_KEY is a SECRET key. Replace it with the anon or publishable key." ; exit 1 ;;
+            *) echo "::warning::Key check: SUPABASE_ANON_KEY doesn't look like an anon (eyJ...) or publishable (sb_publishable_...) key." ;;
+          esac
       - run: npx expo export --platform web --clear
       - run: node scripts/postbuild-web.mjs
       - uses: actions/upload-pages-artifact@v3

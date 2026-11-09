@@ -35,6 +35,14 @@ function fail(error: { message: string } | null, fallback?: string): never {
   if (/invalid login credentials/i.test(msg)) throw new BackendError("Email or password doesn't match.");
   if (/already registered/i.test(msg)) throw new BackendError('That email already has an account. Sign in instead.');
   if (/email not confirmed/i.test(msg)) throw new BackendError('Check your email and tap the confirm link, then sign in.');
+  if (/invalid path specified/i.test(msg)) {
+    throw new BackendError(
+      "The app's server address is set up wrong. In Supabase, copy the Project URL (just https://….supabase.co) and update it in GitHub secrets and .env.",
+    );
+  }
+  if (/invalid api key|no api key/i.test(msg)) {
+    throw new BackendError("The app's Supabase key is wrong. Copy the anon (or Publishable) key again and update it in GitHub secrets and .env.");
+  }
   if (/failed to fetch|network/i.test(msg)) throw new BackendError("Couldn't reach the server. Check your connection and try again.");
   throw new BackendError(msg);
 }

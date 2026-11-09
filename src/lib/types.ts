@@ -149,6 +149,9 @@ export type Program = {
   /** Set when this is a team's posted workout. */
   teamId?: string;
   teamName?: string;
+  /** 'all' = whole team, otherwise a position group id. */
+  groupKey?: string;
+  groupName?: string;
   /** When the coach last posted it. */
   postedAt?: string;
   /** Coach only: edited since the last post. */
@@ -224,6 +227,28 @@ export type AppData = {
   touchLogs?: TouchLog[];
   /** Net height used for "Above the net", in inches. */
   netHeightIn?: number;
+  /** Coach: local copy of each team's shared calendar (events + lightened days). */
+  teamCalendars?: Record<string, LocalTeamCalendar>;
+  /** Athlete: daily readiness check-ins. */
+  readinessLog?: ReadinessEntry[];
+};
+
+export type LocalTeamCalendar = {
+  events: CalendarEvent[];
+  /** groupKey → dates lightened. */
+  lightDates: Record<string, string[]>;
+  unposted?: boolean;
+};
+
+export type ReadinessEntry = {
+  day: string; // YYYY-MM-DD
+  sleep: number;
+  soreness: number;
+  energy: number;
+  pain: boolean;
+  painNote?: string;
+  /** Teams this check-in has been sent to. */
+  sentTo: string[];
 };
 
 export type TouchLog = { date: string; inches: number };

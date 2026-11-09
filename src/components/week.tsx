@@ -149,7 +149,7 @@ export function ProgramWeek({
       {plan.map((p, i) => {
         const vb = p.dayType;
         const session = program.sessions.find((s) => s.id === p.sessionId);
-        const advice = p.note ?? dayAdvice(types, i, !!session, isHeavyLegs(session));
+        const advice = (p.light && session ? 'Coach lightened this day: fewer sets, easy effort. ' : '') + (p.note ?? dayAdvice(types, i, !!session, isHeavyLegs(session)) ?? '') || null;
         const vbLabel = DAY_TYPES.find((x) => x.id === vb)!.label;
         const isToday = p.date === todayKey;
         return (

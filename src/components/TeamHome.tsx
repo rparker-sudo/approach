@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { isDemoMode } from '../lib/backend';
+import { backend, isDemoMode } from '../lib/backend';
 import { useStore } from '../lib/store';
 import { teamProgramId, useTeams } from '../lib/team';
 import { formatDate } from '../lib/util';
@@ -20,7 +20,7 @@ export function weekStart(d = new Date()) {
 /** Coach home: the teams this coach manages. */
 export default function TeamHome() {
   const { data } = useStore();
-  const { account, teams, members, logs, posted, syncing, lastError, refresh, createTeam } = useTeams();
+  const { account, teams, members, logs, postedFor, hasUnposted, syncing, lastError, refresh, createTeam } = useTeams();
   const insets = useSafeAreaInsets();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
@@ -66,6 +66,12 @@ export default function TeamHome() {
             <Note>Demo mode: teams live on this device only. Connect Supabase to sync with athletes' phones.</Note>
           ) : null}
           {lastError ? <Text style={{ color: colors.error, fontSize: 13 }}>{lastError}</Text> : null}
+          {backend.needsUpdate?.() ? (
+            <Note>
+              Your database needs the 2.0 update for groups, the team calendar and check-ins. In Supabase → SQL Editor, run
+              supabase/migrations/002_approach_2.sql (see the README). Everything else keeps working.
+            </Note>
+          ) : null}
 
           {teams.length === 0 && !adding ? (
             <Card>
@@ -80,8 +86,8 @@ export default function TeamHome() {
             const weekLogs = (logs[t.id] ?? []).filter((l) => l.date >= since);
             const trained = new Set(weekLogs.map((l) => l.userId)).size;
             const local = data.programs.find((p) => p.id === teamProgramId(t.id));
-            const tp = posted[t.id];
-            const status = local?.unposted ? 'Changes not posted' : tp ? `Posted ${formatDate(tp.updatedAt)}` : 'No workout posted';
+            const tp = postedFor(t.id);
+            const status = hasUnposted(t.id) && (local || tp) ? 'Changes not posted' : tp ? `Posted ${formatDate(tp.updatedAt)}` : 'No workout posted';
             const programName = local?.name ?? tp?.program.name;
             return (
               <Pressable key={t.id} accessibilityRole="button" onPress={() => router.push(`/team/${t.id}`)}>
@@ -96,7 +102,7 @@ export default function TeamHome() {
                     <Icon name="chevron.right" size={14} color={colors.faint} />
                   </Row>
                   <Row style={{ gap: 6, flexWrap: 'wrap' }}>
-                    <Pill text={status} bg={local?.unposted ? colors.day.game : undefined} />
+                    <Pill text={status} bg={status === 'Changes not posted' ? colors.day.game : undefined} />
                     {roster.length ? (
                       <Pill
                         text={`${trained}/${roster.length} trained this week`}

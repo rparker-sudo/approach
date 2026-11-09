@@ -5,12 +5,15 @@ import {
   Account,
   Backend,
   BackendError,
+  Group,
   makeJoinCode,
   Member,
   normalizeCode,
   setsDone,
   SignUpInput,
+  Readiness,
   Team,
+  TeamCalendar,
   TeamLog,
   TeamProgram,
 } from './types';
@@ -26,18 +29,24 @@ const KEY = 'load-and-launch/demo-server/v1';
 type DB = {
   users: (Account & { password: string })[];
   teams: Team[];
-  members: { teamId: string; userId: string; joinedAt: string }[];
+  members: { teamId: string; userId: string; joinedAt: string; groupId?: string | null }[];
   programs: TeamProgram[];
   logs: TeamLog[];
+  groups: Group[];
+  calendars: TeamCalendar[];
+  readiness: Readiness[];
   sessionUserId: string | null;
 };
 
-const EMPTY: DB = { users: [], teams: [], members: [], programs: [], logs: [], sessionUserId: null };
+const EMPTY: DB = { users: [], teams: [], members: [], programs: [], logs: [], groups: [], calendars: [], readiness: [], sessionUserId: null };
 
 async function load(): Promise<DB> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
-    return raw ? { ...EMPTY, ...(JSON.parse(raw) as DB) } : { ...EMPTY };
+    if (!raw) return { ...EMPTY };
+    const db = { ...EMPTY, ...(JSON.parse(raw) as DB) };
+    db.programs = db.programs.map((p) => ({ ...p, groupKey: p.groupKey ?? 'all' })); // 1.0 data
+    return db;
   } catch {
     return { ...EMPTY };
   }
@@ -125,7 +134,11 @@ export const localBackend: Backend = {
         : db.members.filter((m) => m.userId === user.id).map((m) => m.teamId);
     return db.teams
       .filter((t) => ids.includes(t.id))
-      .map((t) => ({ ...t, coachName: db.users.find((u) => u.id === t.coachId)?.name }));
+      .map((t) => ({
+        ...t,
+        coachName: db.users.find((u) => u.id === t.coachId)?.name,
+        myGroupId: user.role === 'coach' ? undefined : db.members.find((m) => m.teamId === t.id && m.userId === user.id)?.groupId ?? null,
+      }));
   },
 
   async createTeam(name) {
@@ -152,6 +165,9 @@ export const localBackend: Backend = {
     db.members = db.members.filter((m) => m.teamId !== teamId);
     db.programs = db.programs.filter((p) => p.teamId !== teamId);
     db.logs = db.logs.filter((l) => l.teamId !== teamId);
+    db.groups = db.groups.filter((g) => g.teamId !== teamId);
+    db.calendars = db.calendars.filter((c) => c.teamId !== teamId);
+    db.readiness = db.readiness.filter((r) => r.teamId !== teamId);
     await save(db);
   },
 
@@ -161,7 +177,7 @@ export const localBackend: Backend = {
       .filter((m) => m.teamId === teamId)
       .map((m): Member => {
         const u = db.users.find((x) => x.id === m.userId);
-        return { userId: m.userId, name: u?.name ?? 'Athlete', position: u?.position ?? null, joinedAt: m.joinedAt };
+        return { userId: m.userId, name: u?.name ?? 'Athlete', position: u?.position ?? null, joinedAt: m.joinedAt, groupId: m.groupId ?? null };
       });
   },
 
@@ -172,11 +188,11 @@ export const localBackend: Backend = {
     await save(db);
   },
 
-  async postProgram(teamId, program: Program) {
+  async postProgram(teamId, groupKey, program: Program) {
     const { db, user } = await me();
     coachOf(db, teamId, user.id);
-    const tp: TeamProgram = { teamId, program, updatedAt: new Date().toISOString() };
-    db.programs = [...db.programs.filter((p) => p.teamId !== teamId), tp];
+    const tp: TeamProgram = { teamId, groupKey, program, updatedAt: new Date().toISOString() };
+    db.programs = [...db.programs.filter((p) => !(p.teamId === teamId && p.groupKey === groupKey)), tp];
     await save(db);
     return tp;
   },
@@ -205,6 +221,75 @@ export const localBackend: Backend = {
     const { db, user } = await me();
     db.members = db.members.filter((m) => !(m.teamId === teamId && m.userId === user.id));
     await save(db);
+  },
+
+  async listGroups(teamId) {
+    const db = await load();
+    return db.groups.filter((g) => g.teamId === teamId);
+  },
+
+  async createGroup(teamId, name, positionHint) {
+    const { db, user } = await me();
+    coachOf(db, teamId, user.id);
+    const g: Group = { id: uid(), teamId, name: name.trim(), positionHint: positionHint ?? null };
+    db.groups.push(g);
+    await save(db);
+    return g;
+  },
+
+  async renameGroup(groupId, name) {
+    const { db, user } = await me();
+    const g = db.groups.find((x) => x.id === groupId);
+    if (!g) throw new BackendError("That group doesn't exist anymore.");
+    coachOf(db, g.teamId, user.id);
+    g.name = name.trim();
+    await save(db);
+  },
+
+  async deleteGroup(groupId) {
+    const { db, user } = await me();
+    const g = db.groups.find((x) => x.id === groupId);
+    if (!g) return;
+    coachOf(db, g.teamId, user.id);
+    db.groups = db.groups.filter((x) => x.id !== groupId);
+    db.members = db.members.map((m) => (m.groupId === groupId ? { ...m, groupId: null } : m));
+    db.programs = db.programs.filter((p) => !(p.teamId === g.teamId && p.groupKey === groupId));
+    await save(db);
+  },
+
+  async assignGroup(teamId, userId, groupId) {
+    const { db, user } = await me();
+    coachOf(db, teamId, user.id);
+    db.members = db.members.map((m) => (m.teamId === teamId && m.userId === userId ? { ...m, groupId } : m));
+    await save(db);
+  },
+
+  async getCalendars(teamIds) {
+    const db = await load();
+    return db.calendars.filter((c) => teamIds.includes(c.teamId));
+  },
+
+  async postCalendar(cal) {
+    const { db, user } = await me();
+    coachOf(db, cal.teamId, user.id);
+    const c: TeamCalendar = { ...cal, updatedAt: new Date().toISOString() };
+    db.calendars = [...db.calendars.filter((x) => x.teamId !== cal.teamId), c];
+    await save(db);
+    return c;
+  },
+
+  async submitReadiness(r) {
+    const { db, user } = await me();
+    if (!db.members.some((m) => m.teamId === r.teamId && m.userId === user.id)) throw new BackendError("You're not on that team.");
+    db.readiness = [...db.readiness.filter((x) => !(x.teamId === r.teamId && x.userId === user.id && x.day === r.day)), { ...r, userId: user.id }];
+    await save(db);
+  },
+
+  async listReadiness(teamId, day) {
+    const db = await load();
+    return db.readiness
+      .filter((r) => r.teamId === teamId && r.day === day)
+      .map((r) => ({ ...r, userName: db.users.find((u) => u.id === r.userId)?.name ?? 'Athlete' }));
   },
 
   async addLog(log: WorkoutLog, teamId) {

@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
+import ReadinessCard from '../../components/ReadinessCard';
 import ScreenHeader from '../../components/ScreenHeader';
 import TeamHome from '../../components/TeamHome';
 import {
@@ -94,6 +95,7 @@ function Today() {
     <Screen tab>
       <ScreenHeader title="Lift" subtitle={dateLine} />
       <Text style={{ fontSize: 20, fontWeight: '600' }}>{captainLine(activeProgram, day)}</Text>
+      <ReadinessCard />
 
       <Card>
         <Row style={{ justifyContent: 'space-between' }}>

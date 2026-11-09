@@ -74,7 +74,7 @@ export default function ProgramDetail({ program, afterDelete }: { program: Progr
             title={`Post to ${program.teamName ?? 'team'}`}
             icon="square.and.arrow.up"
             onPress={() =>
-              postTeamProgram(program.teamId!)
+              postTeamProgram(program.teamId!, program.groupKey ?? 'all')
                 .then(() => showAlert('Workout posted', 'Everyone on the roster has the new plan.'))
                 .catch((e) => showAlert("Couldn't post", e instanceof Error ? e.message : 'Try again.'))
             }

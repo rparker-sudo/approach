@@ -16,6 +16,12 @@ The app has four tabs: **Lift** (today's training), **Fuel** (meals and hydratio
 
 **Athlete mode**
 - Builds a weight-training program from your position, lifting experience, time of year (off-season, preseason, in-season or post-season) and your weekly volleyball schedule
+- **Any number of lift days (1–7)**: each count gets its own split (total body, upper/lower, power days, recovery), and sessions get shorter as days go up
+- **Built for your gym**: pick what you have (full weight room, dumbbells & bench, bands & bodyweight, or item by item) and every exercise fits it
+- **Weekly progression**: 4-week blocks (3 building weeks, then a deload week). The workout suggests your next weight: "Last: 135 × 5, 5, 5 → Try 140 (+5)"
+- **Workout view with rest timers**: one exercise at a time (or a list), big Done buttons, and a rest countdown that starts when you finish a set (−15s / +15s / Skip). Keeps the screen awake, survives closing the app, and ends with a summary and new bests
+- **Exercise how-to**: tap any exercise for why it matters for volleyball, steps, coaching cues, common mistakes, equipment, and easier/harder options
+- **Daily check-in**: sleep, soreness, energy and pain. It never changes your workout by itself
 - Never lifts on match days, keeps heavy legs away from the day before a match, and spreads sessions out
 - **Pick your lift days**: the app suggests days, and you tap the days you actually lift. Change them anytime under Plan → Edit lift days, no rebuild needed
 - **Season calendar**: mark real match, tournament and day-off dates (with names like "Reno Classic"). When an event lands on a lift day, that week's lift moves to the nearest good day, or a lighter session is swapped in the day before a match, with a note saying what changed. Tap any date to choose its lift yourself
@@ -31,6 +37,9 @@ The app has four tabs: **Lift** (today's training), **Fuel** (meals and hydratio
 - The coach sets the team's lift days and season calendar (match and tournament dates). Athletes see them read-only.
 - **QR code invites**: Team → Show QR code. Athletes scan it with the iPhone Camera; it opens the app's join page with the team code filled in. Before the App Store launch it opens the browser version; afterward Safari also offers the iPhone app.
 - See the roster, who trained this week, and each athlete's recent lifts and notes.
+- **Position groups**: one tap makes Hitters, Middles, Setters and Liberos / DS and places athletes by position (or make your own groups). Each group gets its own workout; anyone not in a group gets the Whole team workout. The season calendar is shared.
+- **Readiness**: today's check-ins at a glance (who's run down, who reported pain). When several athletes are run down, the app suggests a lighter day; **you decide**. "Lighten today" gives the whole team or a group the same exercises with fewer sets and easy effort, and can be undone.
+- **Rest times**: set per exercise in 15-second steps; athletes' timers use them.
 
 **Athletes on a team** make an account, enter the team code once, and the team workout becomes their plan. Logged workouts go to the coach. **Solo athletes** can skip accounts and build their own program.
 
@@ -45,7 +54,9 @@ Team sync needs a free Supabase project. Until you connect one, the app runs in 
 5. In the project folder, copy `.env.example` to `.env` and paste in those two values.
 6. Restart the app (`npx expo start`). The demo-mode notes disappear when sync is on.
 
-What is stored online: name, email, role, position, team membership, posted team workouts, and the workouts athletes log for a team. Body weight, touch height and fuel targets stay on the phone. Coaches see only their own teams; athletes see only their team's workout and their coach's name. Check with your district before collecting student data, especially for athletes under 13.
+**Upgrading from 1.x?** Paste `supabase/migrations/002_approach_2.sql` into the SQL Editor and click **Run** once. It adds groups, the shared team calendar and readiness check-ins, and keeps everything you already have. (New projects don't need it; `schema.sql` includes it.)
+
+What is stored online: name, email, role, position, team membership and group, posted team workouts and calendar, the workouts athletes log for a team, and daily check-ins (sleep, soreness, energy, pain and an optional note), which only the athlete and their coach can see. Body weight, touch height and fuel targets stay on the phone. Coaches see only their own teams; athletes see only their team's workout and their coach's name. Check with your district before collecting student data, especially for athletes under 13.
 
 The claude.ai preview link can't reach Supabase, so it always runs in demo mode. Use the app in Expo Go or the GitHub Pages site for live sync.
 
@@ -151,7 +162,7 @@ src/lib/
 src/components/     Shared UI pieces (ui.tsx holds the brand Text, buttons, logo and net tape)
 ```
 
-## Ideas for version 2
-- Multi-week progression (for example, adding weight automatically week to week)
-- Exercise demo videos
+## Ideas for later
 - Season phases by date (switch from preseason to in-season lifting automatically)
+- Coach view of each athlete's weights over time
+- Exercise demo videos

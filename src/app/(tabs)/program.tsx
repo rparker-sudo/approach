@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import ProgramDetail from '../../components/ProgramDetail';
 import ScreenHeader from '../../components/ScreenHeader';
-import { Body, Button, Card, colors, H2, Icon, Label, NetTape, Pill, Row, Screen } from '../../components/ui';
+import { Body, Button, Card, colors, H2, Icon, Label, NetTape, Pill, Row, Screen, Text } from '../../components/ui';
 import { formatKey, today, upcomingEvents } from '../../lib/calendar';
 import { useStore } from '../../lib/store';
 import { teamProgramId, useTeams } from '../../lib/team';
@@ -12,7 +12,7 @@ import { PHASES } from '../../lib/types';
 
 export default function ProgramTab() {
   const { data, activeProgram } = useStore();
-  const { account, teams, posted } = useTeams();
+  const { account, teams, postedFor } = useTeams();
   const coach = data.profile?.role === 'coach';
 
   if (coach) {
@@ -28,20 +28,28 @@ export default function ProgramTab() {
           </Card>
         ) : (
           teams.map((t) => {
-            const p = data.programs.find((x) => x.id === teamProgramId(t.id));
+            const teamPrograms = data.programs.filter((x) => x.teamId === t.id);
             return (
               <Pressable key={t.id} accessibilityRole="button" onPress={() => router.push(`/team/${t.id}`)}>
                 <Card>
                   <Row style={{ justifyContent: 'space-between' }}>
-                    <View style={{ flex: 1, gap: 4 }}>
+                    <View style={{ flex: 1, gap: 6 }}>
                       <Label>{t.name}</Label>
-                      <H2>{p?.name ?? 'No workout yet'}</H2>
-                      <Row style={{ gap: 6, flexWrap: 'wrap' }}>
-                        {p ? <Pill text={PHASES.find((x) => x.id === p.phase)!.label} bg={colors.day.game} /> : null}
-                        <Pill
-                          text={p?.unposted ? 'Changes not posted' : posted[t.id] ? `Posted ${formatDate(posted[t.id].updatedAt)}` : 'Not posted'}
-                        />
-                      </Row>
+                      {teamPrograms.length === 0 ? <H2>No workout yet</H2> : null}
+                      {teamPrograms.map((p) => {
+                        const tp = postedFor(t.id, p.groupKey ?? 'all');
+                        return (
+                          <View key={p.id} style={{ gap: 4 }}>
+                            <Text style={{ fontSize: 16, fontWeight: '600' }}>
+                              {p.groupName ?? 'Whole team'} <Text style={{ fontSize: 13, color: colors.muted }}>· {p.name}</Text>
+                            </Text>
+                            <Row style={{ gap: 6, flexWrap: 'wrap' }}>
+                              <Pill text={PHASES.find((x) => x.id === p.phase)!.label} bg={colors.day.game} />
+                              <Pill text={p.unposted || !tp ? 'Not posted' : `Posted ${formatDate(tp.updatedAt)}`} />
+                            </Row>
+                          </View>
+                        );
+                      })}
                     </View>
                     <Icon name="chevron.right" size={14} color={colors.faint} />
                   </Row>

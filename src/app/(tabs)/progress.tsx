@@ -49,6 +49,20 @@ export default function Progress() {
     <Screen tab>
       <ScreenHeader title="Progress" subtitle="Touch height and strength" />
       <AboveTheNet />
+      {(data.readinessLog ?? []).length ? (
+        <Card>
+          <H2>Check-ins</H2>
+          {[...(data.readinessLog ?? [])].reverse().slice(0, 7).map((r) => (
+            <Row key={r.day} style={{ justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 13, color: colors.muted }}>{formatDate(r.day + 'T12:00:00')}</Text>
+              <Text style={{ fontSize: 13 }}>
+                Sleep {r.sleep} · Sore {r.soreness} · Energy {r.energy}
+                {r.pain ? ' · Pain' : ''}
+              </Text>
+            </Row>
+          ))}
+        </Card>
+      ) : null}
       <Row style={{ gap: 12 }}>
         <Big label="Workouts" value={String(data.logs.length)} />
         <Big label="Last 4 weeks" value={String(last28)} />

@@ -1,14 +1,14 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { RefreshControl, ScrollView, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { weekStart } from '../../components/TeamHome';
-import { Body, Button, Card, colors, display, Field, H2, Label, Note, Pill, Row, Text } from '../../components/ui';
+import { Body, Button, Card, Chip, ChipRow, colors, display, Field, H2, Icon, Label, Note, Pill, Row, Text } from '../../components/ui';
 import { isDemoMode } from '../../lib/backend';
-import { ProgramWeek } from '../../components/week';
+import { dateKey, today } from '../../lib/calendar';
 import { showAlert } from '../../lib/dialog';
 import { shareTeamInvite } from '../../lib/share';
 import { useStore } from '../../lib/store';
-import { teamProgramId, useTeams } from '../../lib/team';
+import { ALL, summarizeReadiness, teamProgramId, useTeams } from '../../lib/team';
 import { PHASES } from '../../lib/types';
 import { formatDate } from '../../lib/util';
 
@@ -17,9 +17,12 @@ export default function TeamScreen() {
   const { data } = useStore();
   const t = useTeams();
   const team = t.teams.find((x) => x.id === id);
-  const [posting, setPosting] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [newName, setNewName] = useState('');
+  const [addingGroup, setAddingGroup] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [openMember, setOpenMember] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (!team) {
@@ -30,33 +33,56 @@ export default function TeamScreen() {
     );
   }
 
-  const program = data.programs.find((p) => p.id === teamProgramId(team.id));
-  const tp = t.posted[team.id];
+  const groups = t.groups[team.id] ?? [];
   const roster = t.members[team.id] ?? [];
   const logs = t.logs[team.id] ?? [];
   const since = weekStart().toISOString();
-  const needsPost = !!program && (program.unposted || !tp);
+  const day = dateKey(today());
+  const cal = data.teamCalendars?.[team.id];
+  const lightToday = (key: string) => !!cal?.lightDates[key]?.includes(day);
+  const groupName_ = (gid: string | null | undefined) => (gid ? groups.find((g) => g.id === gid)?.name ?? 'Whole team' : 'Whole team');
+  const workoutKeys = [ALL, ...groups.map((g) => g.id)];
+  const anyUnposted = t.hasUnposted(team.id);
+  const firstProgram = data.programs.find((p) => p.teamId === team.id);
 
-  async function post() {
-    setPosting(true);
-    setError(null);
-    try {
-      await t.postTeamProgram(team!.id);
-      showAlert('Workout posted', `Everyone on ${team!.name} has the new plan.`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't post. Try again.");
-    } finally {
-      setPosting(false);
-    }
-  }
+  // Readiness: whole team, and per group.
+  const checkins = t.readiness[team.id] ?? [];
+  const overall = summarizeReadiness(checkins, roster.length);
+  const perGroup = groups.map((g) => {
+    const ids = roster.filter((m) => m.groupId === g.id).map((m) => m.userId);
+    return { g, s: summarizeReadiness(checkins.filter((r) => ids.includes(r.userId)), ids.length) };
+  });
 
-  async function act(fn: () => Promise<void>) {
+  async function act(fn: () => Promise<void>, done?: string) {
+    setBusy(true);
     setError(null);
     try {
       await fn();
+      if (done) showAlert(done);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong.');
+    } finally {
+      setBusy(false);
     }
+  }
+
+  function lightenButton(key: string, label: string) {
+    const on = lightToday(key);
+    return (
+      <Button
+        key={key}
+        small
+        kind={on ? 'ghost' : 'primary'}
+        title={on ? `Undo lighter day (${label})` : `Lighten today: ${label}`}
+        disabled={busy}
+        onPress={() =>
+          act(
+            () => t.setLightDay(team!.id, key, day, !on),
+            on ? `Back to the normal workout for ${label}.` : `${label} has a lighter workout today: fewer sets, easy effort.`,
+          )
+        }
+      />
+    );
   }
 
   return (
@@ -70,6 +96,59 @@ export default function TeamScreen() {
       <Stack.Screen options={{ title: team.name }} />
       {error ? <Text style={{ color: colors.error, fontSize: 13 }}>{error}</Text> : null}
 
+      {anyUnposted ? (
+        <Card>
+          <Text style={{ fontWeight: '600' }}>Changes not posted</Text>
+          <Text style={{ fontSize: 13, color: colors.muted }}>Athletes get new workouts, days and calendar dates after you post.</Text>
+          <Button title={busy ? 'Posting…' : 'Post all changes'} icon="square.and.arrow.up" disabled={busy} onPress={() => act(() => t.postTeam(team.id), 'Posted. Your athletes have the latest plan.')} />
+        </Card>
+      ) : null}
+
+      {/* ---------- Readiness ---------- */}
+      <Card>
+        <Label>Today's readiness</Label>
+        {roster.length === 0 ? (
+          <Body muted>Athletes check in on their Lift screen each day: sleep, soreness, energy and pain.</Body>
+        ) : (
+          <>
+            <Text style={{ fontSize: 16, fontWeight: '600' }}>
+              {overall.checkedIn} of {roster.length} checked in · {overall.low.length} run down · {overall.pain.length} pain
+            </Text>
+            {overall.suggest ? <Note>Several athletes are run down. Consider a lighter workout today. It's your call.</Note> : null}
+            {perGroup
+              .filter((x) => x.s.suggest)
+              .map((x) => (
+                <Note key={x.g.id}>{`${x.g.name}: ${x.s.low.length} of ${x.s.checkedIn} checked in are run down.`}</Note>
+              ))}
+            {overall.pain.length || overall.low.length ? (
+              <View style={{ gap: 4 }}>
+                <Text style={{ fontSize: 13, color: colors.muted }}>Check in with</Text>
+                {[...overall.pain, ...overall.low.filter((r) => !r.pain)].map((r) => (
+                  <Text key={r.userId} style={{ fontSize: 13 }}>
+                    {r.userName}
+                    <Text style={{ color: colors.muted }}>
+                      {' '}
+                      · sleep {r.sleep}/5 · soreness {r.soreness}/5 · energy {r.energy}/5
+                      {r.pain ? ` · pain${r.painNote ? `: ${r.painNote}` : ''}` : ''}
+                    </Text>
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+            <View style={{ gap: 8 }}>
+              {(overall.suggest || lightToday(ALL)) ? lightenButton(ALL, 'whole team') : null}
+              {perGroup.filter((x) => x.s.suggest || lightToday(x.g.id)).map((x) => lightenButton(x.g.id, x.g.name))}
+              {!overall.suggest && !lightToday(ALL) ? (
+                <Text style={{ fontSize: 12, color: colors.faint }}>
+                  You can lighten today anytime from here: <Text onPress={() => act(() => t.setLightDay(team.id, ALL, day, true), 'The whole team has a lighter workout today.')} style={{ fontSize: 12, textDecorationLine: 'underline', color: colors.muted }}>lighten for the whole team</Text>.
+                </Text>
+              ) : null}
+            </View>
+          </>
+        )}
+      </Card>
+
+      {/* ---------- Team code ---------- */}
       <Card>
         <Label>Team code</Label>
         <Text selectable style={[display(32), { textAlign: 'center', paddingVertical: 4 }]}>
@@ -81,80 +160,134 @@ export default function TeamScreen() {
         {isDemoMode ? <Note>Demo mode: athletes on other phones can't join yet. Connect Supabase first (see the README).</Note> : null}
         <Row>
           <View style={{ flex: 1 }}>
-            <Button
-              title="Show QR code"
-              onPress={() => router.push({ pathname: '/invite', params: { teamId: team.id } })}
-            />
+            <Button title="Show QR code" onPress={() => router.push({ pathname: '/invite', params: { teamId: team.id } })} />
           </View>
           <View style={{ flex: 1 }}>
-            <Button
-              kind="secondary"
-              title="Share link"
-              icon="square.and.arrow.up"
-              onPress={() => shareTeamInvite(team.name, team.joinCode, t.account?.name)}
-            />
+            <Button kind="secondary" title="Share link" icon="square.and.arrow.up" onPress={() => shareTeamInvite(team.name, team.joinCode, t.account?.name)} />
           </View>
         </Row>
       </Card>
 
+      {/* ---------- Workouts by group ---------- */}
       <View style={{ gap: 8 }}>
-        <Label>Team workout</Label>
-        {program ? (
-          <>
-            <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <View style={{ flex: 1, gap: 6 }}>
-                <H2>{program.name}</H2>
-                <Row style={{ gap: 6, flexWrap: 'wrap' }}>
-                  <Pill text={PHASES.find((p) => p.id === program.phase)!.label} bg={colors.day.game} />
-                  <Pill text={needsPost ? (tp ? 'Changes not posted' : 'Not posted yet') : `Posted ${formatDate(tp!.updatedAt)}`} />
-                </Row>
-              </View>
-            </Row>
-            {needsPost ? (
-              <Button title={posting ? 'Posting…' : `Post to ${team.name}`} icon="square.and.arrow.up" disabled={posting} onPress={post} />
-            ) : null}
-            <Text style={{ fontSize: 13, color: colors.muted }}>Tap a lift to edit it. Post again to send changes.</Text>
-            <ProgramWeek
-              program={program}
-              onPressSession={(sessionId) => router.push({ pathname: '/session', params: { programId: program.id, sessionId } })}
-            />
+        <Label>Workouts</Label>
+        <Text style={{ fontSize: 13, color: colors.muted }}>
+          Each group can have its own workout. Athletes not in a group get the Whole team workout. The season calendar is shared.
+        </Text>
+        {workoutKeys.map((key) => {
+          const program = data.programs.find((p) => p.id === teamProgramId(team.id, key));
+          const tp = t.postedFor(team.id, key);
+          const label = key === ALL ? 'Whole team' : groups.find((g) => g.id === key)?.name ?? 'Group';
+          const count = key === ALL ? roster.filter((m) => !m.groupId).length : roster.filter((m) => m.groupId === key).length;
+          const needsPost = !!program && (program.unposted || !tp);
+          return (
+            <Card key={key}>
+              <Row style={{ justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 16, fontWeight: '600' }}>{label}</Text>
+                <Text style={{ fontSize: 13, color: colors.muted }}>
+                  {count} {count === 1 ? 'athlete' : 'athletes'}
+                </Text>
+              </Row>
+              {program ? (
+                <Pressable accessibilityRole="button" onPress={() => router.push(`/program/${program.id}`)}>
+                  <Row style={{ justifyContent: 'space-between' }}>
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <Text style={{ fontWeight: '600' }}>{program.name}</Text>
+                      <Row style={{ gap: 6, flexWrap: 'wrap' }}>
+                        <Pill text={PHASES.find((p) => p.id === program.phase)!.label} bg={colors.day.game} />
+                        <Pill text={`${program.liftSchedule.filter(Boolean).length} lift days`} />
+                        <Pill text={needsPost ? 'Not posted' : `Posted ${formatDate(tp!.updatedAt)}`} />
+                        {lightToday(key) || lightToday(ALL) ? <Pill text="Light today" /> : null}
+                      </Row>
+                    </View>
+                    <Icon name="chevron.right" size={14} color={colors.faint} />
+                  </Row>
+                </Pressable>
+              ) : (
+                <Text style={{ fontSize: 13, color: colors.muted }}>No workout yet.</Text>
+              )}
+              <Row>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    small
+                    kind={program ? 'ghost' : 'primary'}
+                    title={program ? 'Rebuild' : 'Build workout'}
+                    icon="wand.and.stars"
+                    onPress={() => router.push({ pathname: '/builder', params: { teamId: team.id, groupKey: key, ...(program ? { programId: program.id } : {}) } })}
+                  />
+                </View>
+                {needsPost ? (
+                  <View style={{ flex: 1 }}>
+                    <Button small title="Post" disabled={busy} onPress={() => act(() => t.postTeamProgram(team.id, key), `${label} has the new workout.`)} />
+                  </View>
+                ) : null}
+              </Row>
+              {key !== ALL ? (
+                <Text
+                  accessibilityRole="button"
+                  onPress={() =>
+                    showAlert(`Delete ${label}?`, 'Athletes in this group move to the Whole team workout.', [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Delete', style: 'destructive', onPress: () => act(() => t.deleteGroup(key)) },
+                    ])
+                  }
+                  style={{ fontSize: 12, color: colors.faint }}
+                >
+                  Delete group
+                </Text>
+              ) : null}
+            </Card>
+          );
+        })}
+        {addingGroup ? (
+          <Card>
+            <Field placeholder="Group name, e.g. Middles" value={groupName} onChangeText={setGroupName} autoFocus maxLength={40} />
             <Row>
               <View style={{ flex: 1 }}>
-                <Button
-                  kind="secondary"
-                  title="Season calendar"
-                  icon="calendar"
-                  onPress={() => router.push({ pathname: '/calendar', params: { programId: program.id } })}
-                />
+                <Button kind="ghost" title="Cancel" onPress={() => setAddingGroup(false)} />
               </View>
               <View style={{ flex: 1 }}>
                 <Button
-                  kind="secondary"
-                  title="Lift days"
-                  icon="dumbbell"
-                  onPress={() => router.push({ pathname: '/schedule', params: { programId: program.id } })}
+                  title="Add group"
+                  disabled={!groupName.trim() || busy}
+                  onPress={() =>
+                    act(async () => {
+                      await t.createGroup(team.id, groupName);
+                      setGroupName('');
+                      setAddingGroup(false);
+                    })
+                  }
                 />
               </View>
             </Row>
-            <Button
-              kind="ghost"
-              title="Change schedule & rebuild"
-              icon="arrow.triangle.2.circlepath"
-              onPress={() => router.push({ pathname: '/builder', params: { programId: program.id, teamId: team.id } })}
-            />
-          </>
-        ) : (
-          <Card>
-            <Body muted>No workout yet. Build one and post it, and every athlete on the roster gets it.</Body>
-            <Button
-              title="Build team workout"
-              icon="wand.and.stars"
-              onPress={() => router.push({ pathname: '/builder', params: { teamId: team.id } })}
-            />
           </Card>
+        ) : (
+          <Row>
+            <View style={{ flex: 1 }}>
+              <Button kind="ghost" small title="Add group" icon="plus" onPress={() => setAddingGroup(true)} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button
+                kind="ghost"
+                small
+                title="Groups by position"
+                disabled={busy}
+                onPress={() => act(() => t.autoGroupByPosition(team.id), 'Made Hitters, Middles, Setters and Liberos / DS, and placed athletes by position.')}
+              />
+            </View>
+          </Row>
         )}
+        {firstProgram ? (
+          <Button
+            kind="secondary"
+            title="Season calendar"
+            icon="calendar"
+            onPress={() => router.push({ pathname: '/calendar', params: { programId: firstProgram.id } })}
+          />
+        ) : null}
       </View>
 
+      {/* ---------- Roster ---------- */}
       <View style={{ gap: 8 }}>
         <Label>{`Roster · ${roster.length}`}</Label>
         {roster.length === 0 ? (
@@ -166,34 +299,52 @@ export default function TeamScreen() {
             {roster.map((m, i) => {
               const mine = logs.filter((l) => l.userId === m.userId);
               const week = mine.filter((l) => l.date >= since).length;
+              const open = openMember === m.userId;
+              const ci = checkins.find((r) => r.userId === m.userId);
               return (
-                <Row
-                  key={m.userId}
-                  style={{ paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: colors.line, alignItems: 'flex-start' }}
-                >
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={{ fontSize: 16, fontWeight: '600' }}>{m.name}</Text>
-                    <Text style={{ fontSize: 13, color: colors.muted }}>
-                      {m.position ?? 'Position not set'}
-                      {mine[0] ? ` · Last lift ${formatDate(mine[0].date)}` : ' · No lifts logged'}
-                    </Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                    <Pill text={`${week} this week`} achievement={week > 0} />
-                    <Text
-                      accessibilityRole="button"
-                      onPress={() =>
-                        showAlert(`Remove ${m.name}?`, `They'll stop getting ${team.name} workouts.`, [
-                          { text: 'Cancel', style: 'cancel' },
-                          { text: 'Remove', style: 'destructive', onPress: () => act(() => t.removeMember(team.id, m.userId)) },
-                        ])
-                      }
-                      style={{ fontSize: 12, color: colors.faint }}
-                    >
-                      Remove
-                    </Text>
-                  </View>
-                </Row>
+                <View key={m.userId} style={{ paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: colors.line, gap: 8 }}>
+                  <Pressable accessibilityRole="button" onPress={() => setOpenMember(open ? null : m.userId)}>
+                    <Row style={{ alignItems: 'flex-start' }}>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Text style={{ fontSize: 16, fontWeight: '600' }}>{m.name}</Text>
+                        <Text style={{ fontSize: 13, color: colors.muted }}>
+                          {m.position ?? 'Position not set'} · {groupName_(m.groupId)}
+                          {mine[0] ? ` · Last lift ${formatDate(mine[0].date)}` : ' · No lifts logged'}
+                        </Text>
+                        {ci ? (
+                          <Text style={{ fontSize: 12, color: ci.pain ? colors.warning : colors.muted }}>
+                            Today: sleep {ci.sleep} · soreness {ci.soreness} · energy {ci.energy}
+                            {ci.pain ? ' · pain' : ''}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Pill text={`${week} this week`} achievement={week > 0} />
+                    </Row>
+                  </Pressable>
+                  {open ? (
+                    <View style={{ gap: 8 }}>
+                      <Text style={{ fontSize: 12, color: colors.muted }}>Group</Text>
+                      <ChipRow>
+                        <Chip label="Whole team" selected={!m.groupId} onPress={() => act(() => t.assignGroup(team.id, m.userId, null))} />
+                        {groups.map((g) => (
+                          <Chip key={g.id} label={g.name} selected={m.groupId === g.id} onPress={() => act(() => t.assignGroup(team.id, m.userId, g.id))} />
+                        ))}
+                      </ChipRow>
+                      <Text
+                        accessibilityRole="button"
+                        onPress={() =>
+                          showAlert(`Remove ${m.name}?`, `They'll stop getting ${team.name} workouts.`, [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Remove', style: 'destructive', onPress: () => act(() => t.removeMember(team.id, m.userId)) },
+                          ])
+                        }
+                        style={{ fontSize: 12, color: colors.faint }}
+                      >
+                        Remove from team
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
               );
             })}
           </Card>
@@ -232,13 +383,25 @@ export default function TeamScreen() {
                 <Button
                   title="Save"
                   disabled={!newName.trim()}
-                  onPress={() => act(async () => { await t.renameTeam(team.id, newName); setRenaming(false); })}
+                  onPress={() =>
+                    act(async () => {
+                      await t.renameTeam(team.id, newName);
+                      setRenaming(false);
+                    })
+                  }
                 />
               </View>
             </Row>
           </Card>
         ) : (
-          <Button kind="ghost" title="Rename team" onPress={() => { setNewName(team.name); setRenaming(true); }} />
+          <Button
+            kind="ghost"
+            title="Rename team"
+            onPress={() => {
+              setNewName(team.name);
+              setRenaming(true);
+            }}
+          />
         )}
         <Button
           kind="danger"
@@ -249,7 +412,11 @@ export default function TeamScreen() {
               {
                 text: 'Delete',
                 style: 'destructive',
-                onPress: () => act(async () => { await t.deleteTeam(team.id); router.back(); }),
+                onPress: () =>
+                  act(async () => {
+                    await t.deleteTeam(team.id);
+                    router.back();
+                  }),
               },
             ])
           }

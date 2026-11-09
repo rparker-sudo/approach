@@ -6,7 +6,7 @@ import EquipmentPicker from '../components/EquipmentPicker';
 import { ALL_EQUIPMENT } from '../lib/exercises';
 import { generateProgram, pickLiftDays } from '../lib/generator';
 import { useStore } from '../lib/store';
-import { teamProgramId, useTeams } from '../lib/team';
+import { ALL, teamProgramId, useTeams } from '../lib/team';
 import type { DayType, Equipment, Experience, Phase, ProgramPosition } from '../lib/types';
 import { EXPERIENCE, PHASES, POSITIONS } from '../lib/types';
 
@@ -17,16 +17,21 @@ export default function Builder() {
 }
 
 function BuilderForm() {
-  const { programId, teamId } = useLocalSearchParams<{ programId?: string; teamId?: string }>();
+  const { programId, teamId, groupKey: groupParam } = useLocalSearchParams<{ programId?: string; teamId?: string; groupKey?: string }>();
   const { data, saveProgram, setProfile } = useStore();
-  const { teams } = useTeams();
+  const { teams, groups } = useTeams();
   const profile = data.profile!;
   const coach = profile.role === 'coach';
   const team = teams.find((t) => t.id === teamId);
-  const existing = data.programs.find((p) => p.id === (programId ?? (teamId ? teamProgramId(teamId) : undefined)));
+  const groupKey = groupParam ?? (programId ? data.programs.find((p) => p.id === programId)?.groupKey : undefined) ?? ALL;
+  const group = team ? (groups[team.id] ?? []).find((g) => g.id === groupKey) : undefined;
+  const existing = data.programs.find((p) => p.id === (programId ?? (teamId ? teamProgramId(teamId, groupKey) : undefined)));
+  // A position group pre-fills its position (e.g. Middles → Middle Blocker); mixed groups use All positions.
+  const hintPositions = (group?.positionHint ?? '').split(',').filter(Boolean) as ProgramPosition[];
+  const groupPosition: ProgramPosition = hintPositions.length === 1 ? hintPositions[0] : 'All positions';
 
   const [name, setName] = useState(existing?.name ?? '');
-  const [position, setPosition] = useState<ProgramPosition>(existing?.position ?? (team ? 'All positions' : profile.position));
+  const [position, setPosition] = useState<ProgramPosition>(existing?.position ?? (team ? groupPosition : profile.position));
   const [phase, setPhase] = useState<Phase>(existing?.phase ?? profile.phase);
   const [experience, setExperience] = useState<Experience>(existing?.experience ?? profile.experience);
   const [week, setWeekState] = useState<DayType[]>(existing?.volleyballWeek ?? profile.volleyballWeek);
@@ -49,7 +54,7 @@ function BuilderForm() {
 
   function build() {
     const generated = generateProgram({
-      name: name || (team ? `${team.name} – ${PHASES.find((p) => p.id === phase)!.label}` : ''),
+      name: name || (team ? `${group ? group.name : team.name} – ${PHASES.find((p) => p.id === phase)!.label}` : ''),
       forName: team?.name,
       author: coach ? profile.name : existing?.author,
       position,
@@ -68,7 +73,19 @@ function BuilderForm() {
     }
     if (team) {
       // The coach's working copy of the team workout. Posting sends it to the roster.
-      program = { ...program, id: teamProgramId(team.id), teamId: team.id, teamName: team.name, postedAt: existing?.postedAt, unposted: true };
+      const cal = data.teamCalendars?.[team.id];
+      program = {
+        ...program,
+        id: teamProgramId(team.id, groupKey),
+        teamId: team.id,
+        teamName: team.name,
+        groupKey,
+        groupName: group?.name,
+        postedAt: existing?.postedAt,
+        unposted: true,
+        events: cal?.events ?? existing?.events ?? [],
+        lightDates: existing?.lightDates,
+      };
     }
     saveProgram(program, !coach);
     if (coach) setProfile({ ...profile, equipment });
@@ -92,11 +109,15 @@ function BuilderForm() {
 
       <Field
         label="Program name (optional)"
-        placeholder={team ? `${team.name} – ${PHASES.find((p) => p.id === phase)!.label}` : `${PHASES.find((p) => p.id === phase)!.label} – ${position}`}
+        placeholder={team ? `${group ? group.name : team.name} – ${PHASES.find((p) => p.id === phase)!.label}` : `${PHASES.find((p) => p.id === phase)!.label} – ${position}`}
         value={name}
         onChangeText={setName}
       />
-      {team ? <Body muted>Building the workout for {team.name}. You'll post it to the roster next.</Body> : null}
+      {team ? (
+        <Body muted>
+          Building the workout for {group ? `${group.name} (${team.name})` : `${team.name} (whole team)`}. You'll post it to the roster next.
+        </Body>
+      ) : null}
 
       <Label>Position</Label>
       <ChipRow>

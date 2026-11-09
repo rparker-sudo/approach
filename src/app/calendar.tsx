@@ -35,7 +35,7 @@ const TYPE_CHOICES: { id: DayType; label: string }[] = [
 export default function CalendarScreen() {
   const { programId } = useLocalSearchParams<{ programId: string }>();
   const { data, saveProgram } = useStore();
-  const { postTeamProgram } = useTeams();
+  const { postTeam, setTeamEvents, hasUnposted } = useTeams();
   const program = data.programs.find((p) => p.id === programId);
   const [month, setMonth] = useState(() => {
     const t = today();
@@ -62,13 +62,21 @@ export default function CalendarScreen() {
   const upcoming = upcomingEvents(program, today(), 6);
 
   function save(next: Program) {
-    saveProgram({ ...next, ...(next.teamId ? { unposted: true } : null) });
+    if (next.teamId) {
+      // Dates are shared by every group on the team; per-date lift choices belong to this workout.
+      if (JSON.stringify(next.events ?? []) !== JSON.stringify(program!.events ?? [])) setTeamEvents(next.teamId, next.events ?? []);
+      if (JSON.stringify(next.overrides ?? {}) !== JSON.stringify(program!.overrides ?? {})) {
+        saveProgram({ ...program!, overrides: next.overrides, unposted: true });
+      }
+      return;
+    }
+    saveProgram(next);
   }
 
   async function post() {
     setPosting(true);
     try {
-      await postTeamProgram(program!.teamId!);
+      await postTeam(program!.teamId!);
       showAlert('Calendar posted', `${program!.teamName ?? 'The team'} has the new dates.`);
     } catch (e) {
       showAlert("Couldn't post", e instanceof Error ? e.message : 'Try again.');
@@ -86,7 +94,7 @@ export default function CalendarScreen() {
           : 'Tap a date to mark a match, tournament or day off, or to choose that day\'s lift. Lifts move automatically around matches.'}
       </Body>
 
-      {coach && program.teamId && program.unposted ? (
+      {coach && program.teamId && hasUnposted(program.teamId) ? (
         <Card>
           <Text style={{ fontWeight: '600' }}>Changes not posted</Text>
           <Text style={{ fontSize: 13, color: colors.muted }}>Athletes see new dates after you post.</Text>

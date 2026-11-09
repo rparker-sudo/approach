@@ -1,4 +1,4 @@
-import type { Position, Program, Role, WorkoutLog } from '../types';
+import type { CalendarEvent, Position, Program, Role, WorkoutLog } from '../types';
 
 /**
  * Team sync backend. Two implementations:
@@ -21,6 +21,38 @@ export type Team = {
   coachId: string;
   coachName?: string;
   createdAt: string;
+  /** Athletes only: the group they're in on this team (null = whole team). */
+  myGroupId?: string | null;
+};
+
+/** A position group inside a team. 'all' (Whole team) is implicit and not stored. */
+export type Group = {
+  id: string;
+  teamId: string;
+  name: string;
+  /** Positions this group is for, comma-separated (used by auto-assign). */
+  positionHint?: string | null;
+};
+
+/** Shared team calendar: dated events and coach-lightened days. */
+export type TeamCalendar = {
+  teamId: string;
+  events: CalendarEvent[];
+  /** groupKey ('all' or a group id) → dates (YYYY-MM-DD) the coach lightened. */
+  lightDates: Record<string, string[]>;
+  updatedAt: string;
+};
+
+export type Readiness = {
+  teamId: string;
+  userId: string;
+  userName?: string;
+  day: string; // YYYY-MM-DD
+  sleep: number; // 1–5, 5 = great
+  soreness: number; // 1–5, 5 = very sore
+  energy: number; // 1–5, 5 = great
+  pain: boolean;
+  painNote?: string;
 };
 
 export type Member = {
@@ -28,10 +60,13 @@ export type Member = {
   name: string;
   position?: Position | null;
   joinedAt: string;
+  groupId?: string | null;
 };
 
 export type TeamProgram = {
   teamId: string;
+  /** 'all' = Whole team, otherwise a group id. */
+  groupKey: string;
   program: Program;
   updatedAt: string;
 };
@@ -58,6 +93,8 @@ export type SignUpInput = {
 
 export interface Backend {
   mode: 'supabase' | 'local';
+  /** Supabase only: the database is missing the 2.0 tables (migration not run yet). */
+  needsUpdate?: () => boolean;
 
   getAccount(): Promise<Account | null>;
   signUp(input: SignUpInput): Promise<Account>;
@@ -73,8 +110,22 @@ export interface Backend {
   listMembers(teamId: string): Promise<Member[]>;
   removeMember(teamId: string, userId: string): Promise<void>;
 
-  postProgram(teamId: string, program: Program): Promise<TeamProgram>;
+  postProgram(teamId: string, groupKey: string, program: Program): Promise<TeamProgram>;
   getPrograms(teamIds: string[]): Promise<TeamProgram[]>;
+
+  listGroups(teamId: string): Promise<Group[]>;
+  createGroup(teamId: string, name: string, positionHint?: string | null): Promise<Group>;
+  renameGroup(groupId: string, name: string): Promise<void>;
+  deleteGroup(groupId: string): Promise<void>;
+  /** Coach puts an athlete in a group (null = whole team). */
+  assignGroup(teamId: string, userId: string, groupId: string | null): Promise<void>;
+
+  getCalendars(teamIds: string[]): Promise<TeamCalendar[]>;
+  postCalendar(cal: Omit<TeamCalendar, 'updatedAt'>): Promise<TeamCalendar>;
+
+  /** Athlete's daily check-in (one per team per day; re-submitting replaces it). */
+  submitReadiness(r: Omit<Readiness, 'userId' | 'userName'>): Promise<void>;
+  listReadiness(teamId: string, day: string): Promise<Readiness[]>;
 
   joinTeam(code: string): Promise<Team>;
   leaveTeam(teamId: string): Promise<void>;

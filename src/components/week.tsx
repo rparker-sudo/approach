@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { dateKey, fromKey, isHeavyLegs, mondayOf, today, weekPlan } from '../lib/calendar';
-import { dayAdvice, MAX_LIFT_DAYS, pickLiftDays } from '../lib/generator';
-import type { DayType, Phase, Program } from '../lib/types';
+import { dayAdvice, liftCapMessage, pickLiftDays } from '../lib/generator';
+import type { DayType, Program } from '../lib/types';
 import { DAY_TYPES, WEEKDAYS } from '../lib/types';
 import { Body, Button, colors, Icon, Note, Row, Text } from './ui';
 
@@ -57,20 +57,20 @@ export function LiftDayPicker({
   week,
   value,
   onChange,
-  phase,
+  cap,
 }: {
   week: DayType[];
   value: number[];
   onChange: (days: number[]) => void;
-  /** Used for a gentle in-season note when picking 5+ days. */
-  phase?: Phase;
+  /** Max lift days for the level and time of year (G2: liftDayCap). */
+  cap: number;
 }) {
   const [tooMany, setTooMany] = useState(false);
   const toggle = (i: number) => {
     if (value.includes(i)) {
       setTooMany(false);
       onChange(value.filter((d) => d !== i));
-    } else if (value.length >= MAX_LIFT_DAYS) {
+    } else if (value.length >= cap) {
       setTooMany(true);
     } else {
       setTooMany(false);
@@ -118,12 +118,17 @@ export function LiftDayPicker({
         <Text style={{ fontSize: 13, color: colors.muted }}>
           {value.length} lift {value.length === 1 ? 'day' : 'days'} · tap to change
         </Text>
-        <Button small kind="ghost" title="Suggest days" onPress={() => onChange(pickLiftDays(week, Math.max(value.length, 2)))} />
+        <Button
+          small
+          kind="ghost"
+          title="Suggest days"
+          onPress={() => {
+            setTooMany(false);
+            onChange(pickLiftDays(week, Math.min(Math.max(value.length, 2), cap)));
+          }}
+        />
       </Row>
-      {tooMany ? <Note>{`Up to ${MAX_LIFT_DAYS} lift days. Tap a day to turn it off first.`}</Note> : null}
-      {phase === 'in' && value.length >= 5 ? (
-        <Note>In-season, 2–3 lift days is usually enough. More days are fine; each session gets shorter.</Note>
-      ) : null}
+      {tooMany || value.length > cap ? <Note>{liftCapMessage(cap)}</Note> : null}
       {warnings.map((w) => (
         <Note key={w.i}>{`${WEEKDAYS[w.i]}: ${w.text}`}</Note>
       ))}

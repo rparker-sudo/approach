@@ -37,13 +37,33 @@ const isMatch = (d: DayType) => d === 'game' || d === 'tournament';
 export const MAX_LIFT_DAYS = 7;
 
 /**
+ * G2 lift-day caps (Training Content): beginner 3, intermediate 4, advanced 5; in-season 3 for everyone.
+ * At least one day a week has no lifting or conditioning; days past the cap can only be mobility.
+ */
+export function liftDayCap(experience: Experience, phase: Phase): number {
+  const byLevel = experience === 'beginner' ? 3 : experience === 'intermediate' ? 4 : 5;
+  return phase === 'in' ? Math.min(3, byLevel) : byLevel;
+}
+export const liftCapMessage = (cap: number) => `Max ${cap} lift days for your level. Add mobility days instead.`;
+
+/** Lift days in a program (mobility-only sessions don't count). */
+export function liftDayCount(program: Pick<Program, 'liftSchedule' | 'sessions'>): number {
+  return program.liftSchedule.filter((sid) => sid && !program.sessions.find((s) => s.id === sid)?.mobility).length;
+}
+
+/** Program has more lift days than its level and phase allow (made before 2.1). */
+export function overCap(program: Program): boolean {
+  return liftDayCount(program) > liftDayCap(program.experience, program.phase);
+}
+
+/**
  * Pick which weekdays to lift on, working around the volleyball week:
  * never on match days, avoid the day before a match, prefer days
  * with no volleyball, and spread sessions out.
  */
-export function pickLiftDays(week: DayType[], count: number): number[] {
+export function pickLiftDays(week: DayType[], count: number, only?: number[]): number[] {
   const score = week.map((d, i) => {
-    if (isMatch(d)) return -1000;
+    if (isMatch(d) || (only && !only.includes(i))) return -1000;
     let s = d === 'off' ? 10 : 6;
     if (isMatch(week[(i + 1) % 7])) s -= 25; // day before a match
     if (isMatch(week[(i + 6) % 7])) s -= 4; // day after a match: recovery
@@ -279,8 +299,10 @@ export function pickExercise(patterns: Pattern[], role: SlotRole, ctx: PickCtx):
   // Olympic lifts only for experienced lifters with a barbell.
   const allowed = pool.filter((e) => e.pattern !== 'olympic' || ctx.maxLevel >= 3);
   const usable = allowed.filter((e) => fits(e, ctx.equipment));
+  // G1: never above the athlete's level. If nothing at or below their level fits the gym, use a bodyweight
+  // option at or below their level, or skip the slot (undefined). Never fall back to a harder exercise.
   const byLevel = usable.filter((e) => e.level <= ctx.maxLevel);
-  const candidates = byLevel.length ? byLevel : usable.length ? usable : allowed.filter((e) => fits(e, []));
+  const candidates = byLevel.length ? byLevel : allowed.filter((e) => fits(e, []) && e.level <= ctx.maxLevel);
   if (!candidates.length) return undefined;
   const target = role === 'main' ? ctx.maxLevel : role === 'secondary' ? Math.min(2, ctx.maxLevel) : 1;
   // For strength slots, prefer loading the athlete can progress: barbell/trap bar, then dumbbells/kettlebells/cable, then bands, then bodyweight.
@@ -346,13 +368,18 @@ function buildSession(arch: Archetype, input: GeneratorInput, usedWeek: Set<stri
 }
 
 export function generateProgram(input: GeneratorInput): Program {
-  const days = input.liftDays?.length
+  const cap = liftDayCap(input.experience, input.phase);
+  const chosen = input.liftDays?.length
     ? [...new Set(input.liftDays)].filter((d) => d >= 0 && d < 7).sort((a, b) => a - b)
-    : pickLiftDays(input.volleyballWeek, input.liftDaysPerWeek);
+    : pickLiftDays(input.volleyballWeek, Math.min(input.liftDaysPerWeek, cap));
+  // G2: lift on the best `cap` of the chosen days; extra days (keeping one day fully off) are mobility only.
+  const days = chosen.length > cap ? pickLiftDays(input.volleyballWeek, cap, chosen) : chosen;
+  const extra = chosen.filter((d) => !days.includes(d)).slice(0, Math.max(0, 6 - days.length));
   const split = splitFor(Math.max(days.length, 1));
   const usedWeek = new Set<string>();
   const careIndex = { n: 0 };
   const sessions = split.map((arch) => buildSession(arch, input, usedWeek, careIndex));
+  const mobility = extra.length ? { ...buildSession(A.recovery('Mobility'), input, usedWeek, careIndex), mobility: true } : null;
 
   // Put the heavy-leg sessions on days that are not right before a match.
   const liftSchedule: (string | null)[] = Array(7).fill(null);
@@ -364,6 +391,7 @@ export function generateProgram(input: GeneratorInput): Program {
     const [pick] = remaining.splice(idx, 1);
     if (pick) liftSchedule[d] = pick.s.id;
   }
+  if (mobility) for (const d of extra) liftSchedule[d] = mobility.id;
 
   const phaseLabel = PHASES.find((p) => p.id === input.phase)?.label ?? '';
   const today = new Date();
@@ -377,12 +405,25 @@ export function generateProgram(input: GeneratorInput): Program {
     experience: input.experience,
     volleyballWeek: [...input.volleyballWeek],
     liftSchedule,
-    sessions,
+    sessions: mobility ? [...sessions, mobility] : sessions,
     createdAt: today.toISOString(),
     equipment: input.equipment ?? ALL_EQUIPMENT,
     blockStart: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`,
     blockWeeks: 4,
   };
+}
+
+/** A mobility/recovery session for a program (days past the lift-day cap). */
+export function mobilitySession(program: Program): Session {
+  const input: GeneratorInput = {
+    position: program.position,
+    phase: program.phase,
+    experience: program.experience,
+    volleyballWeek: program.volleyballWeek,
+    liftDaysPerWeek: liftDayCount(program),
+    equipment: program.equipment,
+  };
+  return { ...buildSession(A.recovery('Mobility'), input, new Set(), { n: 0 }), mobility: true };
 }
 
 /** Short reasons shown under each day, so athletes understand the plan. */

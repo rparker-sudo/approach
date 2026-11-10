@@ -13,7 +13,7 @@ import { backend } from '../lib/backend';
 import { useTeams } from '../lib/team';
 import EquipmentPicker from '../components/EquipmentPicker';
 import { ALL_EQUIPMENT } from '../lib/exercises';
-import { generateProgram, pickLiftDays } from '../lib/generator';
+import { generateProgram, liftDayCap, pickLiftDays } from '../lib/generator';
 import { useStore } from '../lib/store';
 import type { DayType, Equipment, Experience, Phase, Position, Role } from '../lib/types';
 import { EXPERIENCE, PHASES, POSITIONS } from '../lib/types';
@@ -254,9 +254,10 @@ export default function Onboarding() {
               </Card>
               <Card>
                 <H2>Which days can you lift?</H2>
-                <LiftDayPicker week={week} value={liftDays} onChange={setLiftDays} phase={phase} />
+                <LiftDayPicker week={week} value={liftDays} onChange={setLiftDays} cap={liftDayCap(experience, phase)} />
                 <Body muted style={{ fontSize: 13 }}>
-                  In-season, 2 days is usually right. Off-season, 3–4. You can change days anytime.
+                  In-season, 2 days is usually right. Off-season, 3–4. You can change days anytime. Keep at least one day
+                  fully off.
                 </Body>
               </Card>
               <Card>

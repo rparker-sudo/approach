@@ -48,7 +48,7 @@ export default function Workout() {
   // Today's version of the session (deload week / coach-lightened day applied).
   const day = useMemo(() => (program && session ? sessionForDate(program, session, today()) : null), [program, session]);
   const plan: ProgramExercise[] = day?.exercises ?? [];
-  const suggestions = useMemo(() => plan.map((pe) => suggestWeight(data.logs, pe)), [plan, data.logs]);
+  const suggestions = useMemo(() => plan.map((pe) => suggestWeight(data.logs, pe, program?.equipment)), [plan, data.logs, program?.equipment]);
 
   const fresh = (): Draft => ({
     entries: plan.map((pe, i) => ({

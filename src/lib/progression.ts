@@ -1,6 +1,6 @@
 import { planForDate } from './calendar';
-import { getExercise } from './exercises';
-import type { Program, ProgramExercise, Session, WorkoutLog } from './types';
+import { ALL_EQUIPMENT, getExercise } from './exercises';
+import type { Equipment, Exercise, Program, ProgramExercise, Session, WorkoutLog } from './types';
 
 /**
  * Weekly progression.
@@ -81,15 +81,37 @@ function doneSets(log: WorkoutLog, exerciseId: string): SetRecord[] {
     .filter((s) => s.weight > 0);
 }
 
+/** How the exercise is loaded with this gym's equipment (best setup available). */
+function loading(ex: Exercise, equipment: Equipment[]): 'barbell' | 'dumbbell' | 'band' | 'other' {
+  const setups = ex.equipment.filter((setup) => setup.every((i) => equipment.includes(i)));
+  const list = setups.length ? setups : ex.equipment;
+  if (list.some((s) => s.some((i) => i === 'barbell' || i === 'trap-bar'))) return 'barbell';
+  if (list.some((s) => s.some((i) => i === 'dumbbells' || i === 'kettlebells'))) return 'dumbbell';
+  if (list.every((s) => s.includes('bands'))) return 'band';
+  return 'other';
+}
+
+/**
+ * G5 progression cap: about 10% of the last weight, rounded down to 2.5 lb (at least 2.5),
+ * and no more than +10 lb (barbell) or +5 lb (dumbbell, kettlebell, cable).
+ */
+export function increaseFor(lastWeight: number, kind: 'barbell' | 'dumbbell' | 'other'): number {
+  const tenPct = Math.floor((lastWeight * 0.1) / 2.5) * 2.5;
+  return Math.min(kind === 'barbell' ? 10 : 5, Math.max(2.5, tenPct));
+}
+
 /**
  * Suggested weight for the next session of an exercise (weighted lifts only).
- * Hit the top of the rep range on every set → add weight. In range → same.
+ * Hit the top of the rep range on every set → add a small, capped step. In range → same.
  * Below the range two sessions in a row → drop ~5%.
+ * No suggestions for band-only setups or timed/hold exercises.
  */
-export function suggestWeight(logs: WorkoutLog[], pe: ProgramExercise): Suggestion | null {
+export function suggestWeight(logs: WorkoutLog[], pe: ProgramExercise, equipment: Equipment[] = ALL_EQUIPMENT): Suggestion | null {
   const ex = getExercise(pe.exerciseId);
   const range = repRange(pe.reps);
-  if (!ex.weighted || !range) return null;
+  if (!ex.weighted || !range || /\bhold\b/i.test(ex.name)) return null;
+  const kind = loading(ex, equipment);
+  if (kind === 'band') return null;
   const history = logs
     .filter((l) => doneSets(l, pe.exerciseId).length)
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -100,7 +122,7 @@ export function suggestWeight(logs: WorkoutLog[], pe: ProgramExercise): Suggesti
   const lastText = `${top} × ${working.map((s) => s.reps).join(', ')}`;
   const [lo, hi] = range;
   if (working.every((s) => s.reps >= hi) && working.length >= Math.min(pe.sets, 2)) {
-    const inc = 5;
+    const inc = increaseFor(top, kind);
     return { weight: top + inc, delta: inc, last: lastText, reason: 'up' };
   }
   const missed = (sets: SetRecord[]) => sets.some((s) => s.reps < lo);

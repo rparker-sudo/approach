@@ -13,6 +13,7 @@ import { shareTeamInvite } from '../../lib/share';
 import { useStore } from '../../lib/store';
 import { ALL, summarizeReadiness, teamProgramId, useTeams } from '../../lib/team';
 import { PHASES } from '../../lib/types';
+import { liftDayCount } from '../../lib/generator';
 import { formatDate } from '../../lib/util';
 
 export default function TeamScreen() {
@@ -216,7 +217,7 @@ export default function TeamScreen() {
                       <Text style={{ fontWeight: '600' }}>{program.name}</Text>
                       <Row style={{ gap: 6, flexWrap: 'wrap' }}>
                         <Pill text={PHASES.find((p) => p.id === program.phase)!.label} bg={colors.day.game} />
-                        <Pill text={`${program.liftSchedule.filter(Boolean).length} lift days`} />
+                        <Pill text={`${liftDayCount(program)} lift days`} />
                         <Pill text={needsPost ? 'Not posted' : `Posted ${formatDate(tp!.updatedAt)}`} />
                         {lightToday(key) || lightToday(ALL) ? <Pill text="Light today" /> : null}
                       </Row>

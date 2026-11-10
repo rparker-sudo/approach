@@ -4,7 +4,7 @@ import { Body, Button, Card, Chip, ChipRow, Field, H2, Label, Screen } from '../
 import { LiftDayPicker, WeekEditor } from '../components/week';
 import EquipmentPicker from '../components/EquipmentPicker';
 import { ALL_EQUIPMENT } from '../lib/exercises';
-import { generateProgram, pickLiftDays } from '../lib/generator';
+import { generateProgram, liftDayCap, pickLiftDays } from '../lib/generator';
 import { useStore } from '../lib/store';
 import { ALL, teamProgramId, useTeams } from '../lib/team';
 import type { DayType, Equipment, Experience, Phase, ProgramPosition } from '../lib/types';
@@ -36,9 +36,16 @@ function BuilderForm() {
   const [experience, setExperience] = useState<Experience>(existing?.experience ?? profile.experience);
   const [week, setWeekState] = useState<DayType[]>(existing?.volleyballWeek ?? profile.volleyballWeek);
   const [liftDays, setLiftDaysState] = useState<number[]>(() => {
-    if (existing) return existing.liftSchedule.map((s, i) => (s ? i : -1)).filter((i) => i >= 0);
-    return profile.liftDays?.length ? profile.liftDays : pickLiftDays(week, profile.liftDaysPerWeek);
+    const cap = liftDayCap(existing?.experience ?? profile.experience, existing?.phase ?? profile.phase);
+    const start = existing
+      ? existing.liftSchedule.map((s, i) => (s && !existing.sessions.find((x) => x.id === s)?.mobility ? i : -1)).filter((i) => i >= 0)
+      : profile.liftDays?.length
+        ? profile.liftDays
+        : pickLiftDays(week, Math.min(profile.liftDaysPerWeek, cap));
+    // G2: plans made before the caps rebuild within them (best days kept).
+    return start.length > cap ? pickLiftDays(week, cap, start) : start;
   });
+  const cap = liftDayCap(experience, phase);
   // Until the user taps a day, changing the volleyball week re-suggests lift days.
   const [equipment, setEquipment] = useState<Equipment[]>(existing?.equipment ?? profile.equipment ?? ALL_EQUIPMENT);
   const [daysTouched, setDaysTouched] = useState(!!existing || !!profile.liftDays?.length);
@@ -153,7 +160,7 @@ function BuilderForm() {
 
       <Card>
         <H2>Lift days</H2>
-        <LiftDayPicker week={week} value={liftDays} onChange={setLiftDays} phase={phase} />
+        <LiftDayPicker week={week} value={liftDays} onChange={setLiftDays} cap={cap} />
       </Card>
 
       <Button

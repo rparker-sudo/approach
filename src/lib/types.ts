@@ -129,6 +129,8 @@ export type Session = {
   name: string;
   focus: string;
   exercises: ProgramExercise[];
+  /** Mobility/recovery only (doesn't count toward the lift-day cap). */
+  mobility?: boolean;
 };
 
 export type Program = {

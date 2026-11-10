@@ -4,6 +4,7 @@ import ProgramDetail from '../../components/ProgramDetail';
 import ScreenHeader from '../../components/ScreenHeader';
 import { Body, Button, Card, colors, H2, Icon, Label, NetTape, Pill, Row, Screen, Text } from '../../components/ui';
 import { formatKey, today, upcomingEvents } from '../../lib/calendar';
+import { liftDayCount } from '../../lib/generator';
 import { useStore } from '../../lib/store';
 import { teamProgramId, useTeams } from '../../lib/team';
 import { formatDate } from '../../lib/util';
@@ -137,7 +138,7 @@ function ProgramRow({ program }: { program: Program }) {
             <H2>{program.name}</H2>
             <Row style={{ gap: 6, flexWrap: 'wrap' }}>
               <Pill text={PHASES.find((x) => x.id === program.phase)!.label} bg={colors.day.game} />
-              <Pill text={`${program.liftSchedule.filter(Boolean).length} lifts/wk`} />
+              <Pill text={`${liftDayCount(program)} lifts/wk`} />
             </Row>
             {program.teamName ? <Body muted style={{ fontSize: 13 }}>Team: {program.teamName}</Body> : null}
           </View>

@@ -5,11 +5,16 @@
 
 Plain HTML with the brand colors: no scripts, no external fonts, no trackers.
 Internal notes (owner lines, "Notes for the attorney", "Attorney to finalize") are left out.
-[PLACEHOLDERS] stay visible so they're easy to spot and fill in.
+Contact email and publish date come from the settings below (docs/legal keeps its placeholders);
+an empty setting leaves the visible placeholder.
 """
 import html
 import re
 from pathlib import Path
+
+# Owner-supplied (founder checklist): personal or business, never a district address.
+CONTACT_EMAIL = 'ryan@thehbcvbc.com'
+PUBLISH_DATE = 'November 10, 2026'
 
 ROOT = Path(__file__).resolve().parent.parent
 NOTICE = (ROOT / 'docs/legal/soft-launch-notice.md').read_text()
@@ -55,9 +60,10 @@ CSS = """    :root { --bg:#0B0B0C; --surface:#1C1D20; --border:#3A3D42; --text:#
 
 def inline(text: str) -> str:
     t = html.escape(text, quote=False)
-    # Placeholders stay visible (internal fill-in notes inside them are dropped).
-    t = re.sub(r'\[CONTACT EMAIL[^\]]*\]', '<span class="placeholder">[CONTACT EMAIL]</span>', t)
-    t = re.sub(r'\[publish date\]', '<span class="placeholder">[publish date]</span>', t)
+    # Fill-ins (internal notes inside the placeholders are dropped); empty settings stay visible placeholders.
+    email = f'<a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a>' if CONTACT_EMAIL else '<span class="placeholder">[CONTACT EMAIL]</span>'
+    t = re.sub(r'\[CONTACT EMAIL[^\]]*\]', email, t)
+    t = re.sub(r'\[publish date\]', PUBLISH_DATE or '<span class="placeholder">[publish date]</span>', t)
     t = re.sub(r'_{4,}', '<span class="line"></span>', t)
     t = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', t)
     t = re.sub(r'(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?!\w)', r'<em>\1</em>', t)

@@ -45,6 +45,8 @@ function Board({ teamId }: { teamId: string }) {
   const groups = useMemo(() => t.groups[teamId] ?? [], [t.groups, teamId]);
   const programFor = useTeamProgramFor(teamId);
   const { width, height } = useWindowDimensions();
+  // The tile area's size, so every tile fits on screen (no scrolling on a classroom display).
+  const [grid, setGrid] = useState({ w: 0, h: 0 });
   const [members, setMembers] = useState<BoardMember[] | null>(null);
   const [live, setLive] = useState<LiveProgress[]>([]);
   const [prs, setPrs] = useState<Record<string, number>>({});
@@ -121,7 +123,7 @@ function Board({ teamId }: { teamId: string }) {
     // Done tiles move to the end.
     .sort((a, b) => Number(a.live?.status === 'done') - Number(b.live?.status === 'done') || a.member.boardName.localeCompare(b.member.boardName));
 
-  const cols = tiles.length > 20 ? 6 : tiles.length > 12 ? 5 : 4;
+  const fit = fitGrid(tiles.length, grid.w, grid.h);
   const effortOn = team.settings.boardEffortPanel && showEffort;
 
   return (
@@ -149,7 +151,10 @@ function Board({ teamId }: { teamId: string }) {
       </View>
 
       {/* Tiles */}
-      <View style={{ flex: 1, paddingHorizontal: 24 }}>
+      <View
+        style={{ flex: 1, paddingHorizontal: 24, paddingBottom: 16, overflow: 'hidden' }}
+        onLayout={(e) => setGrid({ w: e.nativeEvent.layout.width - 48, h: e.nativeEvent.layout.height - 16 })}
+      >
         {members === null ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
             {Array.from({ length: 8 }, (_, i) => (
@@ -161,9 +166,9 @@ function Board({ teamId }: { teamId: string }) {
             <Text style={{ color: P.ink, fontSize: 56, fontWeight: '700' }}>Rest day. See you tomorrow.</Text>
           </View>
         ) : (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GAP }}>
             {tiles.map((tile) => (
-              <BoardTile key={tile.member.userId} tile={tile} width={`${100 / cols - 1.5}%`} />
+              <BoardTile key={tile.member.userId} tile={tile} w={fit.w} h={fit.h} />
             ))}
           </View>
         )}
@@ -200,30 +205,71 @@ function Board({ teamId }: { teamId: string }) {
   );
 }
 
-function BoardTile({ tile, width }: { tile: Tile; width: `${number}%` }) {
+const GAP = 12;
+
+/** Columns (4–6, fewer for small rosters) and tile size so every tile fits in the area. */
+function fitGrid(n: number, w: number, h: number): { w: number; h: number } {
+  if (!n || !w || !h) return { w: 260, h: 150 };
+  let best = { w: 0, h: 0, score: -1 };
+  for (let cols = Math.min(4, n); cols <= Math.min(6, Math.max(4, n)); cols++) {
+    const rows = Math.ceil(n / cols);
+    const tw = (w - GAP * (cols - 1)) / cols;
+    const th = Math.min((h - GAP * (rows - 1)) / rows, tw * 0.75);
+    const score = Math.min(tw / 1.6, th);
+    if (score > best.score) best = { w: Math.floor(tw), h: Math.floor(th), score };
+  }
+  return { w: best.w, h: best.h };
+}
+
+function BoardTile({ tile, w, h }: { tile: Tile; w: number; h: number }) {
   const status = tile.live?.status ?? 'not_started';
   const done = status === 'done';
   const label = status === 'done' ? 'Done' : status === 'in_progress' ? 'In progress' : 'Not started';
+  // Type scales with the tile: name up to 36 px, sets up to 28 px.
+  const name = Math.max(16, Math.min(36, h * 0.24, w * 0.13));
+  const sets = Math.max(14, Math.min(28, h * 0.18, w * 0.1));
+  const pill = Math.max(12, Math.min(18, h * 0.12));
+  const pad = Math.max(8, Math.min(18, h * 0.1));
   return (
-    <View style={{ width, backgroundColor: P.tile, borderRadius: 16, padding: 18, gap: 10, borderWidth: 1, borderColor: P.line }}>
+    <View
+      style={{
+        width: w,
+        height: h,
+        backgroundColor: P.tile,
+        borderRadius: 16,
+        padding: pad,
+        borderWidth: 1,
+        borderColor: P.line,
+        justifyContent: 'space-between',
+        overflow: 'hidden',
+      }}
+    >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Text numberOfLines={1} style={{ color: P.ink, fontSize: 36, fontWeight: '700', flex: 1 }}>
+        <Text numberOfLines={1} style={{ color: P.ink, fontSize: name, fontWeight: '700', flexShrink: 1 }}>
           {tile.member.boardName}
         </Text>
         {tile.prs > 0 ? (
-          <View style={{ borderWidth: 2, borderColor: P.done, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 }}>
-            <Text style={{ color: P.done, fontWeight: '700', fontSize: 18 }}>PR</Text>
+          <View style={{ borderWidth: 2, borderColor: P.done, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 }}>
+            <Text style={{ color: P.done, fontWeight: '700', fontSize: pill }}>PR</Text>
           </View>
         ) : null}
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <View style={{ backgroundColor: done ? P.done : 'transparent', borderWidth: 2, borderColor: done ? P.done : P.line, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 4 }}>
-          <Text style={{ color: done ? P.doneInk : P.ink, fontWeight: '700', fontSize: 18 }}>{label}</Text>
-        </View>
-        <Text style={{ color: P.ink, fontSize: 28, fontVariant: ['tabular-nums'] }}>
-          {tile.live ? `Sets ${tile.live.setsDone} / ${tile.live.setsTotal}` : 'Sets –'}
-        </Text>
+      <View
+        style={{
+          alignSelf: 'flex-start',
+          backgroundColor: done ? P.done : 'transparent',
+          borderWidth: 2,
+          borderColor: done ? P.done : P.line,
+          borderRadius: 999,
+          paddingHorizontal: 12,
+          paddingVertical: 2,
+        }}
+      >
+        <Text style={{ color: done ? P.doneInk : P.ink, fontWeight: '700', fontSize: pill }}>{label}</Text>
       </View>
+      <Text numberOfLines={1} style={{ color: P.ink, fontSize: sets, fontVariant: ['tabular-nums'] }}>
+        {tile.live ? `Sets ${tile.live.setsDone} / ${tile.live.setsTotal}` : 'Sets –'}
+      </Text>
     </View>
   );
 }

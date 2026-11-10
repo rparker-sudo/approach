@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import ScreenHeader from '../../components/ScreenHeader';
 import { Body, Card, Chip, ChipRow, colors, H2, Label, Row, Screen, Text } from '../../components/ui';
-import { FOOD_IDEAS, fuelDay, fuelTargets, NUTRITION_DISCLAIMER } from '../../lib/nutrition';
+import { cardsFor, FOOD_IDEAS, FUEL_CARD_NOTE, FuelCard, fuelDay, NUTRITION_DISCLAIMER } from '../../lib/nutrition';
 import { addDays, dayTypeOn, planForDate, today } from '../../lib/calendar';
 import { useStore } from '../../lib/store';
 import type { DayType } from '../../lib/types';
@@ -30,7 +30,7 @@ export default function Fuel() {
   const nextDay = activeProgram ? dayTypeOn(activeProgram, addDays(day, 1)) : undefined;
   const matchTomorrow = !coach && sel === todayId && (nextDay === 'game' || nextDay === 'tournament');
   const fuel = fuelDay(opt.day, opt.lift, matchTomorrow);
-  const targets = coach ? null : fuelTargets(fuel, data.profile?.bodyWeightLb ?? null);
+  const cards = cardsFor(opt.day, opt.lift, matchTomorrow);
 
   return (
     <Screen tab>
@@ -45,19 +45,6 @@ export default function Fuel() {
       <Card>
         <H2>{fuel.title}</H2>
         <Body muted>{fuel.summary}</Body>
-        {targets ? (
-          <View style={{ gap: 8 }}>
-            <Target label="Carbohydrates" value={`${targets.carbsG[0]}–${targets.carbsG[1]} g`} hint="Main fuel for jumps and quick moves" />
-            <Target label="Protein" value={`${targets.proteinG[0]}–${targets.proteinG[1]} g`} hint={`Spread out: about ${targets.proteinPerMealG[0]}–${targets.proteinPerMealG[1]} g per meal`} />
-            <Target label="Fluids" value={`${targets.fluidsOz[0]}–${targets.fluidsOz[1]} oz`} hint="Pale-yellow urine means you're on track" />
-          </View>
-        ) : (
-          <Body muted style={{ fontSize: 13 }}>
-            {coach
-              ? 'Athletes see personal gram targets based on their body weight.'
-              : 'Add your body weight in Settings to see personal gram targets.'}
-          </Body>
-        )}
       </Card>
 
       <Card>
@@ -80,20 +67,29 @@ export default function Fuel() {
         ))}
       </Card>
 
+      <Label>{sel === todayId && !coach ? 'For today' : 'For this day'}</Label>
+      {cards.today.map((c) => (
+        <FuelCardView key={c.id} card={c} />
+      ))}
+      <Label>More fuel tips</Label>
+      {cards.rest.map((c) => (
+        <FuelCardView key={c.id} card={c} />
+      ))}
+
       <Body muted style={{ fontSize: 12 }}>{NUTRITION_DISCLAIMER}</Body>
     </Screen>
   );
 }
 
-function Target({ label, value, hint }: { label: string; value: string; hint: string }) {
+/** A Fuel card: title, short body, source line (12 px muted) and the note every card carries. */
+function FuelCardView({ card }: { card: FuelCard }) {
   return (
-    <View style={{ backgroundColor: colors.raised, borderRadius: 8, padding: 12 }}>
-      <Row style={{ justifyContent: 'space-between' }}>
-        <Label>{label}</Label>
-        <Text style={{ fontSize: 20, fontWeight: '600' }}>{value}</Text>
-      </Row>
-      <Text style={{ color: colors.muted, fontSize: 13, marginTop: 2 }}>{hint}</Text>
-    </View>
+    <Card style={{ gap: 6 }}>
+      <H2>{card.title}</H2>
+      <Body>{card.body}</Body>
+      <Text style={{ fontSize: 12, color: colors.muted }}>{`Source: ${card.source}`}</Text>
+      <Text style={{ fontSize: 12, color: colors.muted }}>{FUEL_CARD_NOTE}</Text>
+    </Card>
   );
 }
 

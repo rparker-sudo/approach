@@ -24,7 +24,7 @@ import {
 import { addDays, dayTypeOn, isHeavyLegs, mondayOf, today, weekPlan } from '../../lib/calendar';
 import { getExercise } from '../../lib/exercises';
 import { captainLine, dayAdvice } from '../../lib/generator';
-import { fuelDay, fuelTargets } from '../../lib/nutrition';
+import { cardsFor, fuelDay } from '../../lib/nutrition';
 import { sessionForDate } from '../../lib/progression';
 import { canCheckIn, canLog } from '../../lib/backend';
 import { useStore } from '../../lib/store';
@@ -94,7 +94,8 @@ function Today() {
   const advice = todayPlan.note ?? dayAdvice(week.map((p) => p.dayType), i, !!session, isHeavyLegs(session));
   const nextVb = dayTypeOn(activeProgram, addDays(day, 1));
   const fuel = fuelDay(vb, !!session, nextVb === 'game' || nextVb === 'tournament');
-  const targets = fuelTargets(fuel, profile.bodyWeightLb);
+  // F12: today's top Fuel card (no numbers), linking to Fuel.
+  const topCard = cardsFor(vb, !!session, nextVb === 'game' || nextVb === 'tournament').today[0];
 
   const weekStart = startOfWeek();
   const doneThisWeek = data.logs.filter((l) => new Date(l.date) >= weekStart && l.programId === activeProgram.id);
@@ -177,15 +178,7 @@ function Today() {
           </Row>
           <H2>{fuel.title}</H2>
           <Body muted>{fuel.summary}</Body>
-          {targets ? (
-            <Row style={{ gap: 8 }}>
-              <Stat label="Carbs" value={`${targets.carbsG[0]}–${targets.carbsG[1]} g`} />
-              <Stat label="Protein" value={`${targets.proteinG[0]}–${targets.proteinG[1]} g`} />
-              <Stat label="Water" value={`${targets.fluidsOz[0]}+ oz`} />
-            </Row>
-          ) : (
-            <Text style={{ fontSize: 13, color: colors.muted }}>Add your body weight in Settings to see gram targets.</Text>
-          )}
+          {topCard ? <Text style={{ fontSize: 15, fontWeight: '600' }}>{`Tip: ${topCard.title}`}</Text> : null}
         </Card>
       </Pressable>
 
@@ -223,16 +216,5 @@ function Today() {
         </Text>
       </Card>
     </Screen>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={{ flex: 1, backgroundColor: colors.raised, borderRadius: 8, padding: 10 }}>
-      <Text style={{ fontSize: 12, color: colors.muted }}>{label}</Text>
-      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ fontSize: 16, fontWeight: '600', marginTop: 2 }}>
-        {value}
-      </Text>
-    </View>
   );
 }

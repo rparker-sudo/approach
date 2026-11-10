@@ -10,82 +10,74 @@
     @media (prefers-color-scheme: light) { :root { --bg:#FFFFFF; --surface:#F1F2F4; --border:#C9CDD2; --text:#0B0B0C; --muted:#3A3D42; } }
     * { box-sizing: border-box; }
     body { margin:0; background:var(--bg); color:var(--text); font: 16px/1.55 Inter, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif; }
-    main { max-width: 720px; margin: 0 auto; padding: 32px 16px 64px; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
     header { display:flex; align-items:center; gap:12px; margin-bottom: 24px; }
     header img { width:40px; height:40px; border-radius:10px; }
     .brand { font-weight:600; letter-spacing:.18em; text-transform:uppercase; font-size:14px; }
     h1 { font-size:26px; line-height:1.25; margin:0 0 4px; }
     h2 { font-size:18px; margin:32px 0 8px; letter-spacing:.06em; text-transform:uppercase; }
     h3 { font-size:16px; margin:24px 0 6px; }
-    p, li { color:var(--text); }
     .muted { color:var(--muted); font-size:14px; }
     ul, ol { padding-left: 22px; }
     li { margin: 6px 0; }
     a { color:inherit; }
+    table { width:100%; border-collapse: collapse; margin: 12px 0; font-size:14px; }
+    th, td { border:1px solid var(--border); padding:8px; text-align:left; vertical-align: top; }
+    th { background: var(--surface); }
+    .table-wrap { overflow-x:auto; }
     .placeholder { background: var(--surface); border:1px dashed var(--warn); padding: 0 4px; border-radius:4px; }
-    .box { border:1px solid var(--border); border-radius:12px; padding:12px 16px; margin:12px 0; background:var(--surface); }
+    .box { border:1px solid var(--border); border-radius:12px; padding:12px 16px; margin:12px 0; background:var(--surface); display:flex; gap:12px; align-items:flex-start; }
+    .box .sq { flex:none; width:20px; height:20px; border:2px solid var(--text); border-radius:3px; margin-top:3px; }
+    .box p { margin:0; }
+    .line { display:inline-block; min-width: 200px; border-bottom:1px solid var(--muted); height: 1.2em; vertical-align: bottom; }
+    .print { font-size:14px; color:var(--muted); }
     nav { margin-top: 40px; font-size:14px; color:var(--muted); }
     nav a { margin-right: 16px; }
-    .line { display:inline-block; min-width: 220px; border-bottom:1px solid var(--muted); height: 1.2em; vertical-align: bottom; }
-    .fields p { margin: 14px 0; }
-    .check { display:flex; gap:12px; align-items:flex-start; }
-    .check .sq { flex:none; width:20px; height:20px; border:2px solid var(--text); border-radius:3px; margin-top:3px; }
-    .print { font-size:14px; color:var(--muted); }
     @media print {
       :root { --bg:#FFFFFF; --surface:#FFFFFF; --border:#000000; --text:#000000; --muted:#333333; }
-      body { font-size: 12pt; }
+      body { font-size: 11pt; }
       main { padding: 0; max-width: none; }
       nav, .print { display:none; }
       .placeholder { border: none; padding: 0; }
-      h2 { margin-top: 18px; }
+      h2 { margin-top: 16px; }
     }
   </style>
 </head>
 <body>
   <main>
     <header><img src="icon-192.png" alt="" /><span class="brand">Approach</span></header>
-    <p class="print">Print this page (or save it as a PDF), have a parent or guardian sign it, and give it to the coach.</p>
-    <h1>Parent/Guardian Consent for an Athlete Under 18</h1>
+    <p class="print">Print this page (or save it as a PDF), have a parent or guardian check the boxes and sign, and give it to the coach.</p>
     <p class="muted">Approach: Volleyball Fitness</p>
-
-    <div class="fields">
-      <p><strong>Athlete name:</strong> <span class="line"></span> &nbsp; <strong>Athlete's month/year of birth:</strong> <span class="line" style="min-width:120px"></span></p>
-      <p><strong>Team:</strong> <span class="line"></span> &nbsp; <strong>Coach:</strong> <span class="line"></span></p>
-      <p><strong>Parent/guardian name:</strong> <span class="line"></span> &nbsp; <strong>Email or phone:</strong> <span class="line"></span></p>
-    </div>
-
-    <h2>What Approach is</h2>
-    <p>Approach is an early-version web app for volleyball strength training. Your athlete's coach posts workouts, and your athlete logs them on a phone. It's free; there is nothing to buy. It is in a small test ("soft launch") before a public release.</p>
-
-    <h2>What information is collected</h2>
-    <p><strong>Stored on Approach's servers, visible only to your athlete and their coach:</strong></p>
-    <ul>
-      <li>Name, email address, volleyball position, birth year, and the team they joined</li>
-      <li>Workouts they log (exercises, sets, reps, weights, and any notes they type)</li>
-      <li><strong>Only if you check Box 2 below:</strong> a daily check-in (sleep, soreness, and energy on a 1–5 scale, and whether they have any pain: yes or no)</li>
-    </ul>
-    <p><strong>Stays only on your athlete's phone (never sent to us):</strong> body weight, jump touch height, and nutrition targets.</p>
-    <p><strong>Not collected:</strong> photos, video, location, contacts, medical or injury details, and no advertising or tracking tools.</p>
-    <p><strong>Never</strong> sold, never used for ads, and never shown to teammates. Approach's operator does not monitor notes or check-ins.</p>
-
-    <h2>Risks of physical training</h2>
-    <p>Strength, power, and conditioning training carries a risk of injury, including muscle strains, sprains, and more serious injury. Approach provides general training information. <strong>It is not medical advice and doesn't replace supervision by a qualified coach.</strong> Athletes should learn new lifts with a coach, stop if something hurts, and tell a coach, parent, or athletic trainer about any pain or injury in person. Approach does not watch check-ins for emergencies.</p>
-
-    <h2>Your choices</h2>
-    <p>Check each box you agree to. Box 1 is required to use Approach. Boxes 2 and 3 are optional; the app works without them.</p>
-    <div class="box check"><span class="sq"></span><p><strong>1. Participation (required).</strong> I am the parent or legal guardian of the athlete named above. I agree that they may use Approach under the Approach <a href="terms.html">Terms</a> and <a href="privacy.html">Privacy Notice</a>. I understand the risks of physical training described above and accept them for my athlete.</p></div>
-    <div class="box check"><span class="sq"></span><p><strong>2. Daily check-ins (optional).</strong> I consent to my athlete logging the daily check-in (sleep, soreness, energy, pain yes/no).</p></div>
-    <div class="box check"><span class="sq"></span><p><strong>3. Sharing check-ins with the coach (optional; requires Box 2).</strong> I consent to the coach named above seeing my athlete's check-ins.</p></div>
-    <p class="muted"><em>(For the coach recording this in the app: Box 1 only = "Training only." Boxes 1, 2 and 3 = "Training and check-ins shared with me." Box 2 without Box 3 = "Training only.")</em></p>
-
-    <h2>Changing your mind</h2>
-    <p>You can withdraw any consent or ask us to delete your athlete's account and data at any time. Tell the coach, or email <span class="placeholder">[CONTACT EMAIL]</span>. Your athlete can also delete their account in the app (Settings → Delete my account). Deleted data is removed within 30 days.</p>
-
-    <div class="fields">
-      <p><strong>Parent/guardian signature:</strong> <span class="line" style="min-width:260px"></span> &nbsp; <strong>Date:</strong> <span class="line" style="min-width:120px"></span></p>
-    </div>
-
-    <p class="muted"><em>Coach: keep the signed form, and send a copy (photo or scan) to the contact email above before recording consent in the app. Approach keeps copies for 5 years after the account closes, as proof of consent.</em></p>
+    <h1>Parent/Guardian Consent for an Athlete Under 18 (Form v2)</h1>
+    <p><strong>Athlete name:</strong> <span class="line"></span> <strong>Athlete's month/year of birth:</strong> <span class="line"></span><br /><strong>Team:</strong> <span class="line"></span> <strong>Coach:</strong> <span class="line"></span><br /><strong>Parent/guardian name:</strong> <span class="line"></span> <strong>Email or phone:</strong> <span class="line"></span></p>
+    <h3>What Approach is</h3>
+    <p>Approach is a free, early-version web app for volleyball strength training. The coach posts workouts, and your athlete logs them on a phone. It is in a small test ("soft launch") before a public release. There is nothing to buy.</p>
+    <h3>What information is collected, and who sees it</h3>
+    <div class="table-wrap"><table>
+      <tr><th>Information</th><th>Who sees it</th><th>Needs box</th></tr>
+      <tr><td>Name, email, volleyball position, birth year, team</td><td>Your athlete and their coach</td><td>1</td></tr>
+      <tr><td>Workouts logged (exercises, sets, reps, weights, notes)</td><td>Your athlete and their coach</td><td>1</td></tr>
+      <tr><td>Daily check-in: sleep, soreness, energy (1–5), pain yes/no</td><td>Your athlete; the coach only with box 3</td><td>2, 3</td></tr>
+      <tr><td>Name ("Jordan M." or initials) and workout progress on the <strong>team boards</strong>: a live screen the coach may show in the weight room, and an <strong>effort leaderboard</strong> ranking sessions completed, consistency, and streaks</td><td>Coach and <strong>teammates</strong></td><td>4</td></tr>
+      <tr><td>Practices and matches attended and hours trained, shown on the effort leaderboard</td><td>Coach and teammates</td><td>5</td></tr>
+      <tr><td><strong>Testing days:</strong> jump tests (approach touch, broad jump, med-ball throw) and <strong>strength checks</strong> (lifting the heaviest weight they can do with good form for 3–5 reps, under coach supervision), plus the estimated strength calculated from them</td><td>Your athlete and their coach. Jump-test <strong>improvement %</strong> may appear on the effort leaderboard if box 4 is also checked. <strong>Lifting results are never shown to teammates or ranked.</strong></td><td>6</td></tr>
+    </table></div>
+    <p><strong>Stays on your athlete's phone only (never sent to us):</strong> body weight and personal notes.<br /><strong>Never collected:</strong> photos, video, location, contacts, medical or injury details. No advertising or tracking tools. Data is <strong>never sold</strong> and never used for ads. Nobody at Approach monitors check-ins or notes.</p>
+    <p><strong>Leaderboards rank effort, not bodies or strength.</strong> They never show weights lifted, strength-check results, body weight, nutrition, or check-in answers. Your athlete can switch to initials or hide from the leaderboard at any time.</p>
+    <h3>Risks of physical training</h3>
+    <p>Strength, power, and conditioning training, including jump tests and strength checks, carries a risk of injury, from muscle strains and sprains to more serious injury. Strength checks involve heavy lifting. In Approach they are only for intermediate and advanced athletes on a coached team, only after the coach confirms in the app that they are supervising with safety bars or spotters, never as a true one-rep max, and never on a day the athlete reports pain or being run down. Approach gives general training information. <strong>It is not medical advice and doesn't replace supervision by a qualified coach.</strong> Athletes should stop if something hurts and tell a coach, parent, or athletic trainer about any pain or injury in person.</p>
+    <h3>Your choices</h3>
+    <p>Check each box you agree to. <strong>Box 1 is required.</strong> Boxes 2–6 are optional; the app works without them, and each matching feature stays off for your athlete.</p>
+    <div class="box"><span class="sq"></span><p><strong>1. Participation (required).</strong> I am the parent or legal guardian of the athlete named above. I agree that they may use Approach under the Approach <a href="terms.html">Terms</a> and <a href="privacy.html">Privacy Notice</a>. I understand the risks of physical training described above and accept them for my athlete.</p></div>
+    <div class="box"><span class="sq"></span><p><strong>2. Daily check-ins.</strong> My athlete may log the daily check-in (sleep, soreness, energy, pain yes/no).</p></div>
+    <div class="box"><span class="sq"></span><p><strong>3. Sharing check-ins with the coach</strong> <em>(requires box 2)</em>. The coach named above may see my athlete's check-ins.</p></div>
+    <div class="box"><span class="sq"></span><p><strong>4. Team boards.</strong> My athlete's name ("Jordan M." or initials) and workout progress may appear on the coach's live board and the team effort leaderboard, which teammates can see.</p></div>
+    <div class="box"><span class="sq"></span><p><strong>5. Attendance and hours.</strong> My athlete's practice and match attendance and hours trained may be recorded and shown on the effort leaderboard.</p></div>
+    <div class="box"><span class="sq"></span><p><strong>6. Testing days.</strong> My athlete may take part in jump tests and, if eligible, coach-supervised strength checks, and the results may be saved and used to set their training weights.</p></div>
+    <h3>Changing your mind</h3>
+    <p>You can withdraw any choice or ask us to delete your athlete's account and data at any time. Tell the coach, or email <strong><span class="placeholder">[CONTACT EMAIL]</span></strong>. Your athlete can also delete their account in the app (Settings → Delete my account). Deleted data is removed within 30 days.</p>
+    <p><strong>Parent/guardian signature:</strong> <span class="line"></span> <strong>Date:</strong> <span class="line"></span></p>
+    <p><em>Coach: keep the signed form, and send a copy (photo or scan) to the contact email above. Then record exactly the boxes checked in the app (Team → athlete → Record parent consent, form v2). Approach keeps copies for 5 years after the account closes, as proof of consent.</em></p>
     <nav><a href="privacy.html">Privacy Notice</a><a href="terms.html">Terms</a><a href="consent.html">Parent consent form</a></nav>
   </main>
 </body>

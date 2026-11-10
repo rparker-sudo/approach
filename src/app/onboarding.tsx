@@ -31,7 +31,7 @@ function useOnboardingAccount() {
 // Practices only. Matches and tournaments go on the season calendar by date, since they change week to week.
 const DEFAULT_WEEK: DayType[] = ['practice', 'practice', 'practice', 'practice', 'practice', 'off', 'off'];
 
-type Step = 'age' | 'role' | 'account' | 'join' | 'name' | 'position' | 'level' | 'week' | 'weight';
+type Step = 'age' | 'role' | 'account' | 'join' | 'name' | 'position' | 'level' | 'week';
 
 export default function Onboarding() {
   const { setProfile, saveProgram, block } = useStore();
@@ -58,7 +58,6 @@ export default function Onboarding() {
     setWeekState(w);
     if (!daysTouched) setLiftDaysState(pickLiftDays(w, liftDays.length || 2));
   };
-  const [weight, setWeight] = useState('');
 
   const effectiveRole: Role | null = account?.role ?? role;
   const steps: Step[] =
@@ -73,7 +72,6 @@ export default function Onboarding() {
           'position',
           'level',
           ...(!team ? (['week'] as Step[]) : []),
-          'weight',
         ];
   const step = steps[Math.min(stepIndex, steps.length - 1)];
   const isLast = stepIndex >= steps.length - 1;
@@ -82,14 +80,14 @@ export default function Onboarding() {
 
   function finish(roleOverride?: Role, nameOverride?: string) {
     const r = roleOverride ?? effectiveRole!;
-    const bw = parseFloat(weight);
     const profile = {
       name: (nameOverride ?? account?.name ?? name).trim(),
       role: r,
       position: position ?? 'Outside Hitter',
       experience,
       phase,
-      bodyWeightLb: Number.isFinite(bw) && bw > 0 ? bw : null,
+      // P7.2: no body weight step (Fuel no longer uses it). It's optional in Progress, on this phone only.
+      bodyWeightLb: null,
       liftDaysPerWeek: liftDays.length,
       liftDays,
       volleyballWeek: week,
@@ -116,8 +114,7 @@ export default function Onboarding() {
     (step === 'name' && name.trim().length > 0) ||
     (step === 'position' && !!position) ||
     step === 'level' ||
-    (step === 'week' && liftDays.length > 0) ||
-    step === 'weight';
+    (step === 'week' && liftDays.length > 0);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'bottom']}>
@@ -267,21 +264,6 @@ export default function Onboarding() {
             </>
           )}
 
-          {step === 'weight' && (
-            <>
-              <H1>Body weight (optional)</H1>
-              <Body muted>
-                Used only to estimate how much carbs, protein and water you need. It stays on this phone. You can skip
-                this.
-              </Body>
-              <Field
-                placeholder="Pounds"
-                keyboardType="decimal-pad"
-                value={weight}
-                onChangeText={setWeight}
-              />
-            </>
-          )}
 
           {step === 'age' ? null : step === 'account' || step === 'join' ? (
             stepIndex > 0 ? <Button kind="ghost" title="Back" onPress={back} /> : null

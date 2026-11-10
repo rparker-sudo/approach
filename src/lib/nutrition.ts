@@ -1,10 +1,9 @@
 import type { DayType } from './types';
 
 /**
- * General sports-nutrition guidance for volleyball athletes, based on
- * common sports-dietitian ranges (grams per kg of body weight).
- * This is education, not a meal plan. It deliberately shows fuel targets
- * and plate guidance rather than calorie counts, since many users are teens.
+ * General sports-nutrition education for volleyball athletes (Fuel phase 1, D-019).
+ * No personal or numeric targets: no calories, grams, g/kg, ounces, weight goals or supplements,
+ * and body weight is never used. Day-type guidance, plate proportions, meal timing and cited cards only.
  */
 
 export type FuelLevel = 'rest' | 'moderate' | 'high' | 'very-high';
@@ -13,14 +12,9 @@ export type FuelDay = {
   level: FuelLevel;
   title: string;
   summary: string;
-  carbsPerKg: [number, number];
-  proteinPerKg: [number, number];
   plate: { carbs: number; protein: number; veg: number }; // fractions of a plate
   timing: { when: string; what: string }[];
-  fluidsExtraOz: number; // on top of baseline, for training/match time
 };
-
-const LB_PER_KG = 2.2046;
 
 export function fuelLevel(day: DayType, lifting: boolean): FuelLevel {
   if (day === 'tournament') return 'very-high';
@@ -37,9 +31,7 @@ export function fuelDay(day: DayType, lifting: boolean, matchTomorrow = false): 
     ...base,
     title: `${base.title} · match tomorrow`,
     summary: 'Match tomorrow. Eat a bit more carbs today and drink extra water so you start the match fully fueled.',
-    carbsPerKg: [Math.max(base.carbsPerKg[0], 5), Math.max(base.carbsPerKg[1], 7)],
     plate: { carbs: 0.45, protein: 0.25, veg: 0.3 },
-    fluidsExtraOz: base.fluidsExtraOz + 16,
     timing: [
       ...base.timing,
       { when: 'Dinner tonight', what: 'Carb-focused meal you know sits well: pasta, rice, potatoes with lean protein.' },
@@ -49,17 +41,13 @@ export function fuelDay(day: DayType, lifting: boolean, matchTomorrow = false): 
 
 function baseFuelDay(day: DayType, lifting: boolean): FuelDay {
   const level = fuelLevel(day, lifting);
-  const protein: [number, number] = [1.4, 1.8];
 
   if (day === 'tournament') {
     return {
       level,
       title: 'Tournament day',
       summary: 'Long day, several matches. Keep topping up carbs and fluids all day.',
-      carbsPerKg: [7, 8],
-      proteinPerKg: protein,
       plate: { carbs: 0.5, protein: 0.25, veg: 0.25 },
-      fluidsExtraOz: 48,
       timing: [
         { when: '3–4 hrs before first match', what: 'Full meal: oatmeal or bagel, eggs or yogurt, fruit. Low fat and fiber.' },
         { when: '30–60 min before', what: 'Easy carb snack: banana, pretzels, applesauce pouch.' },
@@ -74,10 +62,7 @@ function baseFuelDay(day: DayType, lifting: boolean): FuelDay {
       level,
       title: 'Match day',
       summary: 'Top off your energy before the match and refuel after.',
-      carbsPerKg: [6, 7],
-      proteinPerKg: protein,
       plate: { carbs: 0.5, protein: 0.25, veg: 0.25 },
-      fluidsExtraOz: 32,
       timing: [
         { when: 'Breakfast & lunch', what: 'Normal meals with extra carbs: rice, pasta, bread, potatoes, fruit.' },
         { when: '3–4 hrs before', what: 'Pre-match meal: pasta with lean meat, rice bowl, sandwich. Familiar foods only.' },
@@ -94,15 +79,12 @@ function baseFuelDay(day: DayType, lifting: boolean): FuelDay {
       summary: lifting
         ? 'Your biggest training day. Fuel before practice and refuel after you lift.'
         : 'Fuel before practice, refuel after.',
-      carbsPerKg: lifting ? [5, 7] : [5, 6],
-      proteinPerKg: protein,
       plate: { carbs: 0.4, protein: 0.3, veg: 0.3 },
-      fluidsExtraOz: lifting ? 32 : 24,
       timing: [
         { when: 'Meals', what: '3 meals, each with protein, a carb and a fruit or vegetable.' },
         { when: '1–2 hrs before practice', what: 'Snack: fruit + string cheese, toast with peanut butter, yogurt.' },
         { when: 'During', what: 'Water. Sports drink if practice is longer than 90 min or very hot.' },
-        { when: lifting ? 'After practice + lift' : 'After practice', what: 'Within 1 hr: 20–30 g protein + carbs. Chocolate milk, turkey wrap, rice and chicken.' },
+        { when: lifting ? 'After practice + lift' : 'After practice', what: 'Within an hour: protein + carbs. Chocolate milk, turkey wrap, rice and chicken.' },
         { when: 'Before bed', what: 'Optional protein snack: Greek yogurt, milk, cottage cheese.' },
       ],
     };
@@ -113,38 +95,14 @@ function baseFuelDay(day: DayType, lifting: boolean): FuelDay {
     summary: lifting
       ? 'Normal eating with protein after your lift.'
       : 'Recovery day. Eat normal meals; you still need carbs to refill energy stores.',
-    carbsPerKg: lifting ? [4, 5] : [3, 4],
-    proteinPerKg: protein,
     plate: { carbs: 0.3, protein: 0.3, veg: 0.4 },
-    fluidsExtraOz: lifting ? 16 : 0,
     timing: [
       { when: 'Meals', what: '3 balanced meals with protein, carbs, fruits and vegetables.' },
       { when: 'Snacks', what: '1–2 snacks with protein: yogurt, nuts, eggs, cheese and crackers.' },
       ...(lifting
-        ? [{ when: 'After your lift', what: '20–30 g protein + carbs within an hour.' }]
+        ? [{ when: 'After your lift', what: 'Protein + carbs within an hour: yogurt and fruit, eggs and toast, a sandwich.' }]
         : [{ when: 'Recovery', what: 'Sleep 8–10 hours. Sleep is when muscles rebuild.' }]),
     ],
-  };
-}
-
-export type FuelTargets = {
-  carbsG: [number, number];
-  proteinG: [number, number];
-  proteinPerMealG: [number, number];
-  fluidsOz: [number, number];
-};
-
-/** Grams per day, rounded to 5 g. Returns null when body weight is unknown. */
-export function fuelTargets(day: FuelDay, bodyWeightLb: number | null): FuelTargets | null {
-  if (!bodyWeightLb || bodyWeightLb <= 0) return null;
-  const kg = bodyWeightLb / LB_PER_KG;
-  const r5 = (n: number) => Math.round(n / 5) * 5;
-  const baseFluid = bodyWeightLb * 0.5; // oz
-  return {
-    carbsG: [r5(day.carbsPerKg[0] * kg), r5(day.carbsPerKg[1] * kg)],
-    proteinG: [r5(day.proteinPerKg[0] * kg), r5(day.proteinPerKg[1] * kg)],
-    proteinPerMealG: [Math.max(15, r5(0.25 * kg)), Math.max(20, r5(0.4 * kg))],
-    fluidsOz: [Math.round(baseFluid + day.fluidsExtraOz), Math.round(baseFluid * 1.3 + day.fluidsExtraOz)],
   };
 }
 
@@ -156,3 +114,103 @@ export const FOOD_IDEAS = {
 
 export const NUTRITION_DISCLAIMER =
   'General sports-nutrition education, not medical advice. Athletes with health conditions, allergies, or who want a personal plan should talk with a doctor or registered dietitian. Never skip meals to make weight.';
+
+/* ---------- Fuel cards (docs/content/fuel-cards.md) ---------- */
+
+/** When a card shows first, mapped from the day logic (fuelDay): rest, lift, practice, match, tournament, pre-match. */
+export type CardDay = 'all' | 'rest' | 'lift' | 'practice' | 'match' | 'tournament' | 'pre-match';
+export type FuelCard = { id: number; title: string; days: CardDay[]; body: string; source: string };
+
+/** Shown on every card (fuel-cards.md). */
+export const FUEL_CARD_NOTE =
+  'General information for healthy athletes, not individual advice. Talk to a doctor or registered dietitian about your own needs, allergies, or health conditions.';
+
+const ACSM = 'ACSM / Academy of Nutrition and Dietetics / Dietitians of Canada, Nutrition and Athletic Performance, joint position statement, 2016.';
+const ACSM_SHORT = 'ACSM / AND / DC joint position statement, 2016.';
+
+export const FUEL_CARDS: FuelCard[] = [
+  {
+    id: 1,
+    title: 'Eat enough to train',
+    days: ['all'],
+    body: "Training hard and growing at the same time takes a lot of fuel. Eat regular meals and snacks through the day instead of skipping meals. If you're often tired, sore for days, or getting sick a lot, talk to a parent, coach, or doctor.",
+    source: ACSM,
+  },
+  {
+    id: 2,
+    title: 'Before practice or a lift',
+    days: ['practice', 'lift'],
+    body: 'Have a meal 3–4 hours before, or a lighter snack 1–2 hours before. Choose foods with carbs that sit well in your stomach: a sandwich, rice bowl, fruit and yogurt, or a granola bar. Go easy on very greasy or high-fiber foods right before you play.',
+    source: ACSM_SHORT,
+  },
+  {
+    id: 3,
+    title: 'After you train',
+    days: ['lift', 'practice', 'match'],
+    body: 'Within a couple of hours after training, eat a meal or snack with both protein and carbs: chocolate milk, a turkey sandwich, yogurt with fruit, or eggs and toast. It helps your body recover for tomorrow.',
+    source: ACSM_SHORT,
+  },
+  {
+    id: 4,
+    title: 'The day before a match',
+    days: ['pre-match'],
+    body: "Eat normal, familiar meals with plenty of carbs (pasta, rice, potatoes, bread) and drink water through the day. It's not the day to try a new food.",
+    source: ACSM_SHORT,
+  },
+  {
+    id: 5,
+    title: 'Match day',
+    days: ['match'],
+    body: "Eat a familiar meal 3–4 hours before your match. If it's closer than that, have a small carb snack like a banana, crackers, or a bagel. Bring water.",
+    source: ACSM_SHORT,
+  },
+  {
+    id: 6,
+    title: 'Tournament days',
+    days: ['tournament'],
+    body: 'Long days need a plan. Pack easy snacks for between matches (fruit, pretzels, sandwiches, granola bars) and a water bottle. Eat small amounts often instead of one big meal in the middle of the day.',
+    source: ACSM_SHORT,
+  },
+  {
+    id: 7,
+    title: 'Hydration',
+    days: ['all'],
+    body: "Drink water through the day, not just at practice. Bring a bottle to every practice and match and drink during breaks. Pale-yellow urine is a simple sign you're drinking enough. In hot gyms, or on long days, you'll need more.",
+    source: "National Athletic Trainers' Association, Position Statement: Fluid Replacement for the Physically Active, 2017.",
+  },
+  {
+    id: 8,
+    title: 'Sports drinks and energy drinks',
+    days: ['all'],
+    body: "For most practices, water is enough. Sports drinks can help during long, hot, or very sweaty sessions and tournament days. Energy drinks aren't recommended for teens: their caffeine and other stimulants aren't a safe way to get energy.",
+    source: 'American Academy of Pediatrics, Sports Drinks and Energy Drinks for Children and Adolescents, clinical report, 2011.',
+  },
+  {
+    id: 9,
+    title: 'Rest days',
+    days: ['rest'],
+    body: "Rest days are when your body rebuilds, so keep eating regular meals. Rest days aren't a reason to skip food.",
+    source: ACSM_SHORT,
+  },
+];
+
+/** The day's tags, from the same inputs as fuelDay. */
+export function cardDaysFor(day: DayType, lifting: boolean, matchTomorrow = false): CardDay[] {
+  const tags: CardDay[] = [];
+  if (day === 'off' && !lifting) tags.push('rest');
+  if (lifting) tags.push('lift');
+  if (day === 'practice') tags.push('practice');
+  if (day === 'game') tags.push('match');
+  if (day === 'tournament') tags.push('tournament');
+  if (matchTomorrow && day !== 'game' && day !== 'tournament') tags.push('pre-match');
+  return tags;
+}
+
+/** Cards matching the day first (then every-day cards), then the rest, in the doc's order. */
+export function cardsFor(day: DayType, lifting: boolean, matchTomorrow = false): { today: FuelCard[]; rest: FuelCard[] } {
+  const tags = cardDaysFor(day, lifting, matchTomorrow);
+  const specific = FUEL_CARDS.filter((c) => c.days.some((d) => tags.includes(d)));
+  const always = FUEL_CARDS.filter((c) => c.days.includes('all'));
+  const today = [...specific, ...always];
+  return { today, rest: FUEL_CARDS.filter((c) => !today.includes(c)) };
+}

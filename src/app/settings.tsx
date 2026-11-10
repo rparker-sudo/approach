@@ -13,7 +13,6 @@ import { LEGAL_TITLES, LegalPage, openLegal } from '../lib/legal';
 import { useStore } from '../lib/store';
 import { useTeams } from '../lib/team';
 import { POSITIONS } from '../lib/types';
-import { parseNum } from '../lib/util';
 import { NUTRITION_DISCLAIMER } from '../lib/nutrition';
 
 export default function Settings() {
@@ -22,14 +21,12 @@ export default function Settings() {
   const [savedChoices, setSavedChoices] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [name, setName] = useState(data.profile?.name ?? '');
-  const [weight, setWeight] = useState(data.profile?.bodyWeightLb ? String(data.profile.bodyWeightLb) : '');
   if (!data.profile) return null;
   const profile = data.profile;
   const coach = profile.role === 'coach';
 
   function save() {
-    const w = parseNum(weight);
-    setProfile({ ...profile, name: name.trim() || profile.name, bodyWeightLb: w > 0 ? w : null });
+    setProfile({ ...profile, name: name.trim() || profile.name });
     router.back();
   }
 
@@ -38,7 +35,6 @@ export default function Settings() {
       <Field label="Name" value={name} onChangeText={setName} />
       {!coach ? (
         <>
-          <Field label="Body weight (lb)" keyboardType="decimal-pad" value={weight} onChangeText={setWeight} placeholder="Optional" />
           <Label>Position</Label>
           <ChipRow>
             {POSITIONS.map((p) => (

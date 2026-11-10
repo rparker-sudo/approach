@@ -12,8 +12,8 @@ export function formatDate(iso: string): string {
   return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-/** Epley estimate of a one-rep max. */
-export function estimate1RM(weight: number, reps: number): number {
+/** Estimated strength (Epley): weight × (1 + reps / 30). Always shown as an estimate. */
+export function estimateStrength(weight: number, reps: number): number {
   if (!weight || !reps) return 0;
   if (reps === 1) return weight;
   return Math.round(weight * (1 + reps / 30));

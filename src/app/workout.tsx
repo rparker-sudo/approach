@@ -17,7 +17,7 @@ import { canLog } from '../lib/backend';
 import { useStore } from '../lib/store';
 import { useTeams } from '../lib/team';
 import type { LoggedSet, ProgramExercise, WorkoutLog } from '../lib/types';
-import { estimate1RM, uid } from '../lib/util';
+import { estimateStrength, uid } from '../lib/util';
 
 type Entry = { exerciseId: string; sets: LoggedSet[] };
 type Draft = { entries: Entry[]; index: number; note: string; startedAt: number };
@@ -48,7 +48,14 @@ export default function Workout() {
   // Today's version of the session (deload week / coach-lightened day applied).
   const day = useMemo(() => (program && session ? sessionForDate(program, session, today()) : null), [program, session]);
   const plan: ProgramExercise[] = useMemo(() => day?.exercises ?? [], [day]);
-  const suggestions = useMemo(() => plan.map((pe) => suggestWeight(data.logs, pe, program?.equipment)), [plan, data.logs, program?.equipment]);
+  const suggestions = useMemo(
+    () =>
+      plan.map((pe) => {
+        const est = data.strengthEstimates?.[pe.exerciseId];
+        return suggestWeight(data.logs, pe, program?.equipment, est && program ? { e1rm: est.e1rm, phase: program.phase } : undefined);
+      }),
+    [plan, data.logs, data.strengthEstimates, program],
+  );
 
   const fresh = (): Draft => ({
     entries: plan.map((pe, i) => ({
@@ -198,12 +205,12 @@ export default function Workout() {
       teamId: program!.teamId,
       synced: false,
     };
-    // New best estimated maxes vs. earlier logs.
+    // New best estimated strength vs. earlier logs.
     const prs: string[] = [];
     for (const e of entries) {
       const ex = getExercise(e.exerciseId);
       if (!ex.weighted || (ex.category !== 'lower' && ex.category !== 'upper')) continue;
-      const best = (sets: LoggedSet[]) => Math.max(0, ...sets.filter((s) => s.done).map((s) => estimate1RM(parseFloat(s.weight) || 0, parseFloat(s.reps) || 0)));
+      const best = (sets: LoggedSet[]) => Math.max(0, ...sets.filter((s) => s.done).map((s) => estimateStrength(parseFloat(s.weight) || 0, parseFloat(s.reps) || 0)));
       const now1 = best(e.sets);
       const before = Math.max(0, ...data.logs.map((l) => best(l.entries.find((x) => x.exerciseId === e.exerciseId)?.sets ?? [])));
       if (now1 > 0 && before > 0 && now1 > before) prs.push(`${ex.name}: estimated strength ~${now1} lb (estimate, +${now1 - before})`);
@@ -425,7 +432,7 @@ function ExerciseCard({
           <Text style={{ fontSize: 13 }}>
             Last: {suggestion.last} →{' '}
             <Text style={{ fontWeight: '600' }}>
-              {suggestion.reason === 'up' ? `Try ${suggestion.weight} (+${suggestion.delta})` : suggestion.reason === 'down' ? `Try ${suggestion.weight} (${suggestion.delta})` : `Stay at ${suggestion.weight}`}
+              {suggestion.reason === 'test' ? `Start at ${suggestion.weight} (from your strength check)` : suggestion.reason === 'up' ? `Try ${suggestion.weight} (+${suggestion.delta})` : suggestion.reason === 'down' ? `Try ${suggestion.weight} (${suggestion.delta})` : `Stay at ${suggestion.weight}`}
             </Text>
           </Text>
         ) : (

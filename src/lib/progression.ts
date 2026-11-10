@@ -1,6 +1,7 @@
 import { planForDate } from './calendar';
 import { ALL_EQUIPMENT, getExercise } from './exercises';
-import type { Equipment, Exercise, Program, ProgramExercise, Session, WorkoutLog } from './types';
+import { testedWeight } from './testing';
+import type { Equipment, Exercise, Phase, Program, ProgramExercise, Session, WorkoutLog } from './types';
 
 /**
  * Weekly progression.
@@ -65,7 +66,8 @@ export type Suggestion = {
   delta: number;
   /** e.g. "135 × 8, 8, 8" */
   last: string;
-  reason: 'up' | 'same' | 'down';
+  /** 'test': set from a strength check (P6.7). */
+  reason: 'up' | 'same' | 'down' | 'test';
 };
 
 const round5 = (n: number) => Math.max(5, Math.round(n / 5) * 5);
@@ -106,12 +108,35 @@ export function increaseFor(lastWeight: number, kind: 'barbell' | 'dumbbell' | '
  * Below the range two sessions in a row → drop ~5%.
  * No suggestions for band-only setups or timed/hold exercises.
  */
-export function suggestWeight(logs: WorkoutLog[], pe: ProgramExercise, equipment: Equipment[] = ALL_EQUIPMENT): Suggestion | null {
+export function suggestWeight(
+  logs: WorkoutLog[],
+  pe: ProgramExercise,
+  equipment: Equipment[] = ALL_EQUIPMENT,
+  /** Latest strength-check estimate for this lift, and the program's phase (P6.7). */
+  test?: { e1rm: number; phase: Phase },
+): Suggestion | null {
   const ex = getExercise(pe.exerciseId);
   const range = repRange(pe.reps);
   if (!ex.weighted || !range || /\bhold\b/i.test(ex.name)) return null;
   const kind = loading(ex, equipment);
   if (kind === 'band') return null;
+  const base = progressionSuggestion(logs, pe, range, kind);
+  if (!test || (kind !== 'barbell' && kind !== 'dumbbell')) return base;
+  // Tested lift: never above e1RM × the phase's upper %; a lower re-test lowers it.
+  const step = kind === 'barbell' ? 5 : 2.5;
+  const w = testedWeight(test.e1rm, test.phase, base?.weight ?? null, step);
+  if (!base) return { weight: w, delta: 0, last: 'From your strength check', reason: 'test' };
+  if (w >= base.weight) return base;
+  const lastTop = base.weight - base.delta;
+  return { weight: w, delta: w - lastTop, last: base.last, reason: 'test' };
+}
+
+function progressionSuggestion(
+  logs: WorkoutLog[],
+  pe: ProgramExercise,
+  range: [number, number],
+  kind: 'barbell' | 'dumbbell' | 'other',
+): Suggestion | null {
   const history = logs
     .filter((l) => doneSets(l, pe.exerciseId).length)
     .sort((a, b) => b.date.localeCompare(a.date));

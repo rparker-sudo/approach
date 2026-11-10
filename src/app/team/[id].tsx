@@ -7,6 +7,7 @@ import ConsentSheet from '../../components/ConsentSheet';
 import EffortBoard, { useTeamProgramFor } from '../../components/EffortBoard';
 import TeamSettingsCard from '../../components/TeamSettingsCard';
 import TestingBanner from '../../components/TestingBanner';
+import TestsSection from '../../components/TestsSection';
 import { defaultTeamGoal, liftDaysOf, weeksRemaining } from '../../lib/effort';
 import { weekStart } from '../../components/TeamHome';
 import { Body, Button, Card, Chip, ChipRow, colors, display, Field, Icon, Label, Note, Pill, Row, StatusChip, Text } from '../../components/ui';
@@ -428,6 +429,7 @@ export default function TeamScreen() {
                         ))}
                       </ChipRow>
                       <AttendanceMarks team={team} member={m} program={programFor(m.groupId ?? null)} />
+                      <TestsSection team={team} member={m} />
                       <Text
                         accessibilityRole="button"
                         onPress={() =>

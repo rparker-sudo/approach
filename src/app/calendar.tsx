@@ -16,13 +16,16 @@ import {
   upcomingEvents,
   weekPlan,
   weekdayOf,
+  testBlocked,
   withEvent,
+  withTest,
   withOverride,
 } from '../lib/calendar';
 import { showAlert } from '../lib/dialog';
 import { useStore } from '../lib/store';
 import { useTeams } from '../lib/team';
-import type { DayType, Program } from '../lib/types';
+import type { DayType, Program, TestBattery } from '../lib/types';
+import { BATTERY_LABEL } from '../lib/testing';
 import { DAY_TYPES, WEEKDAYS } from '../lib/types';
 
 const TYPE_CHOICES: { id: DayType; label: string }[] = [
@@ -155,7 +158,7 @@ export default function CalendarScreen() {
                     {changed ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.ink }} /> : null}
                   </Row>
                   <Text style={{ fontSize: 12, fontWeight: '600', textAlign: 'center' }}>
-                    {p.dayType === 'tournament' ? 'T' : p.dayType === 'game' ? 'M' : ''}
+                    {p.test ? 'Test' : p.dayType === 'tournament' ? 'T' : p.dayType === 'game' ? 'M' : ''}
                   </Text>
                   <View
                     style={{
@@ -174,6 +177,7 @@ export default function CalendarScreen() {
           <Legend swatch={<View style={{ width: 14, height: 4, borderRadius: 2, backgroundColor: colors.ink }} />} text="Lift" />
           <Legend swatch={<Text style={{ fontSize: 12, fontWeight: '600' }}>M</Text>} text="Match" />
           <Legend swatch={<Text style={{ fontSize: 12, fontWeight: '600' }}>T</Text>} text="Tournament" />
+          <Legend swatch={<Text style={{ fontSize: 12, fontWeight: '600' }}>Test</Text>} text="Testing day" />
           <Legend swatch={<View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.ink }} />} text="Lift moved or chosen" />
         </Row>
       </Card>
@@ -209,6 +213,7 @@ export default function CalendarScreen() {
           program={program}
           dateKeyStr={selected}
           readOnly={readOnly}
+          canTest={coach && !!program.teamId}
           onClose={() => setSelected(null)}
           onSave={(next) => {
             save(next);
@@ -234,12 +239,15 @@ function DaySheet({
   program,
   dateKeyStr,
   readOnly,
+  canTest,
   onClose,
   onSave,
 }: {
   program: Program;
   dateKeyStr: string;
   readOnly: boolean;
+  /** Coach on a team calendar: can add a testing day (P6.1). */
+  canTest?: boolean;
   onClose: () => void;
   onSave: (p: Program) => void;
 }) {
@@ -252,11 +260,15 @@ function DaySheet({
   const [nextDayToo, setNextDayToo] = useState(false);
   const hasOverride = !!program.overrides && dateKeyStr in program.overrides;
   const [lift, setLift] = useState<string | null | 'auto'>(hasOverride ? program.overrides![dateKeyStr] : 'auto');
+  const [test, setTest] = useState<TestBattery | null>(existing?.test ?? null);
 
   // Preview the automatic plan with the event edits applied.
   let draft = withEvent(program, dateKeyStr, type, label);
   const nextKey = dateKey(addDays(date, 1));
   if (nextDayToo && type === 'tournament') draft = withEvent(draft, nextKey, 'tournament', label);
+  draft = withTest(draft, dateKeyStr, canTest ? test : existing?.test ?? null);
+  // P6.1: no testing within 48 hours before a match or tournament.
+  const testError = canTest && test ? testBlocked(draft, dateKeyStr) : null;
   const auto = planForDate(withOverride(draft, dateKeyStr, undefined), date);
   const autoName = program.sessions.find((s) => s.id === auto.sessionId)?.name ?? 'Rest';
   const current = planForDate(program, date);
@@ -288,7 +300,7 @@ function DaySheet({
                 {DAY_TYPES.find((x) => x.id === current.dayType)!.label}
                 {current.event?.label ? ` · ${current.event.label}` : ''}
               </Text>
-              <Text style={{ fontSize: 16, fontWeight: '600' }}>Lift: {currentName}</Text>
+              <Text style={{ fontSize: 16, fontWeight: '600' }}>{current.test ? `Testing day: ${BATTERY_LABEL[current.test]}` : `Lift: ${currentName}`}</Text>
               {current.note ? <Note>{current.note}</Note> : null}
               <Button title="Close" onPress={onClose} />
             </>
@@ -321,6 +333,22 @@ function DaySheet({
                 />
               ) : null}
 
+              {canTest ? (
+                <>
+                  <Label>Testing day</Label>
+                  <ChipRow>
+                    <Chip label="None" selected={test === null} onPress={() => setTest(null)} />
+                    {(['full', 'jump', 'mid'] as TestBattery[]).map((b) => (
+                      <Chip key={b} label={BATTERY_LABEL[b]} selected={test === b} onPress={() => setTest(b)} />
+                    ))}
+                  </ChipRow>
+                  {testError ? <Text style={{ fontSize: 13, color: colors.error }}>{testError}</Text> : null}
+                  {test && !testError ? (
+                    <Text style={{ fontSize: 13, color: colors.muted }}>That day&apos;s lift becomes a Testing session. You confirm supervision on the day.</Text>
+                  ) : null}
+                </>
+              ) : null}
+
               <Label>Lift</Label>
               <ChipRow>
                 <Chip label={`Auto: ${autoName}`} selected={lift === 'auto'} onPress={() => setLift('auto')} />
@@ -339,7 +367,7 @@ function DaySheet({
                   <Button kind="ghost" title="Cancel" onPress={onClose} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Button title="Save" onPress={apply} />
+                  <Button title="Save" disabled={!!testError} onPress={apply} />
                 </View>
               </Row>
             </>
@@ -349,4 +377,3 @@ function DaySheet({
     </Modal>
   );
 }
-

@@ -26,6 +26,7 @@ import {
   TestSession,
 } from './backend';
 import { dateKey, today } from './calendar';
+import { isLow } from './readiness';
 import { useStore } from './store';
 import type { AppData, CalendarEvent, LocalTeamCalendar, Position, Program, ReadinessEntry, TestBattery } from './types';
 
@@ -63,11 +64,8 @@ export type ReadinessSummary = {
   suggest: boolean;
 };
 
-/** A check-in counts as "run down" when the average of sleep, energy and (inverted) soreness is ≤ 2, or soreness is 4–5. */
-export function isLow(r: Pick<Readiness, 'sleep' | 'energy' | 'soreness'>) {
-  const avg = (r.sleep + r.energy + (6 - r.soreness)) / 3;
-  return avg <= 2 || r.soreness >= 4;
-}
+// "Run down" rule shared with testing-day eligibility (P6.4).
+export { isLow } from './readiness';
 
 /** Suggest lightening when ≥ 3 athletes, or ≥ 30% of those checked in, are run down. */
 export function summarizeReadiness(list: Readiness[], roster: number): ReadinessSummary {

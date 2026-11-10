@@ -28,6 +28,7 @@ import { fuelDay, fuelTargets } from '../../lib/nutrition';
 import { sessionForDate } from '../../lib/progression';
 import { canCheckIn, canLog } from '../../lib/backend';
 import { useStore } from '../../lib/store';
+import { BATTERY_LABEL } from '../../lib/testing';
 import { useTeams } from '../../lib/team';
 import { DAY_TYPES, WEEKDAYS } from '../../lib/types';
 import { weekdayIndex } from '../../lib/util';
@@ -114,7 +115,17 @@ function Today() {
           <Label>Today</Label>
           <Pill text={todayPlan.event?.label ?? DAY_TYPES.find((d) => d.id === vb)!.label} bg={colors.day[vb]} />
         </Row>
-        {session ? (
+        {todayPlan.test && activeProgram.teamId ? (
+          <>
+            <H2>Testing session</H2>
+            <Body muted>{`${BATTERY_LABEL[todayPlan.test]}: warm-up, jump tests${todayPlan.test === 'jump' ? '' : ', then strength checks with your coach'}.`}</Body>
+            <Button
+              title="Start testing session"
+              icon="play.fill"
+              onPress={() => router.push({ pathname: '/testing', params: { teamId: activeProgram.teamId! } })}
+            />
+          </>
+        ) : session ? (
           <>
             <H2>{session.name}</H2>
             <Body muted>{session.focus}</Body>

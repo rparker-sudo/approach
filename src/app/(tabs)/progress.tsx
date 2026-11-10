@@ -12,7 +12,7 @@ import ScreenHeader from '../../components/ScreenHeader';
 import { Body, Button, Card, colors, Field, H2, Label, Row, Screen, Text } from '../../components/ui';
 import { getExercise } from '../../lib/exercises';
 import { useStore } from '../../lib/store';
-import { estimate1RM, formatDate, parseNum } from '../../lib/util';
+import { estimateStrength, formatDate, parseNum } from '../../lib/util';
 
 type LiftPoint = { date: string; e1rm: number; best: string };
 
@@ -32,7 +32,7 @@ export default function Progress() {
           if (!s.done) continue;
           const w = parseNum(s.weight);
           const r = parseNum(s.reps);
-          const est = estimate1RM(w, r);
+          const est = estimateStrength(w, r);
           if (est > best) {
             best = est;
             bestLabel = `${w} lb × ${r}`;
@@ -56,6 +56,7 @@ export default function Progress() {
       <ScreenHeader title="Progress" subtitle="Touch height and strength" />
       <AboveTheNet />
       <TeamEffortCards />
+      <Button kind="secondary" title="Jump test" onPress={() => router.push({ pathname: '/testing', params: { solo: '1' } })} />
       {(data.readinessLog ?? []).length ? (
         <Card>
           <H2>Check-ins</H2>
@@ -156,14 +157,14 @@ function LiftRow({ name, points }: { name: string; points: LiftPoint[] }) {
     <View style={{ gap: 6, paddingVertical: 6, borderTopWidth: 1, borderTopColor: colors.line }}>
       <Row style={{ justifyContent: 'space-between' }}>
         <Text style={{ fontWeight: '600', fontSize: 16, flex: 1 }}>{name}</Text>
-        <Text style={{ fontWeight: '600' }}>{last.e1rm} lb</Text>
+        <Text style={{ fontWeight: '600' }}>~{last.e1rm} lb (estimate)</Text>
       </Row>
       <Row style={{ justifyContent: 'space-between' }}>
         <Text style={{ color: colors.muted, fontSize: 12 }}>Last best set: {last.best}</Text>
         {points.length > 1 ? (
           <Text style={{ color: change > 0 ? colors.achievement : colors.muted, fontSize: 12, fontWeight: '600' }}>
             {change >= 0 ? '+' : ''}
-            {change} lb est. max
+            {change} lb estimated strength
           </Text>
         ) : null}
       </Row>

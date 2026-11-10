@@ -147,7 +147,8 @@ export function weekPlan(program: Program, monday: Date): DayPlan[] {
 
   // 4. Testing days replace that day's lift with a Testing session (the day keeps its day type).
   for (const p of plan) {
-    if (p.event?.test) {
+    // A match added later within 48 hours cancels the testing day (P6.1).
+    if (p.event?.test && !testBlocked(program, p.date)) {
       p.test = p.event.test;
       p.sessionId = null;
       p.note = 'Testing day';

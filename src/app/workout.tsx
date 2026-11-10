@@ -41,7 +41,7 @@ export default function Workout() {
   useKeepAwake();
   const { programId, sessionId } = useLocalSearchParams<{ programId: string; sessionId: string }>();
   const { data, addLog } = useStore();
-  const { consentFor } = useTeams();
+  const { consentFor, shareLiveProgress } = useTeams();
   const insets = useSafeAreaInsets();
   const program = data.programs.find((p) => p.id === programId);
   const session = program?.sessions.find((s) => s.id === sessionId);
@@ -91,6 +91,19 @@ export default function Workout() {
     if (!loaded.current || !draft || !program || !session || summary) return;
     AsyncStorage.setItem(draftKey(program.id, session.id), JSON.stringify(draft)).catch(() => {});
   }, [draft, program, session, summary]);
+
+  // P3: share sets done with the coach board (debounced 2 s; only with boards permission, checked in shareLiveProgress).
+  const doneCount = draft ? draft.entries.reduce((n, e) => n + e.sets.filter((x) => x.done).length, 0) : 0;
+  const totalCount = draft ? draft.entries.reduce((n, e) => n + e.sets.length, 0) : 0;
+  const lastShared = useRef(-1);
+  useEffect(() => {
+    if (!program?.teamId || !session || !draft || summary || doneCount === lastShared.current || doneCount === 0) return;
+    const timer = setTimeout(() => {
+      lastShared.current = doneCount;
+      shareLiveProgress({ teamId: program.teamId!, day: dateKey(today()), sessionId: session.id, setsDone: doneCount, setsTotal: totalCount, status: 'in_progress' });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [doneCount, totalCount, program?.teamId, session, draft, summary, shareLiveProgress]);
 
   // Tick while resting.
   useEffect(() => {
@@ -173,6 +186,7 @@ export default function Workout() {
       showAlert('No sets checked off', 'Tap Done next to each set you finish, then save.');
       return;
     }
+    const minutes = Math.max(1, Math.round((Date.now() - draft!.startedAt) / 60000));
     const log: WorkoutLog = {
       id: uid(),
       date: new Date().toISOString(),
@@ -192,12 +206,16 @@ export default function Workout() {
       const best = (sets: LoggedSet[]) => Math.max(0, ...sets.filter((s) => s.done).map((s) => estimate1RM(parseFloat(s.weight) || 0, parseFloat(s.reps) || 0)));
       const now1 = best(e.sets);
       const before = Math.max(0, ...data.logs.map((l) => best(l.entries.find((x) => x.exerciseId === e.exerciseId)?.sets ?? [])));
-      if (now1 > 0 && before > 0 && now1 > before) prs.push(`${ex.name}: ${now1} lb est. max (+${now1 - before})`);
+      if (now1 > 0 && before > 0 && now1 > before) prs.push(`${ex.name}: estimated strength ~${now1} lb (estimate, +${now1 - before})`);
     }
-    addLog(log);
+    // Lift minutes count toward effort hours (capped at 120 per workout); bests show as a "PR" badge on the board.
+    addLog({ ...log, durationMin: Math.min(120, minutes), prCount: prs.length });
+    if (program!.teamId) {
+      shareLiveProgress({ teamId: program!.teamId, day: dateKey(today()), sessionId: session!.id, setsDone: done, setsTotal: total, status: 'done' });
+    }
     clearDraft();
     setRest(null);
-    setSummary({ sets: done, total, minutes: Math.max(1, Math.round((Date.now() - draft!.startedAt) / 60000)), prs, team: !!program!.teamId });
+    setSummary({ sets: done, total, minutes, prs, team: !!program!.teamId });
   }
 
   function leave() {

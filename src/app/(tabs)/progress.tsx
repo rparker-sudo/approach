@@ -2,6 +2,12 @@ import { useMemo, useState } from 'react';
 import { showAlert } from '../../lib/dialog';
 import { Pressable, View } from 'react-native';
 import AboveTheNet from '../../components/AboveTheNet';
+import { MyEffortSummary, useEffort, useTeamProgramFor } from '../../components/EffortBoard';
+import { router } from 'expo-router';
+import { canBoard, Team } from '../../lib/backend';
+import { dateKey } from '../../lib/calendar';
+import { badges, lastBlockComplete } from '../../lib/effort';
+import { useTeams } from '../../lib/team';
 import ScreenHeader from '../../components/ScreenHeader';
 import { Body, Button, Card, colors, Field, H2, Label, Row, Screen, Text } from '../../components/ui';
 import { getExercise } from '../../lib/exercises';
@@ -49,6 +55,7 @@ export default function Progress() {
     <Screen tab>
       <ScreenHeader title="Progress" subtitle="Touch height and strength" />
       <AboveTheNet />
+      <TeamEffortCards />
       {(data.readinessLog ?? []).length ? (
         <Card>
           <H2>Check-ins</H2>
@@ -76,7 +83,7 @@ export default function Progress() {
           lifts.map(([id, points]) => <LiftRow key={id} name={getExercise(id).name} points={points} />)
         )}
         <Body muted style={{ fontSize: 12 }}>
-          Estimated max is calculated from your best set. No need to test it.
+          Estimated strength comes from your best set. It&apos;s an estimate; no need to test it.
         </Body>
       </Card>
 
@@ -99,7 +106,7 @@ export default function Progress() {
         {data.bodyLogs.length > 0 ? (
           <Bars values={data.bodyLogs.slice(-12).map((b) => b.weightLb)} labels={data.bodyLogs.slice(-12).map((b) => formatDate(b.date).split(',').pop()!.trim())} />
         ) : (
-          <Body muted style={{ fontSize: 13 }}>Optional. Used to keep your fuel targets accurate.</Body>
+          <Body muted style={{ fontSize: 13 }}>Optional. Stays on this phone.</Body>
         )}
       </Card>
 
@@ -186,5 +193,50 @@ function Bars({ values, labels }: { values: number[]; labels?: string[] }) {
         </View>
       ) : null}
     </View>
+  );
+}
+
+/** P4: the athlete's team effort card (their rank, link to the full list) and private badges. */
+function TeamEffortCards() {
+  const { teams, consentFor } = useTeams();
+  const shown = teams.filter((t) => t.settings.effortBoard);
+  if (!shown.length) return null;
+  return (
+    <>
+      {shown.map((t) => (
+        <TeamEffortCard key={t.id} team={t} onBoards={canBoard(consentFor(t.id))} />
+      ))}
+    </>
+  );
+}
+
+function TeamEffortCard({ team, onBoards }: { team: Team; onBoards: boolean }) {
+  const { data } = useStore();
+  const { testResults } = useTeams();
+  const programFor = useTeamProgramFor(team.id);
+  const { stats } = useEffort(team.id, 'season');
+  const me = stats?.find((x) => x.isMe);
+  const logDays = new Set(data.logs.filter((l) => l.teamId === team.id).map((l) => dateKey(new Date(l.date))));
+  const touches = (testResults[team.id] ?? []).filter((r) => r.testId === 'touch' && !r.voided).sort((a, b) => a.day.localeCompare(b.day));
+  const newTouchBest = touches.length >= 2 && touches[touches.length - 1].value > Math.max(...touches.slice(0, -1).map((r) => r.value));
+  // Private: only on this athlete's Progress tab, never shown to teammates.
+  const mine = badges(me, lastBlockComplete(programFor(null), logDays), newTouchBest);
+  return (
+    <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/effort', params: { teamId: team.id } })}>
+      <Card>
+        <MyEffortSummary teamId={team.id} />
+        {!onBoards ? <Text style={{ fontSize: 12, color: colors.muted }}>You&apos;re not shown to teammates on boards.</Text> : null}
+        {mine.length ? (
+          <Row style={{ gap: 6, flexWrap: 'wrap' }}>
+            {mine.map((b) => (
+              <View key={b} style={{ borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
+                <Text style={{ fontSize: 12, fontWeight: '600' }}>{b}</Text>
+              </View>
+            ))}
+          </Row>
+        ) : null}
+        <Text style={{ fontSize: 13, color: colors.muted }}>See the full list</Text>
+      </Card>
+    </Pressable>
   );
 }

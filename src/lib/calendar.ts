@@ -1,4 +1,4 @@
-import type { CalendarEvent, DayType, Program, Session } from './types';
+import type { CalendarEvent, DayType, Program, Session, TestBattery } from './types';
 import { WEEKDAYS } from './types';
 
 /**
@@ -72,6 +72,8 @@ export type DayPlan = {
   source: 'plan' | 'auto' | 'override';
   /** The coach lightened this date (readiness). */
   light?: boolean;
+  /** Testing day (P6): the lift is replaced by a Testing session. */
+  test?: TestBattery;
 };
 
 const MATCH_WORD: Record<DayType, string> = { game: 'match', tournament: 'tournament', practice: 'practice', off: 'day off' };
@@ -142,7 +144,38 @@ export function weekPlan(program: Program, monday: Date): DayPlan[] {
       p.note = p.sessionId ? 'Lift chosen for this date' : 'Rest day chosen for this date';
     }
   }
+
+  // 4. Testing days replace that day's lift with a Testing session (the day keeps its day type).
+  for (const p of plan) {
+    if (p.event?.test) {
+      p.test = p.event.test;
+      p.sessionId = null;
+      p.note = 'Testing day';
+    }
+  }
   return plan;
+}
+
+/** P6.1: testing can't be within 48 hours before a match or tournament (or on one). */
+export function testBlocked(program: Program, key: string): string | null {
+  const d = fromKey(key);
+  for (let i = 0; i <= 2; i++) {
+    if (isMatch(dayTypeOn(program, addDays(d, i)))) return "Testing can't be within 2 days before a match";
+  }
+  return null;
+}
+
+/** Add (battery) or remove (null) a testing day on a date. The day keeps its underlying day type. */
+export function withTest(program: Program, key: string, battery: TestBattery | null): Program {
+  const existing = (program.events ?? []).find((e) => e.date === key);
+  const rest = (program.events ?? []).filter((e) => e.date !== key);
+  const base = program.volleyballWeek[weekdayOf(fromKey(key))];
+  if (battery) return { ...program, events: [...rest, { ...(existing ?? { date: key, type: base }), test: battery }] };
+  if (!existing) return program;
+  const { test: _t, ...ev } = existing;
+  // An event that only existed for the test (same type as the usual week, no label) goes away.
+  const keep = ev.type !== base || !!ev.label;
+  return { ...program, events: keep ? [...rest, ev] : rest };
 }
 
 export function planForDate(program: Program, d: Date): DayPlan {
@@ -164,8 +197,14 @@ export function formatKey(key: string, opts: Intl.DateTimeFormatOptions = { week
 
 /** Set, change or clear (type null) the event on a date. */
 export function withEvent(program: Program, key: string, type: DayType | null, label?: string): Program {
+  const existing = (program.events ?? []).find((e) => e.date === key);
   const rest = (program.events ?? []).filter((e) => e.date !== key);
-  return { ...program, events: type ? [...rest, { date: key, type, label: label?.trim() || undefined }] : rest };
+  // A testing day stays on the date unless the day becomes a match (then it can't be a testing day).
+  const test = existing?.test && type !== 'game' && type !== 'tournament' ? existing.test : undefined;
+  if (!type) {
+    return { ...program, events: test ? [...rest, { date: key, type: program.volleyballWeek[weekdayOf(fromKey(key))], test }] : rest };
+  }
+  return { ...program, events: [...rest, { date: key, type, label: label?.trim() || undefined, ...(test ? { test } : {}) }] };
 }
 
 /** Set (session id or null = rest) or clear (undefined = back to automatic) the lift for a date. */

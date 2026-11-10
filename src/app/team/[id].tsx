@@ -1,8 +1,13 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { Platform, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { rosterChips } from '../../components/Consent';
+import AttendanceMarks from '../../components/AttendanceMarks';
 import ConsentSheet from '../../components/ConsentSheet';
+import EffortBoard, { useTeamProgramFor } from '../../components/EffortBoard';
+import TeamSettingsCard from '../../components/TeamSettingsCard';
+import TestingBanner from '../../components/TestingBanner';
+import { defaultTeamGoal, liftDaysOf, weeksRemaining } from '../../lib/effort';
 import { weekStart } from '../../components/TeamHome';
 import { Body, Button, Card, Chip, ChipRow, colors, display, Field, Icon, Label, Note, Pill, Row, StatusChip, Text } from '../../components/ui';
 import { canShareCheckIns, isDemoMode } from '../../lib/backend';
@@ -28,6 +33,8 @@ export default function TeamScreen() {
   const [groupName, setGroupName] = useState('');
   const [openMember, setOpenMember] = useState<string | null>(null);
   const [consentFor, setConsentFor] = useState<string | null>(null);
+  const [tab, setTab] = useState<'team' | 'effort'>('team');
+  const programFor = useTeamProgramFor(id);
   const [error, setError] = useState<string | null>(null);
 
   if (!team) {
@@ -110,6 +117,33 @@ export default function TeamScreen() {
         onSave={(status) => t.recordConsent(team.id, consentFor!, status)}
       />
       {error ? <Text style={{ color: colors.error, fontSize: 13 }}>{error}</Text> : null}
+
+      <ChipRow>
+        <Chip label="Team" selected={tab === 'team'} onPress={() => setTab('team')} />
+        <Chip label="Effort" selected={tab === 'effort'} onPress={() => setTab('effort')} />
+      </ChipRow>
+      {tab === 'effort' ? (
+        team.settings.effortBoard ? (
+          <EffortBoard teamId={team.id} viewer="coach" />
+        ) : (
+          <Card>
+            <Text style={{ fontSize: 14, color: colors.muted }}>The effort board is off for athletes. Turn it on under Team → Boards and testing.</Text>
+            <EffortBoard teamId={team.id} viewer="coach" />
+          </Card>
+        )
+      ) : null}
+      {tab === 'team' ? (
+      <>
+      <TestingBanner team={team} />
+      <Button
+        kind="secondary"
+        title="Open coach board"
+        onPress={() => {
+          // Web: a new tab for the classroom display. Only the signed-in coach can open it.
+          if (Platform.OS === 'web' && typeof window !== 'undefined') window.open(`${window.location.pathname.replace(/\/team\/[^/]+\/?$/, '')}/board/${team.id}`, '_blank', 'noopener');
+          else router.push(`/board/${team.id}`);
+        }}
+      />
 
       {anyUnposted ? (
         <Card>
@@ -393,6 +427,7 @@ export default function TeamScreen() {
                           <Chip key={g.id} label={g.name} selected={m.groupId === g.id} onPress={() => act(() => t.assignGroup(team.id, m.userId, g.id))} />
                         ))}
                       </ChipRow>
+                      <AttendanceMarks team={team} member={m} program={programFor(m.groupId ?? null)} />
                       <Text
                         accessibilityRole="button"
                         onPress={() =>
@@ -432,6 +467,16 @@ export default function TeamScreen() {
           </Card>
         </View>
       ) : null}
+
+      <TeamSettingsCard
+        key={JSON.stringify(team.settings)}
+        team={team}
+        suggestedGoal={defaultTeamGoal(
+          roster.filter((m) => m.perms.boards).length,
+          programFor(null) ? liftDaysOf(programFor(null)!) : 0,
+          weeksRemaining(programFor(null)),
+        )}
+      />
 
       <View style={{ gap: 8 }}>
         <Label>Team settings</Label>
@@ -485,6 +530,8 @@ export default function TeamScreen() {
           }
         />
       </View>
+      </>
+      ) : null}
     </ScrollView>
   );
 }

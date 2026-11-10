@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
+import AttendanceCheck from '../../components/AttendanceCheck';
 import CapNotice from '../../components/CapNotice';
 import { ConsentBanner } from '../../components/Consent';
 import ReadinessCard from '../../components/ReadinessCard';
@@ -106,6 +107,7 @@ function Today() {
       <Text style={{ fontSize: 20, fontWeight: '600' }}>{captainLine(activeProgram, day)}</Text>
       {showCheckIn ? <ReadinessCard /> : null}
       {activeProgram.teamId ? null : <CapNotice program={activeProgram} />}
+      {activeProgram.teamId ? <AttendanceCheck program={activeProgram} /> : null}
 
       <Card>
         <Row style={{ justifyContent: 'space-between' }}>

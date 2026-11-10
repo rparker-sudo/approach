@@ -93,7 +93,7 @@
 - **Improvement format:** the spec and Privacy Notice say "% gain"; the design doc F10 shows "+1.5 in". The owner chose **% gain**.
 
 **In progress / not finished:**
-- Tag `v2.1` (from the Mac). Live check of the coach board's update speed on two devices.
+- Tag `v2.1` (from the Mac).
 - No iPhone build (EAS/TestFlight/App Store). Apple Developer Program not purchased.
 
 ---
@@ -204,6 +204,7 @@ $0 now. Future: Apple Developer Program $99/year; Supabase Pro about $25/month i
 - Migration 004 was run on a local Postgres 16 with a stand-in Supabase `auth` schema, both as an upgrade (v1 → 002 → 003 with pass 1 consent data → 004, run twice) and fresh from `schema.sql`. All the API/RLS checks in `supabase/tests/rls-2.1-pass2.sql` behaved as expected.
 - Scripted logic checks passed: effort metric rules, testing rules (eligibility, batteries, e1RM, phase caps, re-test lowering, 48 h rule) and G1/G2/G5.
 - Browser tests (demo mode) passed: no body-weight step; adult "Your choices"; Privacy names; permission list; Fuel without numbers and with sources; six-box sheet and box rules; live progress with no weights; coach board names, statuses and the forbidden-content check; effort tab; testing day scheduling, lock, confirmation record, best of 3, 200 × 5 → ~233 lb (estimate); hidden athlete off the board; legal pages v2. A pass 1 regression run (age block, check-in notice, account deletion for both roles, including the new tables) also passed.
-- **Not tested:** the real Supabase project and **Realtime latency** (the "within about 3 s" criterion needs two devices on the live project), and iOS in Expo Go.
+- **Live two-device test (owner, November 10, 2026):** coach board on a laptop and a new adult test athlete on a phone, on the live site and Supabase. Tiles updated about 2–4 s after each set was marked done (the phone waits 2 s, then Realtime delivers). The "within about 3 s" criterion passes. A first attempt with an older test account showed nothing, because that account's boards permission was off.
+- **Not tested:** iOS in Expo Go.
 
 **Content review:** program rules, readiness thresholds, exercise text and the testing protocol details above were written with AI assistance. Fuel cards are from the planning team (Legal-checked, no dietitian review yet). No review by a qualified strength coach, athletic trainer or dietitian is recorded **(unverified)**.

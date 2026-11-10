@@ -39,7 +39,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "build:web": "expo export --platform web --clear && node scripts/postbuild-web.mjs"
+    "build:web": "expo export --platform web --clear && node scripts/postbuild-web.mjs",
+    "update": "git pull && npm install",
+    "go": "npm run update && npx expo start"
   },
   "private": true
 }

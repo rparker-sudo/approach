@@ -2,9 +2,10 @@ import { Redirect } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
 import { Platform } from 'react-native';
 import { useState } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AgeQuestionScreen } from '../../components/AgeGate';
-import { colors, fonts, Icon } from '../../components/ui';
+import YourChoices, { DEFAULT_CHOICES } from '../../components/YourChoices';
+import { colors, fonts, H1, Icon, Screen, Text } from '../../components/ui';
 import type { AgeAnswer } from '../../lib/age';
 import { backend } from '../../lib/backend';
 import { useStore } from '../../lib/store';
@@ -16,7 +17,7 @@ import { useTeams } from '../../lib/team';
  */
 export default function TabsLayout() {
   const { data, setProfile, block } = useStore();
-  const { account, checked, deleteAccount, signOut, refresh } = useTeams();
+  const { account, checked, deleteAccount, signOut, refresh, teams, setMyChoices } = useTeams();
   const [busy, setBusy] = useState(false);
   const insets = useSafeAreaInsets();
   if (!data.profile) return <Redirect href="/onboarding" />;
@@ -41,6 +42,22 @@ export default function TabsLayout() {
       if (account) backend.setBirthYear(a.birthYear, a.isMinor).then(refresh, () => {});
     };
     return <AgeQuestionScreen onAnswer={answer} busy={busy} />;
+  }
+
+  // P1.4 / F8: adults choose boxes 2–6 once after joining a team (and once for existing adult members).
+  const needsChoices = data.profile.role === 'athlete' && account?.isMinor === false && teams.some((t) => t.myConsentVersion == null);
+  if (needsChoices) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'bottom']}>
+        <Screen>
+          <H1>Your choices</H1>
+          <Text style={{ fontSize: 15, color: colors.muted }}>
+            Choose what Approach does for you on your team. You can change these later in Settings → Privacy.
+          </Text>
+          <YourChoices initial={DEFAULT_CHOICES} onSave={setMyChoices} />
+        </Screen>
+      </SafeAreaView>
+    );
   }
   const coach = data.profile.role === 'coach';
 

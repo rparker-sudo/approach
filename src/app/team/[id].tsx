@@ -1,11 +1,11 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
-import { rosterChip } from '../../components/Consent';
+import { rosterChips } from '../../components/Consent';
 import ConsentSheet from '../../components/ConsentSheet';
 import { weekStart } from '../../components/TeamHome';
 import { Body, Button, Card, Chip, ChipRow, colors, display, Field, Icon, Label, Note, Pill, Row, StatusChip, Text } from '../../components/ui';
-import { canCheckIn, isDemoMode } from '../../lib/backend';
+import { canShareCheckIns, isDemoMode } from '../../lib/backend';
 import { openLegal } from '../../lib/legal';
 import { dateKey, today } from '../../lib/calendar';
 import { showAlert } from '../../lib/dialog';
@@ -52,7 +52,10 @@ export default function TeamScreen() {
 
   // Readiness: whole team, and per group. Only athletes with check-in consent (or adults) count.
   const checkins = t.readiness[team.id] ?? [];
-  const canCheck = roster.filter((m) => canCheckIn(m.consentStatus));
+  const canCheck = roster.filter((m) => canShareCheckIns(m.perms));
+  // Consent tracker (F7): minors with a form on file.
+  const minors = roster.filter((m) => m.isMinor !== false);
+  const formsIn = minors.filter((m) => m.perms.participation).length;
   const withoutConsent = roster.length - canCheck.length;
   const overall = summarizeReadiness(checkins, canCheck.length);
   const perGroup = groups.map((g) => {
@@ -312,6 +315,14 @@ export default function TeamScreen() {
       {/* ---------- Roster ---------- */}
       <View style={{ gap: 8 }}>
         <Label>{`Roster · ${roster.length}`}</Label>
+        {minors.length ? (
+          <Text style={{ fontSize: 13, color: colors.muted }}>
+            {`Consent forms: ${formsIn} of ${minors.length} in · `}
+            <Text accessibilityRole="link" onPress={() => openLegal('consent')} style={{ fontSize: 13, color: colors.muted, textDecorationLine: 'underline' }}>
+              Print form
+            </Text>
+          </Text>
+        ) : null}
         {roster.length === 0 ? (
           <Card>
             <Body muted>No athletes yet. Share the team code to invite them.</Body>
@@ -323,29 +334,32 @@ export default function TeamScreen() {
               const week = mine.filter((l) => l.date >= since).length;
               const open = openMember === m.userId;
               const ci = checkins.find((r) => r.userId === m.userId);
-              const chip = rosterChip(m.consentStatus);
+              const chips = rosterChips(m);
+              const needsForm = m.isMinor !== false && !m.perms.participation;
               return (
                 <View key={m.userId} style={{ paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: colors.line, gap: 8 }}>
                   <Pressable
                     accessibilityRole="button"
                     onPress={() => {
                       // A minor with no form recorded: tapping the row records consent (F3).
-                      if (m.consentStatus === 'pending' && !open) setConsentFor(m.userId);
+                      if (needsForm && !open) setConsentFor(m.userId);
                       setOpenMember(open ? null : m.userId);
                     }}
                   >
                     <Row style={{ alignItems: 'flex-start' }}>
                       <View style={{ flex: 1, gap: 2 }}>
                         <Text style={{ fontSize: 16, fontWeight: '600' }}>{m.name}</Text>
-                        {chip ? (
+                        {chips.length ? (
                           <Pressable
                             accessibilityRole="button"
-                            accessibilityLabel={`${chip.label}. Parent consent for ${m.name}`}
+                            accessibilityLabel={`${chips.map((c) => c.label).join('. ')}. Parent consent for ${m.name}`}
                             onPress={() => setConsentFor(m.userId)}
                             hitSlop={12}
-                            style={{ alignSelf: 'flex-start', paddingVertical: 2 }}
+                            style={{ alignSelf: 'flex-start', paddingVertical: 2, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}
                           >
-                            <StatusChip label={chip.label} tone={chip.tone} />
+                            {chips.map((c) => (
+                              <StatusChip key={c.label} label={c.label} tone={c.tone} />
+                            ))}
                           </Pressable>
                         ) : null}
                         <Text style={{ fontSize: 13, color: colors.muted }}>
@@ -364,11 +378,11 @@ export default function TeamScreen() {
                   </Pressable>
                   {open ? (
                     <View style={{ gap: 8 }}>
-                      {chip ? (
+                      {chips.length ? (
                         <Button
                           small
                           kind="secondary"
-                          title={m.consentStatus === 'pending' ? 'Record parent consent' : 'Change parent consent'}
+                          title={needsForm ? 'Record parent consent' : 'Change parent consent'}
                           onPress={() => setConsentFor(m.userId)}
                         />
                       ) : null}

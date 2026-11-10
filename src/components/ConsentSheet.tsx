@@ -1,16 +1,60 @@
 import { useState } from 'react';
-import { Modal, Pressable, View } from 'react-native';
-import type { ConsentStatus, Member, RecordableConsent } from '../lib/backend';
+import { Modal, Pressable, ScrollView, View } from 'react-native';
+import { Member, NO_PERMS, normalizePerms, Perms } from '../lib/backend';
 import { showAlert } from '../lib/dialog';
 import { openLegal } from '../lib/legal';
-import { BRAND, Button, colors, H2, Icon, OptionCard, Text } from './ui';
+import { BRAND, Button, colors, H2, Icon, Text } from './ui';
 
-const OPTIONS: { value: Exclude<RecordableConsent, 'pending'>; title: string }[] = [
-  { value: 'training_only', title: 'Training only (no check-ins)' },
-  { value: 'full', title: 'Training and check-ins shared with me' },
+/** The six boxes on parent consent form v2, in order (F7). */
+export const CONSENT_BOXES: { key: keyof Perms; title: string; line: string }[] = [
+  { key: 'participation', title: '1 Participation (required)', line: 'Use Approach and log workouts.' },
+  { key: 'checkins', title: '2 Check-ins', line: 'Log sleep, soreness, energy, and pain (yes/no).' },
+  { key: 'shareCheckins', title: '3 Share check-ins with me', line: 'You see their check-ins. Teammates never do.' },
+  { key: 'boards', title: '4 Team boards', line: 'Name ("Jordan M." or initials) and progress on team boards.' },
+  { key: 'attendance', title: '5 Attendance & hours', line: 'Practices, matches, and hours on the effort board.' },
+  { key: 'testing', title: '6 Testing days', line: 'Jump tests and coach-supervised strength checks.' },
 ];
 
-/** Coach records (or changes / clears) a minor's parent consent (F3). */
+/** Box 3 needs box 2; boxes 2–6 need box 1. */
+function enabled(key: keyof Perms, p: Perms) {
+  if (key === 'participation') return true;
+  if (key === 'shareCheckins') return p.participation && p.checkins;
+  return p.participation;
+}
+
+function Check({
+  checked,
+  disabled,
+  onPress,
+  title,
+  line,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+  title: string;
+  line?: string;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked, disabled }}
+      aria-checked={checked}
+      aria-disabled={disabled}
+      disabled={disabled}
+      onPress={onPress}
+      style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, minHeight: 44, paddingVertical: 4, opacity: disabled ? 0.4 : 1 }}
+    >
+      <Icon name={checked ? 'checkmark.square.fill' : 'square'} size={24} color={colors.ink} />
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 15, fontWeight: line ? '600' : '400' }}>{title}</Text>
+        {line ? <Text style={{ fontSize: 13, color: colors.muted }}>{line}</Text> : null}
+      </View>
+    </Pressable>
+  );
+}
+
+/** Coach records (or changes / clears) a minor's six permissions from a signed form v2 (F7). */
 export default function ConsentSheet({
   member,
   onClose,
@@ -18,7 +62,7 @@ export default function ConsentSheet({
 }: {
   member: Member | null;
   onClose: () => void;
-  onSave: (status: RecordableConsent) => Promise<void>;
+  onSave: (perms: Perms) => Promise<void>;
 }) {
   return (
     <Modal visible={!!member} transparent animationType="slide" onRequestClose={onClose}>
@@ -27,19 +71,21 @@ export default function ConsentSheet({
   );
 }
 
-function Sheet({ member, onClose, onSave }: { member: Member; onClose: () => void; onSave: (status: RecordableConsent) => Promise<void> }) {
-  const recorded: ConsentStatus = member.consentStatus;
-  const isRecorded = recorded === 'training_only' || recorded === 'full';
-  const [choice, setChoice] = useState<RecordableConsent | null>(isRecorded ? recorded : null);
+function Sheet({ member, onClose, onSave }: { member: Member; onClose: () => void; onSave: (perms: Perms) => Promise<void> }) {
+  // Start from what's on file only if it came from form v2; a v1 record needs the new form.
+  const onFile = member.consentVersion === 2 && member.perms.participation;
+  const [perms, setPerms] = useState<Perms>(onFile ? member.perms : { ...NO_PERMS });
   const [signed, setSigned] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function save(status: RecordableConsent) {
+  const toggle = (key: keyof Perms) => setPerms((p) => normalizePerms({ ...p, [key]: !p[key] }));
+
+  async function save(p: Perms) {
     setBusy(true);
     setError(null);
     try {
-      await onSave(status);
+      await onSave(p);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong.');
@@ -52,50 +98,52 @@ function Sheet({ member, onClose, onSave }: { member: Member; onClose: () => voi
     <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} onPress={onClose}>
       <Pressable
         onPress={() => {}}
-        style={{ backgroundColor: colors.card, borderTopLeftRadius: BRAND.radius.lg, borderTopRightRadius: BRAND.radius.lg, padding: 16, paddingBottom: 32, gap: 12 }}
+        style={{ backgroundColor: colors.card, borderTopLeftRadius: BRAND.radius.lg, borderTopRightRadius: BRAND.radius.lg, maxHeight: '92%' }}
       >
-        <H2>{`Record parent consent for ${member.name}`}</H2>
-        {OPTIONS.map((o) => (
-          <OptionCard key={o.value} title={o.title} selected={choice === o.value} onPress={() => setChoice(o.value)} />
-        ))}
-        <Pressable
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: signed }}
-          aria-checked={signed}
-          onPress={() => setSigned((v) => !v)}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 }}
-        >
-          <Icon name={signed ? 'checkmark.square.fill' : 'square'} size={24} color={colors.ink} />
-          <Text style={{ flex: 1, fontSize: 15 }}>{`I have a signed parent consent form for ${member.name}.`}</Text>
-        </Pressable>
-        {error ? <Text style={{ color: colors.error, fontSize: 13 }}>{error}</Text> : null}
-        <Button
-          title={busy ? 'Saving…' : isRecorded ? 'Change' : 'Save'}
-          disabled={!choice || !signed || busy || (isRecorded && choice === recorded)}
-          onPress={() => save(choice!)}
-        />
-        {isRecorded ? (
-          <Button
-            kind="ghost"
-            title="Clear consent"
-            disabled={busy}
-            onPress={() =>
-              showAlert(`Clear consent for ${member.name}?`, "They won't be able to log or check in until you record a form again.", [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Clear consent', style: 'destructive', onPress: () => save('pending') },
-              ])
-            }
-          />
-        ) : null}
-        <View style={{ alignItems: 'center' }}>
-          <Text
-            accessibilityRole="link"
-            onPress={() => openLegal('consent')}
-            style={{ fontSize: 14, textDecorationLine: 'underline', color: colors.muted, paddingVertical: 12 }}
-          >
-            Print the consent form
-          </Text>
-        </View>
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 10 }}>
+          <H2>{`Record parent consent for ${member.name} (form v2)`}</H2>
+          {member.consentVersion === 1 ? (
+            <Text style={{ fontSize: 13, color: colors.muted }}>
+              On file: the earlier form. Record the new form to turn on boards, attendance, and testing.
+            </Text>
+          ) : null}
+          {CONSENT_BOXES.map((b) => (
+            <Check
+              key={b.key}
+              checked={perms[b.key]}
+              disabled={!enabled(b.key, perms)}
+              onPress={() => toggle(b.key)}
+              title={b.title}
+              line={b.line}
+            />
+          ))}
+          <View style={{ height: 1, backgroundColor: colors.line, marginVertical: 4 }} />
+          <Check checked={signed} onPress={() => setSigned((v) => !v)} title={`I have a signed parent consent form (version 2) for ${member.name}.`} />
+          {error ? <Text style={{ color: colors.error, fontSize: 13 }}>{error}</Text> : null}
+          <Button title={busy ? 'Saving…' : 'Save'} disabled={!perms.participation || !signed || busy} onPress={() => save(perms)} />
+          {member.perms.participation ? (
+            <Button
+              kind="ghost"
+              title="Clear consent"
+              disabled={busy}
+              onPress={() =>
+                showAlert(`Clear consent for ${member.name}?`, "They won't be able to log or check in until you record a form again.", [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Clear consent', style: 'destructive', onPress: () => save({ ...NO_PERMS }) },
+                ])
+              }
+            />
+          ) : null}
+          <View style={{ alignItems: 'center' }}>
+            <Text
+              accessibilityRole="link"
+              onPress={() => openLegal('consent')}
+              style={{ fontSize: 14, textDecorationLine: 'underline', color: colors.muted, paddingVertical: 12 }}
+            >
+              Print the consent form
+            </Text>
+          </View>
+        </ScrollView>
       </Pressable>
     </Pressable>
   );

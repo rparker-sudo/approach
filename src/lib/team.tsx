@@ -3,23 +3,31 @@ import { AppState } from 'react-native';
 import {
   Account,
   backend,
+  Attendance,
+  AttendanceKind,
   BackendError,
-  canCheckIn,
+  BoardNameMode,
   canLog,
-  ConsentStatus,
+  canShareCheckIns,
+  canTest,
   Group,
+  NO_PERMS,
+  LiveProgress,
   Member,
+  Perms,
   Readiness,
-  RecordableConsent,
   SignUpInput,
   Team,
   TeamCalendar,
   TeamLog,
   TeamProgram,
+  TeamSettings,
+  TestResult,
+  TestSession,
 } from './backend';
 import { dateKey, today } from './calendar';
 import { useStore } from './store';
-import type { AppData, CalendarEvent, LocalTeamCalendar, Position, Program, ReadinessEntry } from './types';
+import type { AppData, CalendarEvent, LocalTeamCalendar, Position, Program, ReadinessEntry, TestBattery } from './types';
 
 /**
  * Team sync: keeps this device in step with the server.
@@ -109,10 +117,26 @@ type TeamState = {
   setLightDay: (teamId: string, groupKey: string, day: string, light: boolean) => Promise<void>;
   /** Athlete daily check-in. */
   checkIn: (entry: Omit<ReadinessEntry, 'sentTo'>) => void;
-  /** Athletes: this team's consent status (last known, so it works offline). */
-  consentFor: (teamId: string | undefined) => ConsentStatus | undefined;
-  /** Coach records (or clears) a minor's parent consent. */
-  recordConsent: (teamId: string, userId: string, status: RecordableConsent) => Promise<void>;
+  /** Athletes: this team's permissions (last known, so it works offline). */
+  consentFor: (teamId: string | undefined) => Perms | undefined;
+  /** Coach records a minor's form-v2 boxes. */
+  recordConsent: (teamId: string, userId: string, perms: Perms) => Promise<void>;
+  /** Adults: boxes 2–6 for themselves. */
+  setMyChoices: (p: Omit<Perms, 'participation'>) => Promise<void>;
+  setBoardNameMode: (mode: BoardNameMode) => Promise<void>;
+  updateTeamSettings: (teamId: string, patch: Partial<TeamSettings>) => Promise<void>;
+  /** Athlete: share sets done with the coach board (only with boards permission). */
+  shareLiveProgress: (p: Omit<LiveProgress, 'userId' | 'updatedAt'>) => void;
+  /** Recent attendance (coach: the roster's; athlete: their own), per team. */
+  attendance: Record<string, Attendance[]>;
+  markAttendance: (a: { teamId: string; userId: string; day: string; kind: AttendanceKind; minutes: number | null }) => Promise<void>;
+  /** Today's supervision confirmations per team. */
+  testSessions: Record<string, TestSession | undefined>;
+  confirmSupervision: (teamId: string, day: string, battery: TestBattery) => Promise<void>;
+  /** Test results (coach: the roster's; athlete: their own), per team. */
+  testResults: Record<string, TestResult[]>;
+  addTestResult: (r: Omit<TestResult, 'id' | 'e1rm' | 'voided'>) => Promise<TestResult>;
+  updateTestResult: (teamId: string, id: string, patch: Partial<Pick<TestResult, 'value' | 'reps' | 'voided'>>) => Promise<void>;
   /** Deletes the account on the server; the caller then erases local data. */
   deleteAccount: () => Promise<void>;
 };
@@ -234,6 +258,9 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const [logs, setLogs] = useState<Record<string, TeamLog[]>>({});
   const [readiness, setReadiness] = useState<Record<string, Readiness[]>>({});
   const [posted, setPosted] = useState<Record<string, TeamProgram>>({});
+  const [attendance, setAttendance] = useState<Record<string, Attendance[]>>({});
+  const [testSessions, setTestSessions] = useState<Record<string, TestSession | undefined>>({});
+  const [testResults, setTestResults] = useState<Record<string, TestResult[]>>({});
   const [syncing, setSyncing] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   const accountRef = useRef<Account | null>(account);
@@ -248,7 +275,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 
   const flushLogs = useCallback(async () => {
     // Only teams where the athlete may log (parent consent on file, or an adult).
-    const allowed = new Set(teamsRef.current.filter((t) => canLog(t.myConsent)).map((t) => t.id));
+    const allowed = new Set(teamsRef.current.filter((t) => canLog(t.myPerms)).map((t) => t.id));
     const pending = dataRef.current.logs.filter((l) => l.teamId && !l.synced && allowed.has(l.teamId));
     const sent: string[] = [];
     for (const l of pending) {
@@ -271,7 +298,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     if (!entry) return;
     const sent: string[] = [];
     for (const t of teamsRef.current) {
-      if (entry.sentTo.includes(t.id) || !canCheckIn(t.myConsent)) continue;
+      if (entry.sentTo.includes(t.id) || !canShareCheckIns(t.myPerms)) continue;
       try {
         await backend.submitReadiness({ teamId: t.id, day, sleep: entry.sleep, soreness: entry.soreness, energy: entry.energy, pain: entry.pain });
         sent.push(t.id);
@@ -306,20 +333,30 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       setPosted(Object.fromEntries(tps.map((p) => [postedKey(p.teamId, p.groupKey), p])));
       mutate((d) => ({
         ...applyPosted(d, acct.role, { teams: t, posted: tps, calendars: cals, groups: groupMap }),
-        teamConsent: acct.role === 'athlete' ? Object.fromEntries(t.map((x) => [x.id, x.myConsent ?? 'pending'])) : {},
+        teamConsent: acct.role === 'athlete' ? Object.fromEntries(t.map((x) => [x.id, x.myPerms ?? { ...NO_PERMS }])) : {},
       }));
+      const day = dateKey(today());
+      const attSince = dateKey(new Date(Date.now() - 2 * 864e5));
+      const [sessions, att] = await Promise.all([backend.getTestSessions(ids, day), Promise.all(ids.map((id) => backend.listAttendance(id, attSince)))]);
+      setTestSessions(Object.fromEntries(ids.map((id) => [id, sessions.find((x) => x.teamId === id)])));
+      setAttendance(Object.fromEntries(ids.map((id, i) => [id, att[i]])));
       if (acct.role === 'coach') {
         const since = new Date(Date.now() - LOG_WINDOW_DAYS * 864e5).toISOString();
-        const day = dateKey(today());
-        const [m, l, r] = await Promise.all([
+        const [m, l, r, tr] = await Promise.all([
           Promise.all(ids.map((id) => backend.listMembers(id))),
           Promise.all(ids.map((id) => backend.listTeamLogs(id, since))),
           Promise.all(ids.map((id) => backend.listReadiness(id, day))),
+          Promise.all(ids.map((id) => backend.listTestResults(id))),
         ]);
         setMembers(Object.fromEntries(ids.map((id, i) => [id, m[i]])));
         setLogs(Object.fromEntries(ids.map((id, i) => [id, l[i]])));
         setReadiness(Object.fromEntries(ids.map((id, i) => [id, r[i]])));
+        setTestResults(Object.fromEntries(ids.map((id, i) => [id, tr[i]])));
       } else {
+        const tr = await Promise.all(t.map((x) => (canTest(x.myPerms) ? backend.listTestResults(x.id, acct.id) : Promise.resolve([] as TestResult[]))));
+        setTestResults(Object.fromEntries(ids.map((id, i) => [id, tr[i]])));
+        // P6.7: the latest strength check per lift sets starting weights (even if it's lower).
+        mutate((d) => ({ ...d, strengthEstimates: latestEstimates(tr.flat()) }));
         await flushLogs();
         await flushReadiness();
       }
@@ -387,7 +424,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     if (account?.role === 'athlete' && pendingCount > 0) flushLogs();
   }, [account, pendingCount, flushLogs]);
   const todayEntry = (data.readinessLog ?? []).find((r) => r.day === dateKey(today()));
-  const readinessPending = !!todayEntry && teams.some((t) => canCheckIn(t.myConsent) && !todayEntry.sentTo.includes(t.id));
+  const readinessPending = !!todayEntry && teams.some((t) => canShareCheckIns(t.myPerms) && !todayEntry.sentTo.includes(t.id));
   useEffect(() => {
     if (account?.role === 'athlete' && readinessPending) flushReadiness();
   }, [account, readinessPending, flushReadiness]);
@@ -444,6 +481,9 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     setLogs({});
     setReadiness({});
     setPosted({});
+    setAttendance({});
+    setTestSessions({});
+    setTestResults({});
     mutate((d) => {
       const programs = d.programs.filter((p) => !p.teamId);
       return {
@@ -489,11 +529,54 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       },
       consentFor(teamId) {
         if (!teamId) return undefined;
-        return teams.find((t) => t.id === teamId)?.myConsent ?? data.teamConsent?.[teamId];
+        return teams.find((t) => t.id === teamId)?.myPerms ?? data.teamConsent?.[teamId];
       },
-      async recordConsent(teamId, userId, status) {
-        await backend.recordConsent(teamId, userId, status);
+      async recordConsent(teamId, userId, perms) {
+        await backend.recordConsent(teamId, userId, perms);
         await refresh();
+      },
+      async setMyChoices(p) {
+        await backend.setMyChoices(p);
+        await refresh();
+      },
+      async setBoardNameMode(mode) {
+        const a = await backend.setBoardNameMode(mode);
+        setAccount(a);
+      },
+      async updateTeamSettings(teamId, patch) {
+        await backend.updateTeamSettings(teamId, patch);
+        await refresh();
+      },
+      shareLiveProgress(p) {
+        const team = teams.find((x) => x.id === p.teamId);
+        if (!team?.myPerms?.boards) return;
+        backend.shareLiveProgress(p).catch(() => {}); // the board is best-effort
+      },
+      attendance,
+      async markAttendance(a) {
+        await backend.markAttendance(a);
+        const list = await backend.listAttendance(a.teamId, dateKey(new Date(Date.now() - 2 * 864e5)));
+        setAttendance((s) => ({ ...s, [a.teamId]: list }));
+      },
+      testSessions,
+      async confirmSupervision(teamId, day, battery) {
+        const ts = await backend.confirmSupervision(teamId, day, battery);
+        setTestSessions((s) => ({ ...s, [teamId]: ts }));
+      },
+      testResults,
+      async addTestResult(r) {
+        const saved = await backend.addTestResult(r);
+        setTestResults((s) => {
+          const next = { ...s, [r.teamId]: [...(s[r.teamId] ?? []), saved] };
+          if (accountRef.current?.role === 'athlete') mutate((d) => ({ ...d, strengthEstimates: latestEstimates(Object.values(next).flat()) }));
+          return next;
+        });
+        return saved;
+      },
+      async updateTestResult(teamId, id, patch) {
+        await backend.updateTestResult(id, patch);
+        const list = await backend.listTestResults(teamId);
+        setTestResults((s) => ({ ...s, [teamId]: list }));
       },
       async createTeam(name) {
         const t = await backend.createTeam(name);
@@ -584,10 +667,20 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         }));
       },
     }),
-    [account, checked, teams, members, groups, logs, readiness, posted, syncing, lastError, refresh, mutate, data, postCalendarIfNeeded, postProgram, writeCalendar, clearTeamState],
+    [account, checked, teams, members, groups, logs, readiness, posted, attendance, testSessions, testResults, syncing, lastError, refresh, mutate, data, postCalendarIfNeeded, postProgram, writeCalendar, clearTeamState],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
+/** Latest non-voided estimate per tested lift (exercise id → e1RM). Later tests replace earlier ones. */
+export function latestEstimates(results: TestResult[]): Record<string, { e1rm: number; day: string }> {
+  const out: Record<string, { e1rm: number; day: string }> = {};
+  for (const r of [...results].sort((a, b) => a.day.localeCompare(b.day))) {
+    if (r.voided || r.e1rm == null) continue;
+    out[r.testId] = { e1rm: r.e1rm, day: r.day };
+  }
+  return out;
 }
 
 export function useTeams(): TeamState {

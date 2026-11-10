@@ -1,25 +1,38 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Program, WorkoutLog } from '../types';
+import type { Program, TestBattery, WorkoutLog } from '../types';
 import { uid } from '../util';
 import {
   Account,
+  Attendance,
   Backend,
   BackendError,
-  canCheckIn,
+  boardName,
+  canAttend,
+  canBoard,
   canLog,
-  ConsentStatus,
+  canShareCheckIns,
+  canTest,
+  DEFAULT_TEAM_SETTINGS,
+  e1rm,
+  EffortInput,
   Group,
-  initialConsent,
+  LiveProgress,
   makeJoinCode,
   Member,
   normalizeCode,
   setsDone,
   SignUpInput,
+  normalizePerms,
+  NO_PERMS,
+  Perms,
+  permsFromStatus,
   Readiness,
   Team,
   TeamCalendar,
   TeamLog,
   TeamProgram,
+  TestResult,
+  TestSession,
 } from './types';
 
 /**
@@ -38,19 +51,40 @@ type DB = {
     userId: string;
     joinedAt: string;
     groupId?: string | null;
-    consentStatus?: ConsentStatus;
+    perms?: Perms;
+    consentVersion?: number | null;
     consentRecordedAt?: string | null;
     consentRecordedBy?: string | null;
+    /** Pass 1 data (migrated to perms on load). */
+    consentStatus?: string;
   }[];
   programs: TeamProgram[];
   logs: TeamLog[];
   groups: Group[];
   calendars: TeamCalendar[];
   readiness: Readiness[];
+  live: LiveProgress[];
+  attendance: Attendance[];
+  testSessions: TestSession[];
+  tests: TestResult[];
   sessionUserId: string | null;
 };
 
-const EMPTY: DB = { users: [], teams: [], members: [], programs: [], logs: [], groups: [], calendars: [], readiness: [], sessionUserId: null };
+const EMPTY: DB = {
+  users: [],
+  teams: [],
+  members: [],
+  programs: [],
+  logs: [],
+  groups: [],
+  calendars: [],
+  readiness: [],
+  live: [],
+  attendance: [],
+  testSessions: [],
+  tests: [],
+  sessionUserId: null,
+};
 
 async function load(): Promise<DB> {
   try {
@@ -60,10 +94,16 @@ async function load(): Promise<DB> {
     db.programs = db.programs.map((p) => ({ ...p, groupKey: p.groupKey ?? 'all' })); // 1.0 data
     // 2.0 data: no pain notes (2.1), and memberships start with a consent status like the server's.
     db.readiness = db.readiness.map(({ painNote: _n, ...r }: Readiness & { painNote?: string }) => r);
-    db.members = db.members.map((m) => ({
-      ...m,
-      consentStatus: m.consentStatus ?? initialConsent(db.users.find((u) => u.id === m.userId)?.isMinor),
-    }));
+    // Pass 1 data: one consent status → six permissions (same mapping as migration 004).
+    db.members = db.members.map(({ consentStatus, ...m }) => {
+      if (m.perms) return m;
+      const isMinor = db.users.find((u) => u.id === m.userId)?.isMinor;
+      return { ...m, perms: permsFromStatus(consentStatus, isMinor), consentVersion: consentStatus === 'training_only' || consentStatus === 'full' ? 1 : null };
+    });
+    db.teams = db.teams.map((t) => ({ ...t, settings: { ...DEFAULT_TEAM_SETTINGS, ...(t.settings ?? {}) } }));
+    // Live progress older than 24 hours is deleted.
+    const cutoff = Date.now() - 864e5;
+    db.live = db.live.filter((l) => new Date(l.updatedAt).getTime() >= cutoff);
     return db;
   } catch {
     return { ...EMPTY };
@@ -103,8 +143,18 @@ function minorFrom(year: number, clientMinor: boolean) {
   return clientMinor;
 }
 
-function consentOf(db: DB, teamId: string, userId: string): ConsentStatus | undefined {
-  return db.members.find((m) => m.teamId === teamId && m.userId === userId)?.consentStatus;
+function permsOf(db: DB, teamId: string, userId: string): Perms | undefined {
+  return db.members.find((m) => m.teamId === teamId && m.userId === userId)?.perms;
+}
+
+function isCoach(db: DB, teamId: string, userId: string | null) {
+  return db.teams.some((t) => t.id === teamId && t.coachId === userId);
+}
+
+/** On boards: boards permission and not hidden (same as the server's on_boards). */
+function onBoards(db: DB, teamId: string, userId: string) {
+  const u = db.users.find((x) => x.id === userId);
+  return canBoard(permsOf(db, teamId, userId)) && (u?.boardNameMode ?? 'short') !== 'hidden';
 }
 
 /** Coaches see rows only for current members (2.1); everyone sees their own. */
@@ -185,7 +235,9 @@ export const localBackend: Backend = {
       user.isMinor = minorFrom(year, clientMinor);
     }
     if (user.isMinor === false) {
-      db.members = db.members.map((m) => (m.userId === user.id && m.consentStatus === 'pending' ? { ...m, consentStatus: 'not_required' } : m));
+      db.members = db.members.map((m) =>
+        m.userId === user.id && !m.perms?.participation ? { ...m, perms: { ...(m.perms ?? NO_PERMS), participation: true } } : m,
+      );
     }
     await save(db);
     return publicAccount(user);
@@ -205,7 +257,28 @@ export const localBackend: Backend = {
     db.groups = db.groups.filter((g) => !owned.has(g.teamId));
     db.calendars = db.calendars.filter((c) => !owned.has(c.teamId));
     db.readiness = db.readiness.filter((r) => !gone(r.teamId, r.userId));
+    db.live = db.live.filter((r) => !gone(r.teamId, r.userId));
+    db.attendance = db.attendance.filter((r) => !gone(r.teamId, r.userId));
+    db.testSessions = db.testSessions.filter((r) => !owned.has(r.teamId));
+    db.tests = db.tests.filter((r) => !gone(r.teamId, r.userId));
     db.sessionUserId = null;
+    await save(db);
+  },
+
+  async setBoardNameMode(mode) {
+    const { db, user } = await me();
+    user.boardNameMode = mode;
+    await save(db);
+    return publicAccount(user);
+  },
+
+  async setMyChoices(p) {
+    const { db, user } = await me();
+    if (user.isMinor !== false) throw new BackendError("Your coach records these from your parent's form.");
+    const perms = normalizePerms({ ...p, participation: true });
+    db.members = db.members.map((m) =>
+      m.userId === user.id ? { ...m, perms, consentVersion: 2, consentRecordedAt: new Date().toISOString(), consentRecordedBy: user.id } : m,
+    );
     await save(db);
   },
 
@@ -221,7 +294,8 @@ export const localBackend: Backend = {
         ...t,
         coachName: db.users.find((u) => u.id === t.coachId)?.name,
         myGroupId: user.role === 'coach' ? undefined : db.members.find((m) => m.teamId === t.id && m.userId === user.id)?.groupId ?? null,
-        myConsent: user.role === 'coach' ? undefined : consentOf(db, t.id, user.id),
+        myPerms: user.role === 'coach' ? undefined : permsOf(db, t.id, user.id),
+        myConsentVersion: user.role === 'coach' ? undefined : db.members.find((m) => m.teamId === t.id && m.userId === user.id)?.consentVersion ?? null,
       }));
   },
 
@@ -230,7 +304,15 @@ export const localBackend: Backend = {
     if (user.role !== 'coach') throw new BackendError('Only coaches can create teams.');
     let code = makeJoinCode();
     while (db.teams.some((t) => t.joinCode === code)) code = makeJoinCode();
-    const team: Team = { id: uid(), name: name.trim(), joinCode: code, coachId: user.id, coachName: user.name, createdAt: new Date().toISOString() };
+    const team: Team = {
+      id: uid(),
+      name: name.trim(),
+      joinCode: code,
+      coachId: user.id,
+      coachName: user.name,
+      createdAt: new Date().toISOString(),
+      settings: { ...DEFAULT_TEAM_SETTINGS },
+    };
     db.teams.push(team);
     await save(db);
     return team;
@@ -252,6 +334,10 @@ export const localBackend: Backend = {
     db.groups = db.groups.filter((g) => g.teamId !== teamId);
     db.calendars = db.calendars.filter((c) => c.teamId !== teamId);
     db.readiness = db.readiness.filter((r) => r.teamId !== teamId);
+    db.live = db.live.filter((r) => r.teamId !== teamId);
+    db.attendance = db.attendance.filter((r) => r.teamId !== teamId);
+    db.testSessions = db.testSessions.filter((r) => r.teamId !== teamId);
+    db.tests = db.tests.filter((r) => r.teamId !== teamId);
     await save(db);
   },
 
@@ -268,7 +354,8 @@ export const localBackend: Backend = {
           joinedAt: m.joinedAt,
           groupId: m.groupId ?? null,
           isMinor: u?.isMinor ?? null,
-          consentStatus: m.consentStatus ?? initialConsent(u?.isMinor),
+          perms: m.perms ?? { ...NO_PERMS },
+          consentVersion: m.consentVersion ?? null,
         };
       });
   },
@@ -280,14 +367,177 @@ export const localBackend: Backend = {
     await save(db);
   },
 
-  async recordConsent(teamId, userId, status) {
+  async recordConsent(teamId, userId, perms) {
     const { db, user } = await me();
-    if (!db.teams.some((t) => t.id === teamId && t.coachId === user.id)) throw new BackendError('Only the team coach can record consent.');
-    const m = db.members.find((x) => x.teamId === teamId && x.userId === userId && x.consentStatus !== 'not_required');
-    if (!m) throw new BackendError("That athlete isn't on the team or doesn't need consent.");
-    m.consentStatus = status;
-    m.consentRecordedAt = status === 'pending' ? null : new Date().toISOString();
-    m.consentRecordedBy = status === 'pending' ? null : user.id;
+    if (!isCoach(db, teamId, user.id)) throw new BackendError('Only the team coach can record consent.');
+    if (db.users.find((u) => u.id === userId)?.isMinor === false) throw new BackendError('Adults choose these themselves.');
+    const m = db.members.find((x) => x.teamId === teamId && x.userId === userId);
+    if (!m) throw new BackendError("That athlete isn't on the team.");
+    const p = normalizePerms(perms);
+    m.perms = p;
+    m.consentVersion = p.participation ? 2 : null;
+    m.consentRecordedAt = p.participation ? new Date().toISOString() : null;
+    m.consentRecordedBy = p.participation ? user.id : null;
+    await save(db);
+  },
+
+  async updateTeamSettings(teamId, patch) {
+    const { db, user } = await me();
+    const t = coachOf(db, teamId, user.id);
+    t.settings = { ...DEFAULT_TEAM_SETTINGS, ...t.settings, ...patch };
+    await save(db);
+  },
+
+  async boardMembers(teamId) {
+    const db = await load();
+    const viewer = db.sessionUserId;
+    if (!isCoach(db, teamId, viewer) && !db.members.some((m) => m.teamId === teamId && m.userId === viewer)) return [];
+    return db.members
+      .filter((m) => m.teamId === teamId && onBoards(db, teamId, m.userId))
+      .map((m) => {
+        const u = db.users.find((x) => x.id === m.userId);
+        return { userId: m.userId, boardName: boardName(u?.name ?? '', u?.boardNameMode ?? 'short') ?? 'Athlete', groupId: m.groupId ?? null };
+      });
+  },
+
+  async shareLiveProgress(p) {
+    const { db, user } = await me();
+    if (!canBoard(permsOf(db, p.teamId, user.id))) throw new BackendError('Boards are off for you on this team.');
+    const row: LiveProgress = { ...p, userId: user.id, updatedAt: new Date().toISOString() };
+    db.live = [...db.live.filter((l) => !(l.teamId === p.teamId && l.userId === user.id && l.day === p.day)), row];
+    await save(db);
+  },
+
+  async listLiveProgress(teamId, day) {
+    const db = await load();
+    const viewer = db.sessionUserId;
+    return db.live.filter(
+      (l) => l.teamId === teamId && l.day === day && (l.userId === viewer || (isCoach(db, teamId, viewer) && onBoards(db, teamId, l.userId))),
+    );
+  },
+
+  async bestsSince(teamId, sinceIso) {
+    const db = await load();
+    const out: Record<string, number> = {};
+    for (const l of db.logs) {
+      if (l.teamId === teamId && l.date >= sinceIso && (l.prCount ?? 0) > 0 && visibleTo(db, db.sessionUserId, teamId, l.userId)) {
+        out[l.userId] = (out[l.userId] ?? 0) + (l.prCount ?? 0);
+      }
+    }
+    return out;
+  },
+
+  async teamEffort(teamId, since) {
+    const db = await load();
+    const viewer = db.sessionUserId;
+    const coach = isCoach(db, teamId, viewer);
+    const team = db.teams.find((t) => t.id === teamId);
+    if (!coach && !(db.members.some((m) => m.teamId === teamId && m.userId === viewer) && (team?.settings?.effortBoard ?? true))) return [];
+    return db.members
+      .filter((m) => m.teamId === teamId && (onBoards(db, teamId, m.userId) || m.userId === viewer))
+      .map((m): EffortInput => {
+        const u = db.users.find((x) => x.id === m.userId);
+        const me = m.userId === viewer;
+        const mode = me && u?.boardNameMode === 'hidden' ? 'short' : u?.boardNameMode ?? 'short';
+        const perms = m.perms;
+        const sinceMs = new Date(`${since}T00:00:00`).getTime() - 864e5;
+        // % gain in jump tests (touch, broad): latest vs first since the start date, averaged.
+        let improvement: number | null = null;
+        if (canTest(perms)) {
+          const gains: number[] = [];
+          for (const id of ['touch', 'broad'] as const) {
+            const list = db.tests.filter((x) => x.teamId === teamId && x.userId === m.userId && x.testId === id && !x.voided && x.day >= since).sort((a, b) => a.day.localeCompare(b.day));
+            if (list.length >= 2) gains.push(((list[list.length - 1].value - list[0].value) / list[0].value) * 100);
+          }
+          if (gains.length) improvement = Math.round((gains.reduce((a, b) => a + b, 0) / gains.length) * 10) / 10;
+        }
+        return {
+          userId: m.userId,
+          boardName: boardName(u?.name ?? '', mode) ?? 'Athlete',
+          groupId: m.groupId ?? null,
+          isMe: me,
+          logs: db.logs
+            .filter((l) => l.teamId === teamId && l.userId === m.userId && new Date(l.date).getTime() >= sinceMs)
+            .map((l) => ({ at: l.date, session: l.sessionName, minutes: l.durationMin ?? null })),
+          attendance: canAttend(perms)
+            ? db.attendance.filter((a) => a.teamId === teamId && a.userId === m.userId && a.day >= since && a.minutes > 0).map((a) => ({ day: a.day, kind: a.kind, minutes: a.minutes }))
+            : null,
+          improvement,
+        };
+      });
+  },
+
+  subscribeBoard(_teamId, onChange, onStatus) {
+    listeners.add(onChange);
+    onStatus?.(true);
+    return () => listeners.delete(onChange);
+  },
+
+  async markAttendance(a) {
+    const { db, user } = await me();
+    const coach = isCoach(db, a.teamId, user.id);
+    if (!coach && a.userId !== user.id) throw new BackendError('Only the team coach can do that.');
+    if (!canAttend(permsOf(db, a.teamId, a.userId))) throw new BackendError('Attendance is off for this athlete.');
+    const key = (x: Attendance) => x.teamId === a.teamId && x.userId === a.userId && x.day === a.day && x.kind === a.kind;
+    const existing = db.attendance.find(key);
+    // The coach's entry wins: athletes can't change a row the coach marked.
+    if (!coach && existing && existing.markedBy !== user.id) throw new BackendError('Your coach already marked this one.');
+    db.attendance = db.attendance.filter((x) => !key(x));
+    if (a.minutes != null || coach) {
+      db.attendance.push({ teamId: a.teamId, userId: a.userId, day: a.day, kind: a.kind, minutes: a.minutes ?? 0, markedBy: user.id });
+    }
+    await save(db);
+  },
+
+  async listAttendance(teamId, since) {
+    const db = await load();
+    return db.attendance.filter((x) => x.teamId === teamId && x.day >= since && visibleTo(db, db.sessionUserId, teamId, x.userId));
+  },
+
+  async confirmSupervision(teamId, day, battery: TestBattery) {
+    const { db, user } = await me();
+    coachOf(db, teamId, user.id);
+    const existing = db.testSessions.find((x) => x.teamId === teamId && x.day === day && x.groupKey === 'all');
+    if (existing) return existing;
+    const row: TestSession = { teamId, groupKey: 'all', day, coachId: user.id, confirmedAt: new Date().toISOString(), battery };
+    db.testSessions.push(row);
+    await save(db);
+    return row;
+  },
+
+  async getTestSessions(teamIds, day) {
+    const db = await load();
+    return db.testSessions.filter((x) => teamIds.includes(x.teamId) && x.day === day);
+  },
+
+  async addTestResult(t) {
+    const { db, user } = await me();
+    const coach = isCoach(db, t.teamId, user.id);
+    if (!coach && t.userId !== user.id) throw new BackendError('Only the team coach can do that.');
+    if (!canTest(permsOf(db, t.teamId, t.userId))) throw new BackendError("Testing isn't turned on for you on this team.");
+    if (t.reps != null && !db.testSessions.some((x) => x.teamId === t.teamId && x.day === t.day && x.battery !== 'jump')) {
+      throw new BackendError("Strength checks open when your coach confirms they're supervising.");
+    }
+    const row: TestResult = { ...t, id: uid(), e1rm: t.unit === 'lb' && t.reps != null ? e1rm(t.value, t.reps) : null, voided: false };
+    db.tests.push(row);
+    await save(db);
+    return row;
+  },
+
+  async listTestResults(teamId, forUser) {
+    const db = await load();
+    return db.tests
+      .filter((x) => x.teamId === teamId && (!forUser || x.userId === forUser) && visibleTo(db, db.sessionUserId, teamId, x.userId))
+      .sort((a, b) => a.day.localeCompare(b.day));
+  },
+
+  async updateTestResult(id, patch) {
+    const { db, user } = await me();
+    const row = db.tests.find((x) => x.id === id);
+    if (!row) return;
+    coachOf(db, row.teamId, user.id);
+    Object.assign(row, patch);
+    if (row.unit === 'lb' && row.reps != null) row.e1rm = e1rm(row.value, row.reps);
     await save(db);
   },
 
@@ -314,7 +564,14 @@ export const localBackend: Backend = {
       );
     }
     if (!db.members.some((m) => m.teamId === team.id && m.userId === user.id)) {
-      db.members.push({ teamId: team.id, userId: user.id, joinedAt: new Date().toISOString(), consentStatus: initialConsent(user.isMinor) });
+      // Minors join with nothing on (coach records the form); adults with participation only.
+      db.members.push({
+        teamId: team.id,
+        userId: user.id,
+        joinedAt: new Date().toISOString(),
+        perms: { ...NO_PERMS, participation: user.isMinor === false },
+        consentVersion: null,
+      });
       await save(db);
     }
     return { ...team, coachName: db.users.find((u) => u.id === team.coachId)?.name };
@@ -384,7 +641,7 @@ export const localBackend: Backend = {
   async submitReadiness(r) {
     const { db, user } = await me();
     if (!db.members.some((m) => m.teamId === r.teamId && m.userId === user.id)) throw new BackendError("You're not on that team.");
-    if (!canCheckIn(consentOf(db, r.teamId, user.id))) throw new BackendError('Check-ins need parent consent.');
+    if (!canShareCheckIns(permsOf(db, r.teamId, user.id))) throw new BackendError('Check-ins need parent consent.');
     db.readiness = [...db.readiness.filter((x) => !(x.teamId === r.teamId && x.userId === user.id && x.day === r.day)), { ...r, userId: user.id }];
     await save(db);
   },
@@ -392,14 +649,19 @@ export const localBackend: Backend = {
   async listReadiness(teamId, day) {
     const db = await load();
     return db.readiness
-      .filter((r) => r.teamId === teamId && r.day === day && visibleTo(db, db.sessionUserId, teamId, r.userId))
+      .filter(
+        (r) =>
+          r.teamId === teamId &&
+          r.day === day &&
+          (r.userId === db.sessionUserId || (visibleTo(db, db.sessionUserId, teamId, r.userId) && canShareCheckIns(permsOf(db, teamId, r.userId)))),
+      )
       .map((r) => ({ ...r, userName: db.users.find((u) => u.id === r.userId)?.name ?? 'Athlete' }));
   },
 
   async addLog(log: WorkoutLog, teamId) {
     const { db, user } = await me();
     if (db.logs.some((l) => l.id === log.id)) return;
-    if (!canLog(consentOf(db, teamId, user.id))) throw new BackendError('Logging needs parent consent.');
+    if (!canLog(permsOf(db, teamId, user.id))) throw new BackendError('Logging needs parent consent.');
     db.logs.push({
       id: log.id,
       teamId,
@@ -409,6 +671,8 @@ export const localBackend: Backend = {
       date: log.date,
       setsDone: setsDone(log),
       note: log.note,
+      prCount: log.prCount ?? 0,
+      durationMin: log.durationMin ?? null,
     });
     await save(db);
   },

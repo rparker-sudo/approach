@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { dateKey, today } from '../lib/calendar';
-import { canCheckIn } from '../lib/backend';
+import { canShareCheckIns } from '../lib/backend';
 import { useStore } from '../lib/store';
 import { useTeams } from '../lib/team';
 import { Button, Card, Chip, ChipRow, colors, Label, Note, Row, Text } from './ui';
@@ -29,8 +29,9 @@ export default function ReadinessCard() {
   const [scores, setScores] = useState<Scores>({ sleep: existing?.sleep ?? 0, soreness: existing?.soreness ?? 0, energy: existing?.energy ?? 0 });
   const [pain, setPain] = useState<boolean | null>(existing ? existing.pain : null);
   // Only teams with check-in consent (or adults) get check-ins.
-  const sharedWith = teams.filter((t) => canCheckIn(consentFor(t.id)));
-  const onTeam = sharedWith.length > 0 || Object.values(data.teamConsent ?? {}).some((c) => canCheckIn(c));
+  // Sent only to teams where check-ins are shared with the coach (boxes 2 and 3).
+  const sharedWith = teams.filter((t) => canShareCheckIns(consentFor(t.id)));
+  const onTeam = sharedWith.length > 0 || Object.values(data.teamConsent ?? {}).some((c) => canShareCheckIns(c));
   const showNotice = onTeam && !data.checkinNoticeSeen;
   const ready = scores.sleep && scores.soreness && scores.energy && pain !== null;
 

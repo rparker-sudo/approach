@@ -1,12 +1,14 @@
 import { router } from 'expo-router';
+import { View } from 'react-native';
 import { showAlert } from '../lib/dialog';
 import { useState } from 'react';
 
 import Constants from 'expo-constants';
-import { myConsentLine } from '../components/Consent';
+import { PERM_LABELS } from '../components/Consent';
+import YourChoices, { DEFAULT_CHOICES } from '../components/YourChoices';
 import DeleteAccountDialog from '../components/DeleteAccountDialog';
 import { Body, Button, Card, Chip, ChipRow, colors, Field, H2, Label, Lockup, Row, Screen, Text } from '../components/ui';
-import { isDemoMode, syncConfigProblem } from '../lib/backend';
+import { BoardNameMode, boardName, isDemoMode, PERM_KEYS, syncConfigProblem } from '../lib/backend';
 import { LEGAL_TITLES, LegalPage, openLegal } from '../lib/legal';
 import { useStore } from '../lib/store';
 import { useTeams } from '../lib/team';
@@ -16,7 +18,8 @@ import { NUTRITION_DISCLAIMER } from '../lib/nutrition';
 
 export default function Settings() {
   const { data, setProfile, resetAll, setTheme } = useStore();
-  const { account, teams, signOut, leaveTeam, deleteAccount, consentFor } = useTeams();
+  const { account, teams, signOut, leaveTeam, deleteAccount, consentFor, setMyChoices, setBoardNameMode } = useTeams();
+  const [savedChoices, setSavedChoices] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [name, setName] = useState(data.profile?.name ?? '');
   const [weight, setWeight] = useState(data.profile?.bodyWeightLb ? String(data.profile.bodyWeightLb) : '');
@@ -126,18 +129,64 @@ export default function Settings() {
       </Card>
       )}
 
+      {!coach && account && teams.length ? (
+        <Card>
+          <H2>Privacy</H2>
+          <Label>Show me on boards as</Label>
+          <ChipRow>
+            {(['short', 'initials', 'hidden'] as BoardNameMode[]).map((mode) => (
+              <Chip
+                key={mode}
+                label={mode === 'hidden' ? 'Hidden' : boardName(account.name || profile.name, mode) ?? ''}
+                selected={(account.boardNameMode ?? 'short') === mode}
+                onPress={() => setBoardNameMode(mode).catch(() => {})}
+              />
+            ))}
+          </ChipRow>
+          <Text style={{ fontSize: 13, color: colors.muted }}>Boards never show your full last name, weights, tests, or check-ins.</Text>
+          {account.isMinor === false ? (
+            <>
+              <Label>Your choices</Label>
+              <YourChoices
+                key={JSON.stringify(consentFor(teams[0].id))}
+                initial={
+                  consentFor(teams[0].id)?.participation && teams[0].myConsentVersion === 2
+                    ? (({ participation: _p, ...rest }) => rest)(consentFor(teams[0].id)!)
+                    : DEFAULT_CHOICES
+                }
+                saveLabel={savedChoices ? 'Saved' : 'Save choices'}
+                onSave={async (c) => {
+                  await setMyChoices(c);
+                  setSavedChoices(true);
+                }}
+              />
+            </>
+          ) : (
+            <Text style={{ fontSize: 13, color: colors.muted }}>Your coach records your other choices from your parent&apos;s form.</Text>
+          )}
+        </Card>
+      ) : null}
+
       <Card>
         <H2>Your data</H2>
         <Body muted>{account ? 'Your profile and team workouts sync with your team. Body weight and personal notes stay on this phone.' : 'Everything is stored only on this phone. Nothing is uploaded.'}</Body>
         {!coach && account
           ? teams.map((t) => {
-              const line = myConsentLine(consentFor(t.id));
-              return line ? (
-                <Text key={t.id} style={{ fontSize: 14 }}>
-                  {teams.length > 1 ? `${t.name}: ` : ''}
-                  {line}
-                </Text>
-              ) : null;
+              const p = consentFor(t.id);
+              if (!p) return null;
+              return (
+                <View key={t.id} style={{ gap: 2 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600' }}>
+                    {account.isMinor === false ? `Your choices${teams.length > 1 ? ` · ${t.name}` : ''}` : `Parent consent${teams.length > 1 ? ` · ${t.name}` : ''}`}
+                  </Text>
+                  {account.isMinor !== false && !p.participation ? <Text style={{ fontSize: 14 }}>Waiting for your parent&apos;s form.</Text> : null}
+                  {PERM_KEYS.map((k) => (
+                    <Text key={k} style={{ fontSize: 14 }}>
+                      {`${PERM_LABELS[k]}: ${p[k] ? 'on' : 'off'}`}
+                    </Text>
+                  ))}
+                </View>
+              );
             })
           : null}
         <Button

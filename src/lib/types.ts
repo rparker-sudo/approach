@@ -173,7 +173,10 @@ export type Program = {
 };
 
 /** A dated volleyball event. date is local 'YYYY-MM-DD'. */
-export type CalendarEvent = { date: string; type: DayType; label?: string };
+/** Testing-day battery (P6): full = jumps + strength checks; jump = jumps only; mid = jumps + trap bar. */
+export type TestBattery = 'full' | 'jump' | 'mid';
+/** A dated calendar entry. A testing day keeps its underlying day type and adds `test`. */
+export type CalendarEvent = { date: string; type: DayType; label?: string; test?: TestBattery };
 
 export type Profile = {
   name: string;
@@ -208,6 +211,10 @@ export type WorkoutLog = {
   teamId?: string;
   /** True once the coach's server has it. */
   synced?: boolean;
+  /** New bests in this workout (from the finish summary). */
+  prCount?: number;
+  /** Start to finish, capped at 120 minutes. */
+  durationMin?: number;
 };
 
 export type BodyLog = { date: string; weightLb: number };
@@ -237,8 +244,12 @@ export type AppData = {
   teamCalendars?: Record<string, LocalTeamCalendar>;
   /** Athlete: daily readiness check-ins. */
   readinessLog?: ReadinessEntry[];
-  /** Athletes: last known parent-consent status per team (so logging works offline). */
-  teamConsent?: Record<string, 'not_required' | 'pending' | 'training_only' | 'full'>;
+  /** Athletes: last known permissions per team (so logging works offline). */
+  teamConsent?: Record<string, import('./backend/types').Perms>;
+  /** Athletes: latest estimated strength per tested lift (exercise id → lb, test day), from testing days. */
+  strengthEstimates?: Record<string, { e1rm: number; day: string }>;
+  /** Solo athletes: jump tests kept on this phone (P6.8). */
+  jumpTests?: { day: string; testId: 'touch' | 'broad' | 'throw'; value: number }[];
   /** The athlete has seen "Your coach sees your check-ins" once. */
   checkinNoticeSeen?: boolean;
 };

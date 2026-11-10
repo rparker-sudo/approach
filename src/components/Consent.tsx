@@ -1,4 +1,4 @@
-import type { ConsentStatus } from '../lib/backend';
+import { Member, Perms, PERM_KEYS } from '../lib/backend';
 import { openLegal } from '../lib/legal';
 import { Banner } from './ui';
 
@@ -11,30 +11,26 @@ export function ConsentBanner() {
   );
 }
 
-/** Settings → Your data line for an athlete. Null for adults. */
-export function myConsentLine(status: ConsentStatus | undefined): string | null {
-  switch (status) {
-    case 'pending':
-      return 'Parent consent: waiting';
-    case 'training_only':
-      return 'Parent consent: training only';
-    case 'full':
-      return 'Parent consent: training and check-ins';
-    default:
-      return null;
-  }
+/** Names for Settings → Your data (P1.6). */
+export const PERM_LABELS: Record<keyof Perms, string> = {
+  participation: 'Participation',
+  checkins: 'Check-ins',
+  shareCheckins: 'Share check-ins with my coach',
+  boards: 'Team boards',
+  attendance: 'Attendance & hours',
+  testing: 'Testing days',
+};
+
+export function permCount(p: Perms) {
+  return PERM_KEYS.filter((k) => p[k]).length;
 }
 
-/** Coach roster chip (F3). Null for adults. */
-export function rosterChip(status: ConsentStatus): { label: string; tone: 'warning' | 'muted' } | null {
-  switch (status) {
-    case 'pending':
-      return { label: 'Consent needed', tone: 'warning' };
-    case 'training_only':
-      return { label: 'Training only', tone: 'muted' };
-    case 'full':
-      return { label: 'Full', tone: 'muted' };
-    default:
-      return null;
-  }
+/** Coach roster chips (F7). Adults show nothing. A form v1 record also gets a muted note. */
+export function rosterChips(m: Member): { label: string; tone: 'warning' | 'muted' }[] {
+  if (m.isMinor === false) return [];
+  if (!m.perms.participation) return [{ label: 'Consent needed', tone: 'warning' }];
+  const n = permCount(m.perms);
+  const chips: { label: string; tone: 'warning' | 'muted' }[] = [{ label: n === 6 ? 'Consent: all' : `Consent: ${n} of 6`, tone: 'muted' }];
+  if (m.consentVersion === 1) chips.push({ label: 'Form v2 needed for boards & testing', tone: 'muted' });
+  return chips;
 }

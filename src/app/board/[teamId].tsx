@@ -156,7 +156,7 @@ function Board({ teamId }: { teamId: string }) {
               <View key={i} style={{ width: `${100 / 4 - 2}%`, height: 140, backgroundColor: P.tile, borderRadius: 16, opacity: 0.5 }} />
             ))}
           </View>
-        ) : !sessions.length ? (
+        ) : !sessions.length && !live.length ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ color: P.ink, fontSize: 56, fontWeight: '700' }}>Rest day. See you tomorrow.</Text>
           </View>
@@ -259,7 +259,7 @@ function TeamGoal({ teamId }: { teamId: string }) {
 function EffortPanel({ teamId, index }: { teamId: string; index: number }) {
   const { stats } = useEffort(teamId, 'season');
   const metric = METRICS[index % METRICS.length];
-  const list = stats ? rank(stats, metric.id).slice(0, 5) : [];
+  const list = stats ? rank(stats, metric.id).filter((r) => r.rank).slice(0, 5) : [];
   return (
     <View style={{ flex: 1.4, gap: 6, justifyContent: 'center' }}>
       <Text style={{ color: P.muted, fontSize: 20, fontWeight: '600' }}>{`EFFORT · ${metric.label.toUpperCase()}`}</Text>

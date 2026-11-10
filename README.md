@@ -26,14 +26,15 @@ The app has four tabs: **Lift** (today's training), **Fuel** (meals and hydratio
 - **Pick your lift days**: the app suggests days, and you tap the days you actually lift. Change them anytime under Plan → Edit lift days, no rebuild needed
 - **Season calendar**: mark real match, tournament and day-off dates (with names like "Reno Classic"). When an event lands on a lift day, that week's lift moves to the nearest good day, or a lighter session is swapped in the day before a match, with a note saying what changed. Tap any date to choose its lift yourself
 - Adds prep work for the demands of each position (shoulders for hitters, knees for middles, hands and wrists for setters, ankles and low positions for liberos)
-- Today screen: today's lift, today's fuel targets and the week at a glance
+- Today screen: today's lift (or Testing session), today's top Fuel tip, an "I was there" check on practice and match days, and the week at a glance
 - Logs workouts set by set and pre-fills the weight you used last time
-- Fuel tab: carb, protein and water targets that change with the type of day (rest, lift, practice, match, tournament, day before a match), plus meal timing and food ideas. Calories are left out on purpose, since many users are teens.
-- Progress tab: **Above the net**, your approach touch height minus the net height (women's 2.24 m, men's 2.43 m, or a custom youth height), plus strength gains, body weight and workout history
+- Fuel tab: guidance that changes with the type of day (rest, lift, practice, match, tournament, day before a match): plate proportions, meal timing, food ideas, and Fuel cards with their published sources. No calories, grams, ounces or weight goals, and it never uses body weight.
+- Progress tab: **Above the net**, your approach touch height minus the net height (women's 2.24 m, men's 2.43 m, or a custom youth height), plus strength gains (labeled as estimates), body weight (optional, on this phone only), your team effort rank and private badges, a solo Jump test, and workout history
 
 **Age and parent consent**
 - Everyone answers "When were you born?" (month and year) first. Only the birth year and whether the person is under 18 are kept. Approach is for ages 13 and up; coach accounts are for adults.
-- Athletes under 18 on a team can see the plan right away but can't log workouts or check in until the coach records their signed parent consent form (Training only, or Training and check-ins). The server enforces this too.
+- Athletes under 18 on a team can see the plan right away but can't log workouts until the coach records their signed parent consent form (version 2, six boxes: participation, check-ins, sharing check-ins, team boards, attendance & hours, testing days). Each feature turns on only for the boxes checked. Adults choose boxes 2–6 themselves ("Your choices", later Settings → Privacy). The server enforces all of it.
+- Settings → Privacy: "Show me on boards as" Jordan M. / J.M. / Hidden. Boards never show a full last name.
 - Settings → **Delete my account** removes the account and everything it owns. Settings → **Legal** links the Privacy Notice, Terms and the printable parent consent form.
 
 **Coach mode (teams)**
@@ -45,6 +46,10 @@ The app has four tabs: **Lift** (today's training), **Fuel** (meals and hydratio
 - **Position groups**: one tap makes Hitters, Middles, Setters and Liberos / DS and places athletes by position (or make your own groups). Each group gets its own workout; anyone not in a group gets the Whole team workout. The season calendar is shared.
 - **Readiness**: today's check-ins at a glance (who's run down, who reported pain). When several athletes are run down, the app suggests a lighter day; **you decide**. "Lighten today" gives the whole team or a group the same exercises with fewer sets and easy effort, and can be undone.
 - **Rest times**: set per exercise in 15-second steps; athletes' timers use them.
+- **Coach board** (Team → Open coach board): a full-screen live view for a classroom display. Board names, who's started or done, sets done, a "PR" badge, the team goal and a rotating effort panel. Never weights, test results, check-ins, body weight or nutrition. Only the signed-in coach can open it.
+- **Effort board** (Team → Effort): ranks work, not weight. Consistency, sessions, week streak, attendance, hours (capped at 3 h a day and 15 h a week) and jump-test improvement %. Turn it, or its panel on the coach board, off in Team → Boards and testing.
+- **Attendance**: mark athletes there / not there for practices and matches (your entry wins); set practice and match lengths.
+- **Testing days**: Calendar → tap a date → Testing day (Full battery, Jump tests, Mid-season check), never within 2 days before a match. On the day, tap **Start strength check** and confirm you're supervising; strength checks stay locked until you do. Results set athletes' starting weights; you can edit or void them from the roster.
 
 **Athletes on a team** make an account, enter the team code once, and the team workout becomes their plan. Logged workouts go to the coach. **Solo athletes** can skip accounts and build their own program.
 
@@ -59,16 +64,17 @@ Team sync needs a free Supabase project. Until you connect one, the app runs in 
 5. In the project folder, copy `.env.example` to `.env` and paste in those two values.
 6. Restart the app (`npx expo start`). The demo-mode notes disappear when sync is on.
 
-### Upgrading from 2.0
-Run these once, in order, in **SQL Editor → New query** (paste the whole file, click **Run**). New projects don't need them; `schema.sql` already includes both.
+### Upgrading from 2.0 or 2.1
+Run these once, in order, in **SQL Editor → New query** (paste the whole file, click **Run**). Skip any you've already run. New projects don't need them; `schema.sql` includes all of them.
 
 1. If you haven't yet: `supabase/migrations/002_approach_2.sql` (groups, shared calendar, check-ins).
 2. `supabase/migrations/003_approach_2_1.sql` (age, parent consent, account deletion, coach access only to current members, removes check-in pain notes).
-3. Open the app. Everyone with an account answers the age question once. Adults keep working as before; athletes under 18 stay read-only on their team until the coach records their parent consent form (Team → Roster → **Consent needed**).
+3. `supabase/migrations/004_approach_2_1_pass2.sql` (six consent permissions, board names, coach board, effort board, attendance, testing days). It moves each athlete's consent to the new permissions: "Training only" keeps logging; "Training and check-ins" keeps logging and shared check-ins; boards, attendance and testing stay off until the coach records form v2 (minors) or the athlete saves "Your choices" (adults). It runs as one transaction, so if it fails nothing changes.
+4. Open the app. Everyone with an account answers the age question once (if they haven't). Adults see "Your choices" once. Coaches see **Consent needed**, **Consent: N of 6** or **Form v2 needed for boards & testing** on the roster.
 
-Both files are safe to run on a project that already has your teams and logs. Until 003 is run, the app keeps every team athlete read-only (it can't check consent yet).
+All files are safe to run on a project that already has your teams and logs, and safe to run twice. Run 004 after the 2.1 pass 2 site is live; until then the older site can't read the new consent columns.
 
-What is stored online: name, email, role, position, birth year and whether the person is under 18, team membership and group, parent-consent status (and which coach recorded it, and when), posted team workouts and calendar, the workouts athletes log for a team, and daily check-ins (sleep, soreness, energy, pain yes/no) for athletes whose consent allows them. Only the athlete and their current coach can see an athlete's data. Body weight, touch height and fuel targets stay on the phone. Coaches see only their own teams; athletes see only their team's workout and their coach's name. Athletes must be 13 or older, and athletes under 18 need a signed parent consent form (`public/consent.html`) recorded by their coach. See `docs/compliance.md`.
+What is stored online: name, email, role, position, birth year and whether the person is under 18, how they appear on boards, team membership and group, the six permissions (and which coach recorded them, when, and on which form version), posted team workouts and calendar, the workouts athletes log for a team (with how long they took and whether there was a personal best), live sets-done progress (deleted after a day), daily check-ins (sleep, soreness, energy, pain yes/no), attendance, and testing-day results with the coach's supervision record, each only with the matching permission. Athletes and their current coach see an athlete's data; teammates see only the boards (board name, progress, effort ranks). Body weight, personal notes and solo-mode data stay on the phone. Coaches see only their own teams; athletes see only their team's workout and their coach's name. Athletes must be 13 or older, and athletes under 18 need a signed parent consent form (`public/consent.html`) recorded by their coach. See `docs/compliance.md`.
 
 The claude.ai preview link can't reach Supabase, so it always runs in demo mode. Use the app in Expo Go or the GitHub Pages site for live sync.
 

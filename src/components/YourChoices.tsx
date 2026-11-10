@@ -50,6 +50,8 @@ export default function YourChoices({
               disabled={disabled}
               onValueChange={(v) => set(r.key, v)}
               trackColor={{ true: colors.ink, false: colors.line }}
+              thumbColor={c[r.key] ? colors.bg : colors.muted}
+              {...({ activeThumbColor: colors.bg } as object)}
             />
           </View>
         );

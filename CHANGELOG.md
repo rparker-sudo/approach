@@ -4,6 +4,17 @@ Version numbers: whole numbers (1.0, 2.0) for big changes, decimals (1.1, 1.2) f
 The number is in `app.json` (`expo.version`, written as 1.1.0 for 1.1) and shows in the app under Settings.
 Each version has a matching GitHub tag (`v1.0`, `v1.1`, …) and download (`approach-1.0.zip`).
 
+## 2.1.1 — boards, testing days, Fuel phase 1 (2.1 pass 2)
+- Consent becomes six permissions (parent consent form v2): participation, check-ins, sharing check-ins, team boards, attendance & hours, testing days. Coach six-box checklist with box rules; roster chips (Consent needed / Consent: N of 6 / Consent: all / Form v2 needed for boards & testing) and a consent tracker. Adults choose for themselves ("Your choices", Settings → Privacy). Enforced on the server.
+- Board names: "Jordan M." by default, or initials, or hidden. Never a full last name.
+- Coach board (`/board/[teamId]`): coach-only full-screen live view with board names, status, sets done, PR badge, team goal and a rotating effort panel. Never weights, test results, check-ins, body weight or nutrition.
+- Team effort board: consistency, sessions, week streak, attendance, hours (capped 3 h/day, 15 h/week) and jump-test improvement %. Ranks work, not weight. Coach Effort tab, athlete Progress card, private badges; coach can turn it off.
+- Attendance: athletes tap "I was there"; coaches mark there / not there (coach wins); practice and match lengths per team.
+- Testing days: coach schedules (never within 2 days before a match); a Testing session replaces that day's lift; strength checks locked until the coach confirms supervision (recorded); eligibility rules; estimated strength (always labeled an estimate) sets starting weights within the phase range; coach can edit or void results; solo jump tests stay on the phone.
+- Fuel phase 1: no grams, ounces, calories or body-weight targets anywhere; nine cited Fuel cards; body weight step removed from onboarding (still optional in Progress, on the phone only).
+- Privacy Notice, Terms and consent form v2 pages regenerated (`scripts/build-legal-pages.py`).
+- Supabase migration `supabase/migrations/004_approach_2_1_pass2.sql` (run once after 003).
+
 ## 2.1 — soft-launch safety (pass 1)
 - Age question first for everyone ("When were you born?", month and year, empty to start). Under 13: a neutral "not eligible" screen, and only a local flag is kept. Only the birth year and under-18 are stored. Coach accounts are for adults 18+. Existing accounts answer once.
 - Parent consent on file for athletes under 18: they join a team as "waiting", can view the plan, and can't log or check in until the coach records a signed form (Training only, or Training and check-ins). Coach roster chips and a record/change/clear sheet. Enforced on the server (row-level security).

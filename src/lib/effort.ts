@@ -153,7 +153,8 @@ export function metricValue(s: EffortStats, m: EffortMetric): number | null {
   }
 }
 
-export function formatMetric(v: number, m: EffortMetric): string {
+export function formatMetric(v: number | null, m: EffortMetric): string {
+  if (v == null) return '–';
   switch (m) {
     case 'consistency':
       return `${v}%`;
@@ -168,22 +169,30 @@ export function formatMetric(v: number, m: EffortMetric): string {
   }
 }
 
-export type Ranked = { stats: EffortStats; rank: number; value: number };
+/** rank 0 / value null: listed without a rank ("–"), e.g. consistency before anything was scheduled. */
+export type Ranked = { stats: EffortStats; rank: number; value: number | null };
 
-/** One ranked list per metric. Ties share a rank (1, 1, 3). Members without a value (no permission) are left out. */
+/**
+ * One ranked list per metric. Ties share a rank (1, 1, 3).
+ * Attendance and improvement leave out members without permission. Consistency lists members with nothing
+ * scheduled yet at the end, unranked.
+ */
 export function rank(stats: EffortStats[], m: EffortMetric): Ranked[] {
-  const rows = stats
-    .map((s) => ({ stats: s, value: metricValue(s, m) }))
+  const all = stats.map((s) => ({ stats: s, value: metricValue(s, m) }));
+  const rows = all
     .filter((r): r is { stats: EffortStats; value: number } => r.value != null)
     .sort((a, b) => b.value - a.value || a.stats.boardName.localeCompare(b.stats.boardName));
   let lastValue: number | null = null;
   let lastRank = 0;
-  return rows.map((r, i) => {
+  const ranked: Ranked[] = rows.map((r, i) => {
     const rnk = r.value === lastValue ? lastRank : i + 1;
     lastValue = r.value;
     lastRank = rnk;
     return { ...r, rank: rnk };
   });
+  if (m !== 'consistency') return ranked;
+  const unranked = all.filter((r) => r.value == null).sort((a, b) => a.stats.boardName.localeCompare(b.stats.boardName));
+  return [...ranked, ...unranked.map((r) => ({ stats: r.stats, value: null, rank: 0 }))];
 }
 
 /** Top 10, plus the viewer's own row pinned at the bottom when they're below it (P4.3). */

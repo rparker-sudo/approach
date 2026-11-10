@@ -119,7 +119,7 @@ export default function EffortBoard({ teamId, viewer }: { teamId: string; viewer
               borderRadius: r.stats.isMe ? 8 : 0,
             }}
           >
-            <Text style={{ width: 32, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{r.rank}</Text>
+            <Text style={{ width: 32, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{r.rank || '–'}</Text>
             <Text style={{ flex: 1, fontWeight: r.stats.isMe ? '600' : '400' }}>{r.stats.isMe ? `${r.stats.boardName} (you)` : r.stats.boardName}</Text>
             <Text style={{ fontWeight: '600', fontVariant: ['tabular-nums'] }}>{formatMetric(r.value, metric)}</Text>
           </Row>
@@ -142,9 +142,9 @@ export function MyEffortSummary({ teamId }: { teamId: string }) {
     <View style={{ gap: 4 }}>
       <Label>Team effort</Label>
       <Text style={{ fontSize: 16, fontWeight: '600' }}>
-        {mine ? `#${mine.rank} of ${list.length} for consistency · ${formatMetric(mine.value, 'consistency')}` : 'Log your first team lift to get on the board.'}
+        {mine && mine.rank ? `#${mine.rank} of ${list.filter((r) => r.rank).length} for consistency · ${formatMetric(mine.value, 'consistency')}` : 'Log your first team lift to get on the board.'}
       </Text>
-      {list.slice(0, 3).map((r) => (
+      {list.filter((r) => r.rank).slice(0, 3).map((r) => (
         <Text key={r.stats.userId} style={{ fontSize: 13, color: colors.muted }}>{`${r.rank}. ${r.stats.boardName} · ${formatMetric(r.value, 'consistency')}`}</Text>
       ))}
     </View>

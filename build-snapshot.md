@@ -1,6 +1,6 @@
 # Approach — build snapshot
 
-*As of November 10, 2026 (v2.1, pass 1). Facts only. Items marked **(unverified)** could not be confirmed from the code or from the owner.*
+*As of November 10, 2026 (v2.1: pass 1 and pass 2). Facts only. Items marked **(unverified)** could not be confirmed from the code or from the owner.*
 
 **What it is:** a weight-training, nutrition and planning app for volleyball athletes and coaches. App Store name (planned): "Approach: Volleyball Fitness". Home-screen name: "Approach".
 
@@ -8,30 +8,93 @@
 
 ## 1. Version and changes
 
-**Current version:** 2.1.0 (`app.json`, `package.json`), built on branch `main` of GitHub `rparker-sudo/approach`. Built from `docs/specs/v2.1-soft-launch.md`, pass 1 (S1–S11). Pass 2 (coach board, effort board, Fuel phase 1, testing days, expanded consent form) is **not started**; its spec isn't in the repo yet.
+**Current version:** 2.1.1 (`app.json`, `package.json`).
+- Pass 1 (`docs/specs/v2.1-soft-launch.md`, S1–S11) is on `main`.
+- Pass 2 (`docs/specs/v2.1-pass-2.md`, P1–P8) is on branch **`v2.1-pass-2`** of GitHub `rparker-sudo/approach`, waiting for the owner's approval before it's merged to `main` and tagged `v2.1`.
 
 **History (from `CHANGELOG.md` and git):**
 - Before 1.0 the app was called "Volley Strength", then "Load & Launch", then renamed "Approach".
 - **1.0:** brand, four tabs, generated programs, chosen lift days, season calendar, workout logging, Fuel targets, touch-height tracking, teams with live sync (Supabase), QR invites, mobile browser version on GitHub Pages.
-- **2.0:** 1–7 lift days, equipment-aware programs, 64-exercise library with how-to text, weekly progression with deloads, workout view with rest timers, position groups, shared team calendar, daily readiness check-in, migration `002_approach_2.sql`.
-- Git tags: `v1.0` and `v2.0` exist only in local clones; tag pushes from the cloud workspace are blocked, so the owner pushes tags from the Mac.
+- **2.0:** 1–7 lift days, equipment-aware programs, 64-exercise library with how-to text, weekly progression with deloads, workout view with rest timers, position groups, shared team calendar, daily readiness check-in, migration `002`.
+- **2.1 pass 1 (2.1.0):**
+  - month/year age gate (under 13 blocked; birth year + is_minor only; coaches 18+);
+  - parent consent on file with RLS enforcement;
+  - free-text pain note removed;
+  - check-in sharing notice;
+  - in-app account deletion;
+  - coaches see only current members;
+  - legal pages;
+  - copy without injury claims;
+  - training safety fixes G1, G2, G5;
+  - migration `003`.
+- Git tags: `v1.0` and `v2.0` exist only in local clones. Tag pushes from the cloud workspace are blocked, so the owner pushes tags from the Mac.
 
-**What changed from 2.0 to 2.1:**
-- **Age question (S1):** first onboarding screen for everyone, including solo users: "When were you born?" with empty month and year pickers. Under 13 → "Sorry, you're not eligible to use Approach right now." and a local flag (`approach/not-eligible/v1`) that survives reloads and "Erase all data". Nothing else is saved. Only birth year and is_minor are kept (local profile and `profiles`); the month is used once and discarded. If the birth month is the current month, the younger age is assumed. Coach option disabled under 18 ("Coach accounts are for adults 18 and older."); the server also refuses coach role for minors. Existing accounts with no birth year answer once before the tabs; an under-13 answer deletes the account (RPC) and shows the block screen.
-- **Parent consent (S2):** `team_members.consent_status` (`not_required` / `pending` / `training_only` / `full`) plus `consent_recorded_at` and `consent_recorded_by`. Minors (and anyone with unknown age) join as `pending`; adults as `not_required`. Pending: banner with "See the form", Start workout replaced by "Logging unlocks after consent.", check-in hidden, team logs and check-ins not sent, workout screen blocked. Training only: logging works, check-in hidden and not sent. Coach roster chips (Consent needed / Training only / Full) and a sheet to record, change or clear consent with the "I have a signed parent consent form for [name]." checkbox. Readiness counts only athletes with check-in consent ("X of Y checked in · Z without check-in consent"). Settings → Your data shows "Parent consent: waiting / training only / training and check-ins".
-- **Server enforcement (S2.6, S6):** RLS: `workout_logs` insert needs consent in (training_only, full, not_required); `readiness` insert/update needs (full, not_required). Athletes can't update consent (column-level grants; only `record_consent()` by the team coach). Coaches can read `workout_logs` and `readiness` only for **current** members.
-- **Pain note removed (S3):** gone from the card, types, both backends, displays and the database (`readiness.pain_note` nulled then dropped). Old notes on the device are stripped on load. Pain yes/no stays, with "Tell your coach, parent, or athletic trainer in person about any pain."
-- **Check-in notice (S4):** "Your coach sees your check-ins. Teammates never do." with "Got it." once (saved locally as `checkinNoticeSeen`), then as small footer text.
-- **Account deletion (S5):** Settings → Account → Delete my account; typed DELETE; coach text adds "Your teams and every athlete's logs for those teams are deleted too." Supabase: `delete_my_account()` deletes `auth.users` and cascades. Demo mode: removes the local account, its teams and rows. Local data is erased; the app returns to the age screen.
-- **Legal pages (S7):** `public/privacy.html`, `terms.html`, `consent.html` (printable). Plain HTML, brand colors, no scripts, no external fonts. Linked from the sign-up step, Settings → Legal, the coach team screen ("Print parent consent form") and the consent sheet. They open in a new tab (web) or the system browser (iOS; needs `EXPO_PUBLIC_APP_URL`).
-- **Copy (S8):** all items in the spec table, plus the same rule applied to other "protects/keeps … safe/healthy" exercise text (list in the commit message). Category label is "Prehab".
-- **Repo hygiene (S9):** README (App Privacy, Confirm email on, no district/school-domain suggestions, "Upgrading from 2.0"), proprietary LICENSE, version 2.1.0, CHANGELOG. ESLint config added (`eslint.config.js`, `eslint` + `eslint-config-expo` dev dependencies, `npm run lint`); several existing files were changed only to satisfy it (escaped apostrophes, refs updated in effects).
-- **Migration (S10):** `supabase/migrations/003_approach_2_1.sql`, also folded into `supabase/schema.sql`. Test scripts in `supabase/tests/`.
-- **Training safety (S11):** G1 no exercise above the athlete's level (falls back to an at-or-below-level bodyweight option or skips the slot). G2 caps: beginner 3, intermediate 4, advanced 5, in-season 3; at least one day with nothing; extra chosen days become a mobility-only session; pickers show "Max N lift days for your level. Add mobility days instead."; the schedule screen gains a "Mobility" choice; over-cap programs show a rebuild offer. G5: increase = 10% of last weight rounded down to 2.5 lb (min 2.5), max +10 lb barbell / +5 lb dumbbell, kettlebell or cable; no suggestions for band-only setups or holds.
+**What changed in 2.1 pass 2 (2.1.1):**
+- **P1, six permissions:** `team_members` gains `c_participation`, `c_checkins`, `c_share_checkins`, `c_boards`, `c_attendance`, `c_testing` and `consent_version`. `consent_status` is migrated, then dropped:
+  - training_only → participation
+  - full → participation + check-ins + sharing
+  - pending → none
+  - not_required (adults) → participation + check-ins + sharing; boards, attendance and testing stay off until they save "Your choices"
+
+  The coach records form v2 in a six-box checklist (box 3 needs box 2; boxes 2–6 need box 1), with the confirm line "I have a signed parent consent form (version 2) for [name]."
+  - Roster chips: Consent needed / Consent: N of 6 / Consent: all; a v1 record also shows "Form v2 needed for boards & testing". Tracker: "Consent forms: X of Y in · Print form".
+  - Adults see "Your choices" once (five toggles, all on by default) and can change them in Settings → Privacy. Settings → Your data lists each permission.
+  - RLS:
+    - logs need participation;
+    - `readiness` needs check-ins and sharing;
+    - attendance, test results and live progress need their boxes;
+    - only the coach (minors) or the athlete (adults) can change permissions;
+    - the coach stops seeing check-ins when sharing is turned off.
+  - A check-in with box 2 but not box 3 stays on the phone.
+- **P2, board names:** `profiles.board_name_mode` ('short' | 'initials' | 'hidden'). "Jordan M." (default), "J.M." or hidden; one-word names stay as they are. Never a full last name. A minor without box 4 never appears.
+- **P3, coach board:** `/board/[teamId]`, opened from Team → Open coach board (a new tab on the web). Only the signed-in coach of that team can view it.
+  - Shows: board names, Not started / In progress / Done, sets done / total, a "PR" badge (no weight), today's session per group, a team goal bar, and an effort panel rotating every 20 s that can be hidden.
+  - Controls fade after 3 s. There's a "Reconnecting…" banner, an empty state "Rest day. See you tomorrow.", and a dark projector theme.
+  - New table `live_progress`. The athlete app upserts it 2 s after a set is marked done, and on finish (status done). Live updates come through Supabase Realtime, with a 15-second backup poll. Rows older than 24 h are deleted whenever progress is written.
+  - `workout_logs` gains `pr_count` (from the finish summary) and `duration_min` (start to finish, capped at 120).
+  - The board's queries select only names, status, sets and PR counts.
+- **P4, effort board** (`src/lib/effort.ts`):
+  - **Sessions:** one per scheduled lift day; extras and duplicates don't count.
+  - **Consistency:** completed ÷ scheduled. Today counts once it's done; moved sessions count on their new day; testing days and mobility-only days aren't scheduled lifts.
+  - **Week streak:** rest weeks never break it; a missed past session does.
+  - **Practices & matches:** count of attendance.
+  - **Hours:** lift plus attendance minutes, capped at 3 h a day and 15 h a week.
+  - **Improvement:** average % gain in approach touch and broad jump vs. the first test in the period, computed on the server so teammates never get raw results.
+
+  How it works:
+  - Ties share a rank. The athlete's own row is pinned below the top 10. Season / This block filter.
+  - Athletes see only the metric chips their permissions allow.
+  - Inputs come from the RPC `team_effort`: board name, log times, session names, minutes, attendance (with permission) and improvement % (with permission). Never weights, test values, check-ins or nutrition.
+  - Coach: Team → Effort tab, plus team settings: effort board on/off, effort panel on the coach board on/off, team goal (default = athletes on boards × prescribed sessions a week × weeks remaining × 0.8).
+  - Athlete: Progress → Team effort card → full list. Private badges ("4-week streak", "Block complete", "New touch best") appear only on the athlete's own Progress tab.
+- **P5, attendance:** new table `attendance`. Practice days come from the usual week unless the calendar says otherwise; matches and tournaments come from calendar events.
+  - The athlete's Today screen has "I was there" (today and yesterday). The coach marks There / Not there from the roster, and the coach's entry wins: a coach row with 0 minutes means "not there", and the athlete can't change it.
+  - Team settings: practice / match / tournament minutes (default 120 / 120 / 240).
+- **P6, testing days:**
+  - **Scheduling:** `CalendarEvent.test` ('full' | 'jump' | 'mid'). The coach adds a testing day in the calendar day sheet, and it's blocked within 48 h before a match or tournament ("Testing can't be within 2 days before a match"). A match added later within 48 h cancels the testing day in the plan. That day's lift becomes a Testing session.
+  - **Supervision:** the coach's banner shows "Testing day: Full battery" and **Start strength check**, which needs "I'll be supervising this test, with safeties or spotters set." and records `test_sessions` (team, day, coach, time, battery). Load tests are locked by RLS until that row exists for the team and day.
+  - **Athlete session:** warm-up → approach touch → broad jump → med-ball throw (best of 3; touch also goes into the device touch log) → strength checks:
+    - full battery: trap bar 5RM, back squat and bench 5RM (advanced may choose 3RM);
+    - dumbbell gyms: goblet squat and DB bench 8RM;
+    - mid-season check: trap bar.
+
+    Each lift shows a warm-up checklist, up to 3 attempts with a 3:00 rest timer, the cue "Your coach stops the set when form breaks. Never grind.", and "Enter your last good-form set".
+  - **Eligibility for strength checks:** on a team, box 6, intermediate or advanced, and no pain or "run down" check-in today. Athletes without check-in permission are asked "Any pain today?" on the spot, and the answer isn't saved.
+  - **Estimated strength:** weight × (1 + reps/30), computed in the database. Always "Estimated strength: ~233 lb (estimate)". Visible only to the athlete and coach.
+  - **Starting weights:** a tested lift starts at min(e1RM × phase upper %, progression suggestion), or with no history e1RM × phase lower % (off 70–80, pre 75–85, in 70–80, post 60–70), rounded down to 5 lb (barbell) or 2.5 lb (dumbbell). A new test replaces the old estimate even if it's lower. The results screen shows "Updated your starting weights" (before → after). Untested lifts keep G5.
+  - **Coach:** a Tests section in the roster with Edit / Void. Solo athletes: Progress → Jump test, kept on the phone.
+- **P7, Fuel phase 1:**
+  - `fuelTargets` and every numeric field (carbs/protein per kg, extra fluid ounces) are removed, along with all gram/ounce displays, the "20–30 g protein" timing lines, the onboarding body-weight step, and the Settings body-weight field. Body weight stays optional in Progress, on the phone.
+  - Added the nine Fuel cards from `docs/content/fuel-cards.md`, showing today's matching cards first. Each has its source and the card note, and the tab keeps the nutrition disclaimer. Today shows the top card's title, linking to Fuel.
+- **P8:** `public/privacy.html`, `terms.html`, `consent.html` (form v2, 6 boxes) regenerated from `docs/legal/` by `scripts/build-legal-pages.py`. Internal notes are left out, and the placeholders stay visible.
+- **Migration:** `supabase/migrations/004_approach_2_1_pass2.sql` (one transaction, safe to re-run), folded into `schema.sql`. Tests are in `supabase/tests/rls-2.1-pass2.sql`.
+
+**Decisions made with the owner during pass 2 (for the planning team):**
+- **Touch height conflict:** `docs/compliance.md` says touch height MUST stay on the device, but the pass 2 spec (P6.5, P6.8) and Privacy Notice v2 put testing-day approach-touch results on the server. The owner chose **follow the spec**: testing-day touch results go to `test_results` (box 6 only; athlete and coach), and only the improvement % reaches boards. The everyday touch log in Progress stays on the phone. **compliance.md needs this exception added.**
+- **Improvement format:** the spec and Privacy Notice say "% gain"; the design doc F10 shows "+1.5 in". The owner chose **% gain**.
 
 **In progress / not finished:**
-- Pass 2 of v2.1 (waiting for its spec).
-- Migrations 002 and 003 were run on the live Supabase project on November 10, 2026 (owner confirmed; the check query showed the 2.0 tables and 2.1 consent column present and `readiness.pain_note` gone). Live account deletion and consent flows haven't been tried on the real project yet **(unverified)**.
+- Owner approval, merge to `main`, tag `v2.1` (from the Mac), and running migration 004 on the live project.
 - No iPhone build (EAS/TestFlight/App Store). Apple Developer Program not purchased.
 
 ---
@@ -40,41 +103,31 @@
 
 | Layer | What's used |
 |---|---|
-| Platforms | iPhone (Expo Go only; no standalone build yet) and mobile web browsers (GitHub Pages). Android removed from the config. |
+| Platforms | iPhone (Expo Go only) and mobile web browsers (GitHub Pages). The coach board is web-first (also works on iPad). |
 | Frontend | Expo SDK 58, React Native 0.88, React 19, Expo Router, TypeScript, react-native-web. |
-| Backend / database | Supabase: Postgres, auto REST API, Realtime, row-level security (`supabase/schema.sql`). SQL functions: `handle_new_user`, `join_team`, `record_consent`, `set_my_birth_year`, `delete_my_account`, `minor_from`, `member_consent`, `is_current_member`, plus access-check helpers. |
+| Backend / database | Supabase: Postgres, REST API, Realtime (now also `live_progress` and `test_sessions`), row-level security. SQL functions: `handle_new_user`, `join_team`, `record_consent` (six boxes), `set_my_choices`, `set_my_birth_year`, `delete_my_account`, `minor_from`, `has_perm`, `on_boards`, `board_name`, `board_members`, `team_effort`, `supervised`, `is_current_member`, plus triggers `set_e1rm` and `purge_live_progress`. |
 | Auth | Supabase Auth, email + password ("Confirm email" on). |
 | On-device storage | AsyncStorage (`localStorage` in browsers). |
 | Hosting | GitHub Pages via GitHub Actions on push to `main`. Repository is public. |
-| Build service | Expo EAS configured (`eas.json`), never run. |
-| Dev tooling | TypeScript, ESLint (`eslint-config-expo`). Not shipped in the app. |
-
-**Modes:** live sync (Supabase URL and key set at build time) or demo mode (one device, several accounts).
+| Dev tooling | TypeScript, ESLint (`eslint-config-expo`), a Python script that builds the legal pages. None of it ships in the app. |
 
 ---
 
-## 3. User-facing features
+## 3. User-facing features (2.1.1)
 
 ### Everyone
-- **Onboarding:** age question → role → account (or "Train solo, no account" for athletes) → team code (optional) → name, position, experience, phase, practice week, lift days (capped), equipment, body weight (optional).
-- **Settings:** name, body weight, position, appearance, account (sign in/out, leave team, **Delete my account**), team sync status, **parent consent status** (athletes), **Legal** links, erase data on the device. Switching a solo profile to coach mode is disabled unless the profile is 18+.
+- **Onboarding:** age question, then role, then account (or solo), team code, name, position, experience, and (solo) week, lift days and equipment. No body-weight step.
+- **Settings:** name, position, appearance, account (sign in/out, leave team, Delete my account), **Privacy** (board name; adults: five toggles), Your data (each permission on/off), Legal links, erase data on the device.
 
-### Athletes (solo, or on a team)
-- **Generated program** from position, experience, phase, lift days (within the cap) and equipment, with position-specific prehab exercises.
-- **Lift tab:** daily message, consent banner (pending minors), check-in card (when allowed), lift-day cap notice (solo plans over the cap), today's session, Fuel summary, week dots.
-- **Workout screen:** one exercise at a time or a list, rest timer, suggested weight with the G5 caps, draft kept on the device, finish summary.
-- **Plan tab, Exercise how-to, Fuel tab, Progress tab:** as in 2.0.
-- **Daily check-in:** sleep, soreness, energy (1–5), "Anything hurting?" yes/no. No free text. Team check-ins go only to teams with check-in consent (or adults).
-- **Teams:** join with a code or QR link; the coach's posted workout becomes the plan (read-only).
+### Athletes
+- **Lift tab:** consent banner (if no form yet), check-in card (with check-in permission or solo), lift-day cap notice, "I was there" (attendance permission), today's session or **Testing session**, and today's top Fuel tip.
+- **Workout:** suggestions with G5 caps and strength-check starting weights; shares live sets with the coach board (boards permission); logs duration and bests.
+- **Progress:** touch height, Team effort card and private badges, Jump test (solo), estimated strength per lift (labeled), optional body weight, history.
+- **Fuel:** day-type guidance, plate proportions, meal timing, cited Fuel cards. No numbers.
 
 ### Coaches (18+)
-- Teams, groups, workouts, shared calendar, roster, recent lifts, readiness and "Lighten today" as in 2.0.
-- **Consent:** roster chips, record/change/clear sheet, "Print parent consent form" on the team screen, readiness counts only athletes with check-in consent.
-- Lift-day caps apply to team workouts too (the program's level and phase).
-
-### Other
-- Demo mode, home-screen web app, dark and light themes.
-- Static pages: `/privacy.html`, `/terms.html`, `/consent.html`.
+- **Team screen:** Team / Effort tabs, testing-day banner and supervision confirmation, Open coach board, team code and QR, Print parent consent form, workouts by group, calendar (with testing days), and the roster. Roster rows have consent chips, the six-box sheet, attendance marks and Tests (Edit / Void). There's also the readiness card (only athletes who share check-ins) and team settings for boards, attendance lengths and med-ball weight.
+- **Coach board:** `/board/[teamId]`.
 
 ---
 
@@ -82,118 +135,76 @@
 
 Flags: **AGE** · **HEALTH/WELLNESS** · **BODY METRICS** · **LOCATION** · **PHOTO/VIDEO** · **CREDENTIALS** · **FREE TEXT**.
 
-### Stored on the server (Supabase), live-sync mode only (after migrations 002 + 003)
+### Stored on the server (Supabase), after migrations 002–004
 
 | Table | Fields | Who can read | Flags |
 |---|---|---|---|
-| `auth.users` (Supabase-managed) | email, password (hashed), user metadata: name, role, position, **birth_year, is_minor**; sign-in timestamps and request metadata such as IP **(unverified)** | Supabase project owner | CREDENTIALS, **AGE** |
-| `profiles` | id, name, role, position, **birth_year**, **is_minor**, created_at. Users can update only name and position. | the user; their coach (for athletes); their athletes (coach name) | **AGE** |
-| `teams` | id, name, join_code, coach_id, created_at | coach; team members | — |
-| `team_members` | team_id, user_id, joined_at, group_id, **consent_status, consent_recorded_at, consent_recorded_by** | the athlete (own rows); the team coach | — |
-| `team_programs` | team_id, group_key, program (JSON: sessions incl. optional `mobility` flag, exercises, lift schedule, phase, position, equipment, per-date choices, author name, team name), updated_at | coach; team members | FREE TEXT (coach notes) |
-| `workout_logs` | id, team_id, user_id, session_name, logged_at, sets_done, note, entries | the athlete; the team coach **while the athlete is a member** | FREE TEXT (note) |
-| `team_groups` | id, team_id, name, position_hint, created_at | coach; team members | — |
-| `team_calendars` | team_id, events, light_dates, updated_at | coach; team members | — |
-| `readiness` | team_id, user_id, day, sleep, soreness, energy (1–5), pain (yes/no), created_at. **No pain note.** | the athlete; the team coach **while the athlete is a member** | **HEALTH/WELLNESS** |
-
-Not stored on the server: body weight, touch height, net height, fuel targets, solo programs, theme, workout drafts, birth month.
+| `auth.users` | email, hashed password, metadata (name, role, position, birth_year, is_minor); sign-in data **(unverified)** | Supabase project owner | CREDENTIALS, AGE |
+| `profiles` | id, name, role, position, birth_year, is_minor, **board_name_mode**, created_at. Users can update only name, position and board_name_mode. | the user; their coach; their athletes (coach name) | AGE |
+| `teams` | id, name, join_code, coach_id, created_at, **practice_min, match_min, tournament_min, effort_board, board_effort_panel, team_goal, med_ball_lb** | coach; members | — |
+| `team_members` | team_id, user_id, joined_at, group_id, **c_participation, c_checkins, c_share_checkins, c_boards, c_attendance, c_testing, consent_version**, consent_recorded_at, consent_recorded_by | the athlete (own); the coach | — |
+| `team_programs`, `team_groups`, `team_calendars` | as in 2.0; calendar events may carry `test` | coach; members | FREE TEXT (coach notes) |
+| `workout_logs` | id, team_id, user_id, session_name, logged_at, sets_done, note, entries, **pr_count, duration_min** | the athlete; the current coach. Teammates get only times, session names and minutes through `team_effort` (boarded members). | FREE TEXT |
+| `readiness` | team_id, user_id, day, sleep, soreness, energy, pain (yes/no), created_at | the athlete; the current coach only while sharing is on | HEALTH/WELLNESS |
+| `live_progress` *(new)* | team_id, user_id, day, session_id, sets_done, sets_total, status, updated_at; deleted after 24 h | the athlete; the coach (boarded, not hidden) | — |
+| `attendance` *(new)* | team_id, user_id, day, kind, minutes, marked_by | the athlete; the current coach. Teammates get counts and minutes through `team_effort` (with permission). | — |
+| `test_sessions` *(new)* | team_id, group_key, day, coach_id, confirmed_at, battery | coach; members | — |
+| `test_results` *(new)* | id, team_id, user_id, day, test_id, value, unit, reps, e1rm (computed), entered_by, voided, created_at | the athlete; the current coach. Teammates get only jump-test improvement % (with permission). | **BODY METRICS** (approach touch; owner decision above) |
 
 ### Stored only on the device
 
 | Key | Contents | Flags |
 |---|---|---|
-| `volley-strength/data/v1` | profile (name, role, position, experience, phase, **body weight**, lift days, week, equipment, **birth year, is_minor**), programs, workout logs, body-weight log, touch-height log, readiness log (sleep, soreness, energy, pain yes/no, sent-to teams), last known consent per team, check-in notice seen, coach copy of team calendars, theme, unused legacy `athletes` list | **BODY METRICS**, **HEALTH/WELLNESS**, **AGE**, FREE TEXT |
-| `approach/not-eligible/v1` | `"1"` if this device answered under 13 (nothing else) | — |
-| `approach/workout-draft/…` | in-progress workout sets and note | FREE TEXT |
+| `volley-strength/data/v1` | profile (name, role, position, experience, phase, lift days, week, equipment, birth year, is_minor; body weight now unused), programs, workout logs, body-weight log, touch-height log, readiness log, **last known permissions per team, strength estimates per tested lift, solo jump tests**, check-in notice seen, coach copy of team calendars, theme | BODY METRICS, HEALTH/WELLNESS, AGE, FREE TEXT |
+| `approach/not-eligible/v1` | "1" if this device answered under 13 | — |
+| `approach/workout-draft/…` | in-progress workout | FREE TEXT |
 | Supabase session | login tokens | CREDENTIALS |
-| `load-and-launch/demo-server/v1` (demo mode only) | demo accounts (email, name, role, position, birth year, is_minor, **password in plain text**), teams, rosters with consent, workouts, logs, groups, calendars, check-ins | CREDENTIALS, HEALTH/WELLNESS, AGE |
-
-### Flag summary
-- **AGE:** birth year and is_minor only (server and device). No full date, no month, no grade or school.
-- **HEALTH/WELLNESS:** check-ins (sleep, soreness, energy, pain yes/no), sent only with check-in consent or for adults. Free-text workout notes can still contain anything.
-- **BODY METRICS:** body weight and touch height stay on the device.
-- **LOCATION, PHOTO/VIDEO:** none.
+| `load-and-launch/demo-server/v1` (demo only) | demo accounts (password in plain text), teams, rosters with permissions, logs, check-ins, live progress, attendance, testing sessions and results | CREDENTIALS, HEALTH/WELLNESS, AGE |
 
 ---
 
-## 5. Signup, age and consent
+## 5. Third-party services
 
-1. Age question (month + year, empty pickers). Under 13 → block screen.
-2. Role (coach needs 18+).
-3. Name, email, password, or "I have an account"; agreement line links Terms and Privacy Notice. Athletes can train solo without an account.
-4. Team code (or QR link). Minors join as `pending` until the coach records consent.
-5. Supabase "Confirm email" is ON.
-
-**Consent records:** which option, when, and which coach (`team_members`). The signed paper/e-sign form itself stays with the coach (the form asks coaches to send a copy to the contact email). The app doesn't store form images.
-
-**Missing account flows:** no password reset in the app.
+Supabase and GitHub (Pages, Actions) only. No new services in 2.1. No analytics, ads, trackers, external fonts on the web pages, or in-app AI. Expo Go is used only for development.
 
 ---
 
-## 6. Third-party services and SDKs
+## 6. Deployment and usage
 
-| Service | Role | Data it receives |
-|---|---|---|
-| **Supabase** | Database, auth, realtime, auth emails | Server tables in section 4; email and hashed password; request metadata **(unverified)**. |
-| **GitHub** (repo, Actions, Pages) | Source, builds, hosting of the app and legal pages | Public source code; Supabase URL and public key as Actions secrets; visitors' standard request data **(unverified detail)**. |
-| **Expo** (Expo Go, tunnel) | Running the app on the owner's iPhone during development | Owner's Expo account; dev bundles. Logging **(unverified)**. |
-| **Apple** | Planned App Store distribution | Nothing yet. |
-| Fonts (Inter, Inter Tight) and Material Symbols | Typography and web icons | Nothing at runtime (bundled). The legal pages use system fonts. |
-| **qrcode** (npm) | QR codes on the device | Nothing. |
-
-**Not used:** analytics, crash reporting, advertising, payments, push notifications, in-app AI, maps/location. No new services in 2.1. ESLint is dev-only.
+- **Website:** https://rparker-sudo.github.io/approach/ (deploys from `main`; pass 2 isn't deployed until it's merged).
+- **Supabase:** live, Free plan; migrations 002 and 003 applied November 10, 2026 (owner confirmed); **004 not applied**.
+- **Users:** the owner plus fewer than 10 others, all 18+, per the owner **(unverified count)**.
 
 ---
 
-## 7. Deployment and usage
+## 7. Monthly costs
 
-- **Website:** https://rparker-sudo.github.io/approach/ (deploys on push to `main`). Legal pages at `/approach/privacy.html`, `/terms.html`, `/consent.html` after the 2.1 deploy.
-- **Supabase project:** live, Free plan; 1.0 schema plus migrations 002 and 003 applied (November 10, 2026).
-- **Who has used it:** the owner plus fewer than 10 others, all 18+, per the owner **(unverified count)**. No known use by minors.
+$0 now. Future: Apple Developer Program $99/year; Supabase Pro about $25/month if needed **(unverified)**.
 
 ---
 
-## 8. Monthly costs
+## 8. Known gaps, shortcuts and checks
 
-$0/month now (Supabase Free, GitHub free, Expo free). Future: Apple Developer Program $99/year; Supabase Pro about $25/month if needed **(unverified)**; EAS free tier limits **(unverified)**.
+**Spec gaps filled with placeholders (need Training Content / planning review):**
+- **Warm-up ladder** for strength checks: the spec points to §4a, which isn't in the repo. The app shows a generic checklist without numbers ("Empty bar or a light weight × 8", "About half your working weight × 5", "About 70% × 3", "About 85% × 1–2").
+- **Testing-day warm-up** (before jumps): generic text ("5–10 minutes of easy movement, then a few practice jumps").
+- **§4a phase date suggestions** for testing days: not built (the table isn't in the repo). The coach picks dates.
+- **Season start** for effort metrics = when the team workout was built; "This block" = the current training block.
+- **Weeks remaining** for the default team goal = weeks until the last match or tournament on the calendar, or 8 when none are set.
+- **Supervision** is recorded per team per day (group_key 'all'), not per group.
+- **Attendance "not there"** is stored as a coach row with 0 minutes (no extra field).
 
----
+**Other gaps:**
+- **Retention:** the notice says consent and supervision records are kept 5 years after an account closes, but account deletion cascades them away (also true in pass 1). Not built.
+- **Deploy order:** run migration 004 right after merging, since the older site can't read the new columns. The new app also works on a database without 004 (it falls back to pass 1 consent; boards, attendance and testing then do nothing).
+- **Per-date lift choices** on the season calendar aren't capped by G2.
+- Demo mode stores passwords in plain text; "Lighten today" posts calendar edits immediately; no password reset; pounds only.
 
-## 9. Known bugs, shortcuts and TODOs
+**Testing done for pass 2:**
+- `tsc`, `expo lint` (with `EXPO_OFFLINE=1`; api.expo.dev is blocked here) and `build:web` pass.
+- Migration 004 was run on a local Postgres 16 with a stand-in Supabase `auth` schema, both as an upgrade (v1 → 002 → 003 with pass 1 consent data → 004, run twice) and fresh from `schema.sql`. All the API/RLS checks in `supabase/tests/rls-2.1-pass2.sql` behaved as expected.
+- Scripted logic checks passed: effort metric rules, testing rules (eligibility, batteries, e1RM, phase caps, re-test lowering, 48 h rule) and G1/G2/G5.
+- Browser tests (demo mode) passed: no body-weight step; adult "Your choices"; Privacy names; permission list; Fuel without numbers and with sources; six-box sheet and box rules; live progress with no weights; coach board names, statuses and the forbidden-content check; effort tab; testing day scheduling, lock, confirmation record, best of 3, 200 × 5 → ~233 lb (estimate); hidden athlete off the board; legal pages v2. A pass 1 regression run (age block, check-in notice, account deletion for both roles, including the new tables) also passed.
+- **Not tested:** the real Supabase project and **Realtime latency** (the "within about 3 s" criterion needs two devices on the live project), and iOS in Expo Go.
 
-**Before real athletes (founder checklist from the spec)**
-- ~~Run migrations 002 and 003 on the live project.~~ Done November 10, 2026.
-- Fill in `[CONTACT EMAIL]` and `[publish date]` in `public/privacy.html`, `terms.html` and `consent.html` (they come from `docs/legal/`, which also has the placeholder). Use a personal or business address, not a district one.
-- Attorney review of the consent form and notice; R1 policy check; soft-launch team outside the owner's district.
-
-**Testing done for 2.1**
-- `npx tsc --noEmit` passes. `npx expo lint` passes (run with `EXPO_OFFLINE=1`, because the workspace can't reach api.expo.dev). `npm run build:web` succeeds.
-- Migration 003 and `schema.sql` were run on a local Postgres 16 with a stand-in for Supabase's `auth` schema and roles (fresh install, and v1 → 002 → 003 upgrade, run twice). Scripted API checks passed: under-13 signup rejected; pending minor's log and check-in inserts rejected; athlete can't update consent or role/birth year; adult joins as `not_required`; training_only check-in rejected while logs work; full allows both; coach loses access to a removed athlete's rows; `delete_my_account()` cascades for athletes and coaches; `pain_note` dropped. Scripts: `supabase/tests/`.
-- Browser tests (demo mode, iPhone viewport) passed for the age gate, block screen and reload, minor coach restriction, pending/training-only/full flows, consent sheet, check-in notice and no free-text field, coach removal, beginner 4th-day refusal, account deletion (coach and athlete), and the three legal pages.
-- Scripted checks passed for G1 (all levels × equipment sets × 1–7 days), G2 caps, rest day and mobility-only extras, and G5 steps.
-- **Not tested:** the real Supabase project (unreachable from the workspace), iOS (Expo Go), and the "Logging unlocks after consent." button on a lift day (the test date had no lift; the blocked workout screen was tested).
-
-**Behavior choices worth reviewing**
-- Unknown age (accounts before 2.1, or the database without 003) counts as a minor: read-only on teams until answered or migrated.
-- If the birth month is the current month, the younger age is assumed (affects the 13 and 18 lines).
-- UI copy follows `docs/design/user-flows.md` where it differs from the spec (consent banner, chips "Training only"/"Full", coach deletion sentence).
-- An existing coach account that answers "under 18" on the one-time age question keeps the coach role (the spec doesn't say what to do). New sign-ups can't get it.
-- Per-date lift choices on the season calendar aren't capped by G2 (the spec lists the day pickers and schedule only).
-- Legal links on iPhone need `EXPO_PUBLIC_APP_URL`; without it the app shows a note instead.
-
-**Setup state**
-- The `SUPABASE_URL` GitHub secret has extra path text (the app trims it).
-- Free-tier Supabase projects pause after about a week without activity.
-
-**Missing features**
-- No password reset. No swipe between exercises. Pounds only.
-
-**Security and data handling**
-- Demo mode stores passwords in plain text on the device.
-- "Lighten today" posts the team calendar immediately, including unposted calendar edits.
-
-**Code leftovers**
-- Old storage key names (`volley-strength/…`, `load-and-launch/…`). Unused `athletes` field. Unused `@expo/vector-icons` dependency.
-
-**Content review**
-- Program rules, nutrition targets, readiness thresholds and exercise text were written with AI assistance. G1/G2/G5 come from Training Content's safety guidelines; no review by a qualified strength coach, athletic trainer or dietitian is recorded **(unverified)**.
+**Content review:** program rules, readiness thresholds, exercise text and the testing protocol details above were written with AI assistance. Fuel cards are from the planning team (Legal-checked, no dietitian review yet). No review by a qualified strength coach, athletic trainer or dietitian is recorded **(unverified)**.

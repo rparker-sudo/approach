@@ -85,7 +85,14 @@ function Toggle({ label, value, onChange }: { label: string; value: boolean; onC
   return (
     <Row style={{ justifyContent: 'space-between', minHeight: 44 }}>
       <Text style={{ fontSize: 15, flex: 1 }}>{label}</Text>
-      <Switch accessibilityLabel={label} value={value} onValueChange={onChange} trackColor={{ true: colors.ink, false: colors.line }} />
+      <Switch
+        accessibilityLabel={label}
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ true: colors.ink, false: colors.line }}
+        thumbColor={value ? colors.bg : colors.muted}
+        {...({ activeThumbColor: colors.bg } as object)}
+      />
     </Row>
   );
 }

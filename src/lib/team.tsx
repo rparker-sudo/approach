@@ -236,12 +236,15 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const [posted, setPosted] = useState<Record<string, TeamProgram>>({});
   const [syncing, setSyncing] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
-  const accountRef = useRef<Account | null>(null);
-  accountRef.current = account;
+  const accountRef = useRef<Account | null>(account);
   const dataRef = useRef(data);
-  dataRef.current = data;
-  const teamsRef = useRef<Team[]>([]);
-  teamsRef.current = teams;
+  const teamsRef = useRef<Team[]>(teams);
+  // Latest values for async callbacks. Declared before the other effects so it runs first.
+  useEffect(() => {
+    accountRef.current = account;
+    dataRef.current = data;
+    teamsRef.current = teams;
+  });
 
   const flushLogs = useCallback(async () => {
     // Only teams where the athlete may log (parent consent on file, or an adult).
@@ -362,6 +365,8 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   // Refresh when the account changes and whenever the app comes back to the foreground.
   useEffect(() => {
     if (!account) return;
+    // Fetching from the server is syncing with an external system.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
     const sub = AppState.addEventListener('change', (s) => {
       if (s === 'active') refresh();

@@ -1,6 +1,6 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Pressable, View } from 'react-native';
-import { Body, Card, colors, H2, Icon, Label, Pill, Row, Screen, Text } from '../../components/ui';
+import { Body, Card, colors, Icon, Label, Pill, Row, Screen, Text } from '../../components/ui';
 import { CATEGORY_LABEL, EQUIPMENT, getExercise } from '../../lib/exercises';
 
 /** How to do an exercise: why it matters, steps, cues, mistakes, equipment, easier/harder options. */

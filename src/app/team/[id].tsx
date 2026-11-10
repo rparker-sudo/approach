@@ -118,7 +118,7 @@ export default function TeamScreen() {
 
       {/* ---------- Readiness ---------- */}
       <Card>
-        <Label>Today's readiness</Label>
+        <Label>Today&apos;s readiness</Label>
         {roster.length === 0 ? (
           <Body muted>Athletes check in on their Lift screen each day: sleep, soreness, energy and pain.</Body>
         ) : (
@@ -132,7 +132,7 @@ export default function TeamScreen() {
                 {overall.low.length} run down · {overall.pain.length} pain
               </Text>
             ) : null}
-            {overall.suggest ? <Note>Several athletes are run down. Consider a lighter workout today. It's your call.</Note> : null}
+            {overall.suggest ? <Note>Several athletes are run down. Consider a lighter workout today. It&apos;s your call.</Note> : null}
             {perGroup
               .filter((x) => x.s.suggest)
               .map((x) => (
@@ -175,7 +175,7 @@ export default function TeamScreen() {
         <Text style={{ fontSize: 13, color: colors.muted, textAlign: 'center' }}>
           Athletes scan the QR code, or make an account and enter this code.
         </Text>
-        {isDemoMode ? <Note>Demo mode: athletes on other phones can't join yet. Connect Supabase first (see the README).</Note> : null}
+        {isDemoMode ? <Note>Demo mode: athletes on other phones can&apos;t join yet. Connect Supabase first (see the README).</Note> : null}
         <Row>
           <View style={{ flex: 1 }}>
             <Button title="Show QR code" onPress={() => router.push({ pathname: '/invite', params: { teamId: team.id } })} />
@@ -186,7 +186,7 @@ export default function TeamScreen() {
         </Row>
         <Button kind="ghost" small title="Print parent consent form" onPress={() => openLegal('consent')} />
         <Text style={{ fontSize: 12, color: colors.muted, textAlign: 'center' }}>
-          Athletes under 18 can view the plan but can't log until you record their signed form.
+          Athletes under 18 can view the plan but can&apos;t log until you record their signed form.
         </Text>
       </Card>
 

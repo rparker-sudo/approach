@@ -42,7 +42,7 @@ export default function Progress() {
     return [...map.entries()].sort((a, b) => b[1].length - a[1].length);
   }, [data.logs]);
 
-  const now = Date.now();
+  const [now] = useState(() => Date.now());
   const last28 = data.logs.filter((l) => now - new Date(l.date).getTime() < 28 * 864e5).length;
 
   return (

@@ -16,20 +16,25 @@ The app has four tabs: **Lift** (today's training), **Fuel** (meals and hydratio
 
 **Athlete mode**
 - Builds a weight-training program from your position, lifting experience, time of year (off-season, preseason, in-season or post-season) and your weekly volleyball schedule
-- **Any number of lift days (1–7)**: each count gets its own split (total body, upper/lower, power days, recovery), and sessions get shorter as days go up
+- **Lift days within safe limits**: beginner up to 3, intermediate 4, advanced 5, and 3 for everyone in-season. Every week keeps at least one day fully off; extra days can be mobility days
 - **Built for your gym**: pick what you have (full weight room, dumbbells & bench, bands & bodyweight, or item by item) and every exercise fits it
-- **Weekly progression**: 4-week blocks (3 building weeks, then a deload week). The workout suggests your next weight: "Last: 135 × 5, 5, 5 → Try 140 (+5)"
+- **Weekly progression**: 4-week blocks (3 building weeks, then a deload week). The workout suggests your next weight in small steps (about 10%, at most +10 lb on a barbell or +5 lb on dumbbells): "Last: 135 × 5, 5, 5 → Try 145 (+10)"
 - **Workout view with rest timers**: one exercise at a time (or a list), big Done buttons, and a rest countdown that starts when you finish a set (−15s / +15s / Skip). Keeps the screen awake, survives closing the app, and ends with a summary and new bests
 - **Exercise how-to**: tap any exercise for why it matters for volleyball, steps, coaching cues, common mistakes, equipment, and easier/harder options
-- **Daily check-in**: sleep, soreness, energy and pain. It never changes your workout by itself
+- **Daily check-in**: sleep, soreness, energy and pain (yes/no). It never changes your workout by itself. Team athletes' check-ins go to their coach only, never to teammates
 - Never lifts on match days, keeps heavy legs away from the day before a match, and spreads sessions out
 - **Pick your lift days**: the app suggests days, and you tap the days you actually lift. Change them anytime under Plan → Edit lift days, no rebuild needed
 - **Season calendar**: mark real match, tournament and day-off dates (with names like "Reno Classic"). When an event lands on a lift day, that week's lift moves to the nearest good day, or a lighter session is swapped in the day before a match, with a note saying what changed. Tap any date to choose its lift yourself
-- Adds injury-prevention work for each position (shoulders for hitters, knees for middles, hands and wrists for setters, ankles and low positions for liberos)
+- Adds prep work for the demands of each position (shoulders for hitters, knees for middles, hands and wrists for setters, ankles and low positions for liberos)
 - Today screen: today's lift, today's fuel targets and the week at a glance
 - Logs workouts set by set and pre-fills the weight you used last time
 - Fuel tab: carb, protein and water targets that change with the type of day (rest, lift, practice, match, tournament, day before a match), plus meal timing and food ideas. Calories are left out on purpose, since many users are teens.
 - Progress tab: **Above the net**, your approach touch height minus the net height (women's 2.24 m, men's 2.43 m, or a custom youth height), plus strength gains, body weight and workout history
+
+**Age and parent consent**
+- Everyone answers "When were you born?" (month and year) first. Only the birth year and whether the person is under 18 are kept. Approach is for ages 13 and up; coach accounts are for adults.
+- Athletes under 18 on a team can see the plan right away but can't log workouts or check in until the coach records their signed parent consent form (Training only, or Training and check-ins). The server enforces this too.
+- Settings → **Delete my account** removes the account and everything it owns. Settings → **Legal** links the Privacy Notice, Terms and the printable parent consent form.
 
 **Coach mode (teams)**
 - Create teams (for example Varsity and JV). Each team gets a 6-character join code.
@@ -49,14 +54,21 @@ Team sync needs a free Supabase project. Until you connect one, the app runs in 
 
 1. Create a free account at https://supabase.com and click **New project**.
 2. Open **SQL Editor → New query**, paste everything in `supabase/schema.sql`, and click **Run**.
-3. Open **Authentication → Sign In / Providers → Email**. For school use, turn **Confirm email** off so students can sign in right away. If you leave it on, athletes must tap a link in an email before their first sign-in.
+3. Open **Authentication → Sign In / Providers → Email** and keep **Confirm email** on. New accounts tap a link in an email before their first sign-in.
 4. Open **Project Settings → API**. Copy the **Project URL** and the **anon public** key.
 5. In the project folder, copy `.env.example` to `.env` and paste in those two values.
 6. Restart the app (`npx expo start`). The demo-mode notes disappear when sync is on.
 
-**Upgrading from 1.x?** Paste `supabase/migrations/002_approach_2.sql` into the SQL Editor and click **Run** once. It adds groups, the shared team calendar and readiness check-ins, and keeps everything you already have. (New projects don't need it; `schema.sql` includes it.)
+### Upgrading from 2.0
+Run these once, in order, in **SQL Editor → New query** (paste the whole file, click **Run**). New projects don't need them; `schema.sql` already includes both.
 
-What is stored online: name, email, role, position, team membership and group, posted team workouts and calendar, the workouts athletes log for a team, and daily check-ins (sleep, soreness, energy, pain and an optional note), which only the athlete and their coach can see. Body weight, touch height and fuel targets stay on the phone. Coaches see only their own teams; athletes see only their team's workout and their coach's name. Check with your district before collecting student data, especially for athletes under 13.
+1. If you haven't yet: `supabase/migrations/002_approach_2.sql` (groups, shared calendar, check-ins).
+2. `supabase/migrations/003_approach_2_1.sql` (age, parent consent, account deletion, coach access only to current members, removes check-in pain notes).
+3. Open the app. Everyone with an account answers the age question once. Adults keep working as before; athletes under 18 stay read-only on their team until the coach records their parent consent form (Team → Roster → **Consent needed**).
+
+Both files are safe to run on a project that already has your teams and logs. Until 003 is run, the app keeps every team athlete read-only (it can't check consent yet).
+
+What is stored online: name, email, role, position, birth year and whether the person is under 18, team membership and group, parent-consent status (and which coach recorded it, and when), posted team workouts and calendar, the workouts athletes log for a team, and daily check-ins (sleep, soreness, energy, pain yes/no) for athletes whose consent allows them. Only the athlete and their current coach can see an athlete's data. Body weight, touch height and fuel targets stay on the phone. Coaches see only their own teams; athletes see only their team's workout and their coach's name. Athletes must be 13 or older, and athletes under 18 need a signed parent consent form (`public/consent.html`) recorded by their coach. See `docs/compliance.md`.
 
 The claude.ai preview link can't reach Supabase, so it always runs in demo mode. Use the app in Expo Go or the GitHub Pages site for live sync.
 
@@ -71,7 +83,7 @@ The repository includes `.github/workflows/deploy-web.yml`, which builds the bro
 5. Put that address in `.env` as `EXPO_PUBLIC_APP_URL` (and in the EAS build settings) so QR codes in the iPhone app point to it. The GitHub build sets it automatically.
 6. After the App Store launch, add a repository **variable** `APP_STORE_ID` (the number in your App Store link) so Safari shows a "Get the app" banner on the site.
 
-**Using your own domain** (for example `https://lift.yourschool.org`): add the domain under Settings → Pages, then add two repository variables: `APP_URL` set to the full address, and `BASE_PATH` set to `/`.
+**Using your own domain** (for example `https://lift.example.com`): add the domain under Settings → Pages, then add two repository variables: `APP_URL` set to the full address, and `BASE_PATH` set to `/`.
 
 To build the site yourself: `EXPO_BASE_URL=/approach npm run build:web`, then upload `dist/`.
 
@@ -154,13 +166,12 @@ As you edit the code, the app on your phone refreshes on its own.
    - App name: **Approach: Volleyball Fitness** (when you create the app in App Store Connect under **Apps → +**)
    - Screenshots from a 6.9" or 6.7" iPhone (take them on your phone from the TestFlight build)
    - Description, keywords and support URL
-   - **Privacy policy URL** (required; a free Google Site works)
-   - **App Privacy:** choose "Data Not Collected." The app stores everything on the phone and sends nothing.
+   - **Privacy policy URL** (required): the site's `privacy.html`, for example `https://<your-username>.github.io/approach/privacy.html`
+   - **App Privacy:** App Privacy must list what's collected when team sync is on (see docs/compliance.md). Don't choose 'Data Not Collected.'
    - **Age rating questionnaire**
 8. Click **Submit for Review**. Apple usually responds within 1–3 days.
 
-### Notes for school use
-- If students will use it, ask your district whether the app should be published under the **district's** Apple Developer account (organization enrollment, which needs a D-U-N-S number).
+### Notes
 - Training and nutrition content is general education. Have athletes learn new lifts with a qualified coach, and send anyone with health concerns to a doctor or registered dietitian.
 
 ---

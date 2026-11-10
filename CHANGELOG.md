@@ -4,6 +4,18 @@ Version numbers: whole numbers (1.0, 2.0) for big changes, decimals (1.1, 1.2) f
 The number is in `app.json` (`expo.version`, written as 1.1.0 for 1.1) and shows in the app under Settings.
 Each version has a matching GitHub tag (`v1.0`, `v1.1`, …) and download (`approach-1.0.zip`).
 
+## 2.1 — soft-launch safety (pass 1)
+- Age question first for everyone ("When were you born?", month and year, empty to start). Under 13: a neutral "not eligible" screen, and only a local flag is kept. Only the birth year and under-18 are stored. Coach accounts are for adults 18+. Existing accounts answer once.
+- Parent consent on file for athletes under 18: they join a team as "waiting", can view the plan, and can't log or check in until the coach records a signed form (Training only, or Training and check-ins). Coach roster chips and a record/change/clear sheet. Enforced on the server (row-level security).
+- Check-ins: the free-text pain note is gone (pain yes/no stays, with a reminder to tell a coach, parent or athletic trainer in person). One-time notice: "Your coach sees your check-ins. Teammates never do."
+- Delete my account in Settings (type DELETE to confirm), in team sync and demo mode
+- Coaches lose access to an athlete's logs and check-ins as soon as the athlete leaves or is removed
+- Privacy Notice, Terms and a printable parent consent form (`privacy.html`, `terms.html`, `consent.html`), linked from sign-up, Settings → Legal and the coach team screen
+- Training safety: never an exercise above the athlete's level; lift-day caps (beginner 3, intermediate 4, advanced 5, in-season 3) with a day fully off and mobility-only extra days; smaller weight steps (about 10%, max +10 lb barbell / +5 lb dumbbell) and none for bands or holds
+- Copy: no injury-prevention or medical claims ("Injury prevention" category is now "Prehab")
+- Supabase migration `supabase/migrations/003_approach_2_1.sql` (run once after 002)
+- README: App Privacy and email-confirmation guidance, "Upgrading from 2.0"; LICENSE is now proprietary
+
 ## 2.0 — coach customization and training depth
 - Any number of lift days (1–7); each count builds a different split, with shorter sessions as days go up
 - Equipment-aware programs: full weight room, dumbbells & bench, bands & bodyweight, or pick items

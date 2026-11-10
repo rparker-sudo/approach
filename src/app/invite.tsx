@@ -26,7 +26,7 @@ export default function InviteScreen() {
       <Stack.Screen options={{ title: `Join ${team.name}` }} />
       {isDemoMode ? (
         <View style={{ alignSelf: 'stretch' }}>
-          <Note>Demo mode: athletes on other phones can't join yet. Connect Supabase first (see the README).</Note>
+          <Note>Demo mode: athletes on other phones can&apos;t join yet. Connect Supabase first (see the README).</Note>
         </View>
       ) : null}
       {link ? (
@@ -34,7 +34,7 @@ export default function InviteScreen() {
           <Text style={[display(20), { textAlign: 'center' }]}>{team.name}</Text>
           <QRCode value={link} size={size} />
           <Body muted style={{ textAlign: 'center' }}>
-            Athletes scan with the iPhone Camera, make an account, and they're on the team.
+            Athletes scan with the iPhone Camera, make an account, and they&apos;re on the team.
           </Body>
           <Text style={[display(24), { textAlign: 'center' }]} selectable>
             {team.joinCode}
@@ -47,7 +47,7 @@ export default function InviteScreen() {
         <Card style={{ alignSelf: 'stretch' }}>
           <H2>QR code needs your web address</H2>
           <Body muted>
-            The QR code opens the browser version of Approach. Once it's on GitHub Pages, set EXPO_PUBLIC_APP_URL
+            The QR code opens the browser version of Approach. Once it&apos;s on GitHub Pages, set EXPO_PUBLIC_APP_URL
             to its address (see the README) and the QR code appears here.
           </Body>
           <Note>{`Until then, athletes can enter team code ${team.joinCode} in the app.`}</Note>

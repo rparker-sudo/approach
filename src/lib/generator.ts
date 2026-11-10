@@ -137,7 +137,7 @@ const A = {
   }),
   upper: (n: string): Archetype => ({
     name: n,
-    focus: 'Push, pull and shoulder health',
+    focus: 'Push, pull and shoulder work',
     heavyLegs: false,
     slots: [S('power', 'throw'), S('main', 'h-push'), S('secondary', 'h-pull'), S('secondary', 'v-push'), S('accessory', 'v-pull'), CARE],
   }),

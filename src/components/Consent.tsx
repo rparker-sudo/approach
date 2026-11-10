@@ -6,7 +6,7 @@ import { Banner } from './ui';
 export function ConsentBanner() {
   return (
     <Banner action={{ label: 'See the form', onPress: () => openLegal('consent') }}>
-      Waiting for your parent's consent form. Your coach needs it before you can log. Ask your coach for the form.
+      Waiting for your parent&apos;s consent form. Your coach needs it before you can log. Ask your coach for the form.
     </Banner>
   );
 }

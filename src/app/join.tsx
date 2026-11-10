@@ -40,7 +40,7 @@ export default function JoinScreen() {
       {!account ? (
         <>
           <H2>Make your athlete account</H2>
-          <Body muted>Then you'll join your team{code ? ` (code ${code.toUpperCase()})` : ''}.</Body>
+          <Body muted>Then you&apos;ll join your team{code ? ` (code ${code.toUpperCase()})` : ''}.</Body>
           <AccountForm
             role="athlete"
             onDone={(a) => {

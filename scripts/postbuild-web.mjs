@@ -7,6 +7,7 @@
 //                       → the whole app in ONE file (scripts, fonts and images
 //                         inlined). Handy for previews and places that only take one file.
 
+import { Buffer } from 'node:buffer';
 import fs from 'node:fs';
 import path from 'node:path';
 

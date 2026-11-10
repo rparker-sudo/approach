@@ -44,7 +44,7 @@ export default function DeleteAccountDialog({
           <H2>Delete your account?</H2>
           <Body muted>
             This deletes your account, your team memberships, logged workouts, and check-ins. Data on this phone is erased too. This
-            can't be undone.
+            can&apos;t be undone.
             {coach ? " Your teams and every athlete's logs for those teams are deleted too." : ''}
           </Body>
           <Field

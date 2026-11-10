@@ -21,7 +21,8 @@ import {
 } from './types';
 
 if (Platform.OS !== 'web') {
-  // Supabase needs a full URL implementation on iOS/Android.
+  // Supabase needs a full URL implementation on iOS/Android (loaded only off the web).
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('react-native-url-polyfill/auto');
 }
 

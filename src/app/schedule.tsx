@@ -23,7 +23,7 @@ export default function ScheduleScreen() {
   if (program.teamId && !coach) {
     return (
       <Screen>
-        <Body muted>Your coach sets the team's lift days.</Body>
+        <Body muted>Your coach sets the team&apos;s lift days.</Body>
       </Screen>
     );
   }

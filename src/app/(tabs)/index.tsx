@@ -10,7 +10,6 @@ import {
   Button,
   Card,
   colors,
-  H1,
   H2,
   Icon,
   Label,
@@ -62,8 +61,8 @@ function Today() {
         <NetTape />
         {teams.length ? (
           <Card>
-            <H2>You're on {teams[0].name}</H2>
-            <Body muted>Your coach hasn't posted a workout yet. It shows up here as soon as they do.</Body>
+            <H2>You&apos;re on {teams[0].name}</H2>
+            <Body muted>Your coach hasn&apos;t posted a workout yet. It shows up here as soon as they do.</Body>
           </Card>
         ) : (
           <Card>
@@ -121,7 +120,7 @@ function Today() {
               <Pill text={todaySession!.block.label} />
               {todaySession!.light ? <Pill text="Lightened by coach" bg={colors.day.game} /> : null}
             </Row>
-            {todaySession!.light ? <Note>Coach lightened today's lift. Same exercises, fewer sets, easy effort.</Note> : null}
+            {todaySession!.light ? <Note>Coach lightened today&apos;s lift. Same exercises, fewer sets, easy effort.</Note> : null}
             {!todaySession!.light && todaySession!.block.deload ? <Note>Deload week: fewer sets, easy effort. Let your body catch up.</Note> : null}
             <View style={{ gap: 4 }}>
               {todaySession!.exercises.slice(0, 4).map((e, k) => (

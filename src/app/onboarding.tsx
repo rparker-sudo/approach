@@ -213,7 +213,7 @@ export default function Onboarding() {
 
           {step === 'name' && (
             <>
-              <H1>What's your name?</H1>
+              <H1>What&apos;s your name?</H1>
               <Field autoFocus placeholder="First name" value={name} onChangeText={setName} returnKeyType="done" />
             </>
           )}
@@ -221,7 +221,7 @@ export default function Onboarding() {
           {step === 'position' && (
             <>
               <H1>What position do you play?</H1>
-              <Body muted>Your program adds injury-prevention work for it.</Body>
+              <Body muted>Your program adds prep work for the demands of your position.</Body>
               {POSITIONS.map((p) => (
                 <OptionCard key={p} title={p} selected={position === p} onPress={() => setPosition(p)} />
               ))}
@@ -247,7 +247,7 @@ export default function Onboarding() {
               <H1>Your volleyball week</H1>
               <Body muted>
                 Set your usual practice week. Add match and tournament dates on the season calendar later; lifts move
-                around them automatically. Only mark a match here if it's the same night every week.
+                around them automatically. Only mark a match here if it&apos;s the same night every week.
               </Body>
               <Card>
                 <WeekEditor value={week} onChange={setWeek} />
@@ -261,7 +261,7 @@ export default function Onboarding() {
                 </Body>
               </Card>
               <Card>
-                <H2>What's in your gym?</H2>
+                <H2>What&apos;s in your gym?</H2>
                 <EquipmentPicker value={equipment} onChange={setEquipment} />
               </Card>
             </>

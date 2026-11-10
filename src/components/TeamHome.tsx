@@ -63,7 +63,7 @@ export default function TeamHome() {
       ) : (
         <>
           {isDemoMode ? (
-            <Note>Demo mode: teams live on this device only. Connect Supabase to sync with athletes' phones.</Note>
+            <Note>Demo mode: teams live on this device only. Connect Supabase to sync with athletes&apos; phones.</Note>
           ) : null}
           {lastError ? <Text style={{ color: colors.error, fontSize: 13 }}>{lastError}</Text> : null}
           {backend.needsUpdate?.() ? (
@@ -77,7 +77,7 @@ export default function TeamHome() {
             <Card>
               <NetTape />
               <H2>No teams yet</H2>
-              <Body muted>Make a team for each roster, like Varsity or JV. Athletes join with the team's code.</Body>
+              <Body muted>Make a team for each roster, like Varsity or JV. Athletes join with the team&apos;s code.</Body>
             </Card>
           ) : null}
 

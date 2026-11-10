@@ -2,7 +2,7 @@ import type { Equipment, Exercise, ExerciseCategory, HowTo, Pattern } from './ty
 
 /**
  * Weight-room library. No on-court volleyball drills on purpose: this app covers
- * lifting, power work and injury prevention that support practice.
+ * lifting, power work and prehab that support practice.
  *
  * equipment: each inner list is one way to set the exercise up; the exercise fits a
  * gym when ANY one of those lists is fully available. [] means no equipment needed.
@@ -60,7 +60,7 @@ export const EXERCISES: Exercise[] = [
 
   /* ---------------- Hinge ---------------- */
   x('glute-bridge', 'Single-Leg Glute Bridge', 'lower', 'hinge', false, 1, NONE, 'Drive through the heel, squeeze at the top.',
-    h('Wakes up the glutes, which power your approach and protect your knees and back.',
+    h('Wakes up the glutes, which power your approach and your landings.',
       ['Lie on your back, one knee bent with the foot flat, the other leg straight up.', 'Push through the heel and lift your hips until your body is straight from knee to shoulder.', 'Pause 1 second, lower slowly.'],
       ['Ribs down, squeeze the glute.', 'Push through the heel, not the toes.', 'Keep hips level.'],
       ['Arching the lower back instead of using the glute.', 'Hips tilting to one side.', 'Rushing the reps.']),
@@ -72,19 +72,19 @@ export const EXERCISES: Exercise[] = [
       ['Arching the back at the top.', 'Feet too far forward (hamstrings take over).', 'Bouncing reps.']),
     { easier: 'glute-bridge' }),
   x('db-rdl2', 'Dumbbell Romanian Deadlift', 'lower', 'hinge', true, 1, DB_OR_KB, 'Soft knees, hips back, weights slide down the thighs.',
-    h('Strong hamstrings and glutes for jumping and for protecting your knees on landings.',
+    h('Strong hamstrings and glutes for jumping and for controlled landings.',
       ['Hold weights in front of your thighs, feet hip-width.', 'Bend your knees slightly and push your hips back.', 'Slide the weights down your legs until you feel a big hamstring stretch.', 'Squeeze your glutes to stand back up.'],
       ['Push the hips back like closing a car door.', 'Back stays flat.', 'Weights stay close to your legs.'],
       ['Squatting down instead of hinging.', 'Rounding the back to reach lower.', 'Locking the knees straight.']),
     { easier: 'glute-bridge', harder: 'rdl' }),
   x('rdl', 'Romanian Deadlift', 'lower', 'hinge', true, 2, [['barbell']], 'Soft knees, hips back, feel the hamstrings.',
-    h('The best hamstring builder: helps jumping and lowers hamstring and knee injury risk.',
+    h('The best hamstring builder: strong hamstrings for jumping and landing.',
       ['Hold the bar at hip height with a shoulder-width grip.', 'Soften your knees and push your hips back.', 'Lower the bar along your thighs to just below the knees.', 'Drive hips forward to stand tall.'],
       ['Bar stays touching your legs.', 'Flat back, chest proud.', 'Stop when the hamstrings are stretched, not when the bar hits the floor.'],
       ['Rounding the back.', 'Turning it into a squat.', 'Leaning back at the top.']),
     { easier: 'db-rdl2' }),
   x('trap-bar-deadlift', 'Trap Bar Deadlift', 'lower', 'hinge', true, 2, [['trap-bar']], 'Push the floor away, stand tall, no lower-back rounding.',
-    h('Lets athletes lift heavy safely; builds the whole-body strength behind a big jump.',
+    h('An easier way to learn to lift heavy; builds the whole-body strength behind a big jump.',
       ['Stand in the middle of the trap bar, feet hip-width.', 'Hinge down and grab the handles, back flat, chest up.', 'Push the floor away and stand tall.', 'Lower by pushing hips back, then bending knees.'],
       ['Big breath and brace before the pull.', 'Shoulders over or slightly behind the bar.', 'Stand up straight; do not lean back.'],
       ['Jerking the bar off the floor.', 'Rounding the back.', 'Letting the hips rise first.']),
@@ -96,7 +96,7 @@ export const EXERCISES: Exercise[] = [
       ['Lifting the bell with your arms.', 'Squatting the bell down.', 'Leaning back at the top.']),
     { easier: 'db-rdl2' }),
   x('nordic', 'Nordic Hamstring Curl', 'lower', 'hinge', false, 3, NONE, 'Lower as slowly as you can, catch yourself, repeat.',
-    h('One of the most proven exercises for preventing hamstring injuries.',
+    h('A staple for building eccentric hamstring strength.',
       ['Kneel on a pad with a partner holding your ankles (or ankles hooked under something solid).', 'Keep a straight line from knees to head.', 'Lower forward as slowly as you can.', 'Catch yourself with your hands, push back up, repeat.'],
       ['Hips stay straight, do not bend at the waist.', 'Fight the fall the whole way.', 'Quality over depth.'],
       ['Bending at the hips to make it easier.', 'Dropping fast at the end.', 'Doing too many reps too soon; soreness is strong.']),
@@ -128,7 +128,7 @@ export const EXERCISES: Exercise[] = [
       ['Pushing off the bottom foot.', 'Box too high (hips below knee at the start).', 'Knee caving in.']),
     { easier: 'reverse-lunge', harder: 'split-squat' }),
   x('db-rdl', 'Single-Leg RDL', 'lower', 'single-leg', true, 2, [['dumbbells'], ['kettlebells'], []], 'Square hips, reach back with the free leg.',
-    h('Balance plus hamstring strength; protects ankles and knees on one-foot landings.',
+    h('Balance plus hamstring strength for one-foot landings.',
       ['Stand on one leg, weight in the opposite hand (or no weight).', 'Hinge forward, reaching the free leg straight back.', 'Lower until your body is nearly parallel to the floor.', 'Squeeze the standing glute to come back up.'],
       ['Hips square to the floor.', 'Long line from head to back heel.', 'Soft standing knee.'],
       ['Hip opening up toward the ceiling.', 'Rounding the back to reach lower.', 'Rushing.']),
@@ -154,7 +154,7 @@ export const EXERCISES: Exercise[] = [
       ['Feet too close to the wall (too easy).', 'Bouncing reps.', 'Short range.']),
   ),
   x('ankle-balance', 'Single-Leg Balance Reach', 'prehab', 'ankle-care', false, 1, NONE, 'Reach the free foot in 3 directions. Ankle stability.',
-    h('Trains ankle control to reduce ankle sprains, the most common volleyball injury.',
+    h('Trains ankle control and balance for landing and moving.',
       ['Stand on one foot, knee soft.', 'Reach the other foot forward, to the side, and behind, tapping lightly.', 'Return to center between reaches.'],
       ['Knee stays over the toes.', 'Hips level.', 'Quiet foot, no wobbling to save balance.'],
       ['Standing knee caving in.', 'Putting weight on the reaching foot.', 'Locking the standing knee.']),
@@ -168,7 +168,7 @@ export const EXERCISES: Exercise[] = [
       ['Hips sagging.', 'Elbows flaring straight out.', 'Half reps.']),
     { harder: 'db-bench' }),
   x('db-floor-press', 'Dumbbell Floor Press', 'upper', 'h-push', true, 1, [['dumbbells']], 'Elbows touch the floor, press straight up.',
-    h('Safe pressing strength; the floor protects the shoulders.',
+    h('Pressing strength with a built-in stop: the floor limits how low each rep goes.',
       ['Lie on the floor, knees bent, a dumbbell in each hand.', 'Lower until your upper arms touch the floor.', 'Press straight up.'],
       ['Elbows about 45 degrees out.', 'Pause on the floor.', 'Wrists stacked over elbows.'],
       ['Bouncing elbows off the floor.', 'Flaring elbows wide.', 'Uneven press.']),
@@ -208,19 +208,19 @@ export const EXERCISES: Exercise[] = [
 
   /* ---------------- Horizontal pull ---------------- */
   x('db-row', 'One-Arm Dumbbell Row', 'upper', 'h-pull', true, 1, [['dumbbells'], ['kettlebells'], ['dumbbells', 'bench']], 'Pull the elbow to the hip, no torso twist.',
-    h('Upper-back strength balances all the hitting and keeps shoulders healthy.',
+    h('Upper-back strength to balance all the hitting.',
       ['Brace one hand and knee on a bench (or hinge with a hand on your knee).', 'Let the weight hang straight down.', 'Pull your elbow toward your hip.', 'Lower all the way.'],
       ['Elbow to hip.', 'Flat back.', 'Pause at the top.'],
       ['Twisting the torso to lift.', 'Shrugging.', 'Short range.']),
     { easier: 'band-row', harder: 'inverted-row' }),
   x('band-row', 'Band Row', 'upper', 'h-pull', true, 1, [['bands']], 'Squeeze shoulder blades together, slow return.',
-    h('Upper-back and shoulder health with just a band.',
+    h('Upper-back and shoulder work with just a band.',
       ['Anchor a band at chest height.', 'Stand tall, arms straight in front.', 'Pull your hands to your ribs.', 'Return slowly.'],
       ['Shoulder blades back and down.', 'Elbows close to your body.', 'Slow on the return.'],
       ['Leaning back to pull.', 'Shrugging.', 'Letting the band snap back.']),
     { harder: 'db-row' }),
   x('cable-row', 'Cable Row', 'upper', 'h-pull', true, 1, [['cable']], 'Chest tall, pull to the belly button.',
-    h('Steady upper-back strength for posture and shoulder health.',
+    h('Steady upper-back strength for posture and shoulder control.',
       ['Sit at a cable row with a slight knee bend.', 'Sit tall and pull the handle to your stomach.', 'Return with control.'],
       ['Chest up.', 'Squeeze shoulder blades.', 'Do not rock.'],
       ['Leaning way back.', 'Rounding forward to finish.', 'Jerking the weight.']),
@@ -324,7 +324,7 @@ export const EXERCISES: Exercise[] = [
 
   /* ---------------- Core ---------------- */
   x('dead-bug', 'Dead Bug', 'core', 'core-ext', false, 1, NONE, 'Low back pressed down, move slowly.',
-    h('Core control that keeps your back safe when you jump and hit.',
+    h('Core control for a steady trunk when you jump and hit.',
       ['Lie on your back, arms up, knees bent over hips.', 'Press your low back into the floor.', 'Slowly reach one arm back and the opposite leg out.', 'Return and switch.'],
       ['Low back stays down.', 'Breathe out as you reach.', 'Slow.'],
       ['Arching the back.', 'Rushing.', 'Holding the breath.']),
@@ -336,7 +336,7 @@ export const EXERCISES: Exercise[] = [
       ['Hips sagging.', 'Butt in the air.', 'Holding the breath.']),
     { harder: 'ab-rollout' }),
   x('ab-rollout', 'Ab Wheel Rollout', 'core', 'core-ext', false, 2, NONE, 'Ribs down, only go as far as you can control.',
-    h('Strong anti-extension core for powerful, safe arm swings. Use an ab wheel or a barbell.',
+    h('Strong anti-extension core for powerful, controlled arm swings. Use an ab wheel or a barbell.',
       ['Kneel with the wheel (or a loaded barbell) under your shoulders.', 'Roll forward slowly, keeping your back flat.', 'Go as far as you can control, then pull back.'],
       ['Ribs down.', 'Squeeze glutes.', 'Stop before your back arches.'],
       ['Arching the low back.', 'Going too far.', 'Hips piking up first.']),
@@ -382,7 +382,7 @@ export const EXERCISES: Exercise[] = [
       ['Shrugging.', 'Arching the back.', 'Snapping back.']),
   ),
   x('face-pull', 'Face Pull', 'prehab', 'shoulder-care', true, 1, [['cable'], ['bands']], 'Pull to the eyes, thumbs point back.',
-    h('Shoulder health for overhead athletes: rotator cuff plus upper back.',
+    h('Rotator cuff and upper-back work for overhead athletes.',
       ['Set a rope or band at face height.', 'Pull toward your eyes, elbows high.', 'Finish with thumbs pointing back.', 'Return slowly.'],
       ['Elbows high.', 'Rotate out at the end.', 'Light and controlled.'],
       ['Too heavy.', 'Leaning back.', 'Elbows dropping.']),
@@ -394,15 +394,15 @@ export const EXERCISES: Exercise[] = [
       ['Too heavy.', 'Shrugging.', 'Lifting the chest to cheat.']),
   ),
   x('scap-pushup', 'Scap Push-Up', 'prehab', 'shoulder-care', false, 1, NONE, 'Arms straight, move only the shoulder blades.',
-    h('Keeps the shoulder blade moving well for healthy overhead motion.',
+    h('Keeps the shoulder blade moving well for overhead motion.',
       ['Start in a push-up, arms straight.', 'Let your chest sink between your shoulder blades.', 'Push the floor away to spread them.'],
       ['Arms stay straight.', 'Slow.', 'Full range.'],
       ['Bending elbows.', 'Hips sagging.', 'Rushing.']),
   ),
 
   /* ---------------- Knee / hip care ---------------- */
-  x('spanish-squat', 'Spanish Squat Hold', 'prehab', 'knee-care', false, 1, [['bands']], 'Band behind the knees, sit back. Good for jumper\'s knee.',
-    h('Loads the patellar tendon safely; helps prevent and manage jumper\'s knee.',
+  x('spanish-squat', 'Spanish Squat Hold', 'prehab', 'knee-care', false, 1, [['bands']], 'Band behind the knees, sit back. Builds knee and quad strength.',
+    h('Loads the knee and quads with control.',
       ['Loop a heavy band around something solid and behind both knees.', 'Sit back into a squat with shins vertical.', 'Hold.'],
       ['Shins stay vertical.', 'Lean into the band.', 'Breathe and hold.'],
       ['Band too light.', 'Knees drifting forward.', 'Holding the breath.']),
@@ -442,7 +442,7 @@ export const EXERCISES: Exercise[] = [
       ['Slumping.', 'Forcing the range.', 'Rushing.']),
   ),
   x('thoracic-rotation', 'Open Book', 'prehab', 'mobility', false, 1, NONE, 'Side-lying, open the top arm and follow it.',
-    h('Upper-back rotation for a full, healthy arm swing.',
+    h('Upper-back rotation for a full arm swing.',
       ['Lie on your side, knees bent, arms together in front.', 'Open the top arm to the other side, following it with your eyes.', 'Return. Switch sides.'],
       ['Knees stay together.', 'Breathe out as you open.', 'Slow.'],
       ['Knees lifting.', 'Forcing the arm to the floor.', 'Rushing.']),
@@ -472,7 +472,7 @@ export const CATEGORY_LABEL: Record<ExerciseCategory, string> = {
   lower: 'Lower body',
   upper: 'Upper body',
   core: 'Core',
-  prehab: 'Injury prevention',
+  prehab: 'Prehab',
 };
 
 /* ---------------- Equipment ---------------- */

@@ -422,7 +422,7 @@ export function SelectField<T extends string | number>({
             <FlatList
               data={options}
               keyExtractor={(o) => String(o.value)}
-              initialNumToRender={20}
+              initialNumToRender={options.length}
               renderItem={({ item }) => (
                 <Pressable
                   accessibilityRole="button"

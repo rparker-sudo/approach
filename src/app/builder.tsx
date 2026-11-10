@@ -122,7 +122,7 @@ function BuilderForm() {
       />
       {team ? (
         <Body muted>
-          Building the workout for {group ? `${group.name} (${team.name})` : `${team.name} (whole team)`}. You'll post it to the roster next.
+          Building the workout for {group ? `${group.name} (${team.name})` : `${team.name} (whole team)`}. You&apos;ll post it to the roster next.
         </Body>
       ) : null}
 
@@ -154,7 +154,7 @@ function BuilderForm() {
       </Card>
 
       <Card>
-        <H2>What's in your gym?</H2>
+        <H2>What&apos;s in your gym?</H2>
         <EquipmentPicker value={equipment} onChange={setEquipment} />
       </Card>
 

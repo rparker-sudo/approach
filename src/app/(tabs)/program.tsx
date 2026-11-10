@@ -6,7 +6,7 @@ import { Body, Button, Card, colors, H2, Icon, Label, NetTape, Pill, Row, Screen
 import { formatKey, today, upcomingEvents } from '../../lib/calendar';
 import { liftDayCount } from '../../lib/generator';
 import { useStore } from '../../lib/store';
-import { teamProgramId, useTeams } from '../../lib/team';
+import { useTeams } from '../../lib/team';
 import { formatDate } from '../../lib/util';
 import type { Program } from '../../lib/types';
 import { PHASES } from '../../lib/types';
@@ -61,7 +61,7 @@ export default function ProgramTab() {
         )}
         <Label>Other programs</Label>
         <Body muted style={{ fontSize: 13 }}>
-          Drafts, or programs to send as a code to athletes who don't use a team.
+          Drafts, or programs to send as a code to athletes who don&apos;t use a team.
         </Body>
         {drafts.map((p) => (
           <ProgramRow key={p.id} program={p} />
@@ -89,8 +89,8 @@ export default function ProgramTab() {
       {waitingForCoach ? (
         <Card>
           <NetTape />
-          <H2>You're on {teams[0].name}</H2>
-          <Body muted>Your coach hasn't posted a workout yet. It shows up here as soon as they do.</Body>
+          <H2>You&apos;re on {teams[0].name}</H2>
+          <Body muted>Your coach hasn&apos;t posted a workout yet. It shows up here as soon as they do.</Body>
         </Card>
       ) : null}
       {activeProgram ? (
@@ -129,7 +129,6 @@ export default function ProgramTab() {
 }
 
 function ProgramRow({ program }: { program: Program }) {
-  const { data } = useStore();
   return (
     <Pressable onPress={() => router.push(`/program/${program.id}`)}>
       <Card>

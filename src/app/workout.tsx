@@ -5,7 +5,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Body, BRAND, Button, Card, Chip, ChipRow, colors, display, H2, Icon, Label, Note, Pill, Row, Text, TextInput } from '../components/ui';
+import { Body, BRAND, Button, Card, Chip, ChipRow, colors, display, Icon, Label, Note, Pill, Row, Text, TextInput } from '../components/ui';
 import { dateKey, today } from '../lib/calendar';
 import { showAlert } from '../lib/dialog';
 import { CATEGORY_LABEL, getExercise } from '../lib/exercises';
@@ -47,7 +47,7 @@ export default function Workout() {
   const session = program?.sessions.find((s) => s.id === sessionId);
   // Today's version of the session (deload week / coach-lightened day applied).
   const day = useMemo(() => (program && session ? sessionForDate(program, session, today()) : null), [program, session]);
-  const plan: ProgramExercise[] = day?.exercises ?? [];
+  const plan: ProgramExercise[] = useMemo(() => day?.exercises ?? [], [day]);
   const suggestions = useMemo(() => plan.map((pe) => suggestWeight(data.logs, pe, program?.equipment)), [plan, data.logs, program?.equipment]);
 
   const fresh = (): Draft => ({
@@ -68,7 +68,7 @@ export default function Workout() {
   const [mode, setMode] = useState<'focus' | 'list'>('focus');
   const [rest, setRest] = useState<Rest | null>(null);
   const [restDone, setRestDone] = useState(false);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const [summary, setSummary] = useState<Summary | null>(null);
   const loaded = useRef(false);
 
@@ -95,19 +95,23 @@ export default function Workout() {
   // Tick while resting.
   useEffect(() => {
     if (!rest) return;
-    const t = setInterval(() => setNow(Date.now()), 250);
+    const t = setInterval(() => {
+      const at = Date.now();
+      setNow(at);
+      if (secondsLeft(rest, at) === 0) {
+        buzz();
+        setRest(null);
+        setRestDone(true);
+      }
+    }, 250);
     return () => clearInterval(t);
   }, [rest]);
   const left = rest ? secondsLeft(rest, now) : 0;
   useEffect(() => {
-    if (rest && left === 0) {
-      buzz();
-      setRest(null);
-      setRestDone(true);
-      const t = setTimeout(() => setRestDone(false), 4000);
-      return () => clearTimeout(t);
-    }
-  }, [rest, left]);
+    if (!restDone) return;
+    const t = setTimeout(() => setRestDone(false), 4000);
+    return () => clearTimeout(t);
+  }, [restDone]);
 
   if (!program || !session || !day) return <View style={{ flex: 1, backgroundColor: colors.bg }}><Body muted>Workout not found.</Body></View>;
   // Team workouts need parent consent on file for minors (the server enforces this too).

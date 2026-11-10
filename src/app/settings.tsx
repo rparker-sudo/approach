@@ -112,7 +112,7 @@ export default function Settings() {
       {account ? null : (
       <Card>
         <H2>Mode</H2>
-        <Body muted>You're using the app as {coach ? 'a coach' : 'an athlete'}.</Body>
+        <Body muted>You&apos;re using the app as {coach ? 'a coach' : 'an athlete'}.</Body>
         <Button
           kind="ghost"
           title={coach ? 'Switch to athlete mode' : 'Switch to coach mode'}

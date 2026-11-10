@@ -111,7 +111,7 @@ export default function AccountForm({
         </Note>
       ) : (
         <Body muted style={{ fontSize: 13 }}>
-          Your name and workouts are shared only with your team's coach.
+          Your name and workouts are shared only with your team&apos;s coach.
         </Body>
       )}
     </View>

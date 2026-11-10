@@ -125,7 +125,7 @@ export default function SessionScreen() {
                   <H2>{info.name}</H2>
                 </Pressable>
                 <Body muted style={{ fontSize: 13 }}>{info.cue}</Body>
-                {!fits(info, gym) ? <Text style={{ fontSize: 12, color: colors.warning }}>Needs equipment this program doesn't have.</Text> : null}
+                {!fits(info, gym) ? <Text style={{ fontSize: 12, color: colors.warning }}>Needs equipment this program doesn&apos;t have.</Text> : null}
               </View>
               <View style={{ gap: 2 }}>
                 <Pressable accessibilityLabel="Move up" onPress={() => move(i, -1)} hitSlop={6}>

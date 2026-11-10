@@ -51,7 +51,7 @@ export function NotEligible() {
       <Screen>
         <View style={{ gap: 24, marginTop: 48 }}>
           <Lockup badge={132} />
-          <H1>Sorry, you're not eligible to use Approach right now.</H1>
+          <H1>Sorry, you&apos;re not eligible to use Approach right now.</H1>
         </View>
       </Screen>
     </SafeAreaView>

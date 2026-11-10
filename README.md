@@ -77,6 +77,36 @@ To build the site yourself: `EXPO_BASE_URL=/approach npm run build:web`, then up
 
 ---
 
+## Updating
+
+There is one copy of the project on your Mac: `~/Projects/approach`. It tracks GitHub, so new versions arrive with a pull, not a new folder.
+
+```bash
+cd ~/Projects/approach
+```
+
+```bash
+npm run go
+```
+
+`npm run go` pulls the latest code, installs anything new, and starts the app. Scan the QR code with Expo Go. (`npm run update` does the pull and install without starting.)
+
+Your `.env` file (Supabase keys) lives only in `~/Projects/approach` on your Mac and is never uploaded.
+
+**To run an old version:**
+
+```bash
+git checkout v2.0
+```
+
+**To come back to the latest:**
+
+```bash
+git checkout main
+```
+
+---
+
 ## Step 1: Try it on your iPhone (free)
 
 You need a computer with **Node.js** (free from https://nodejs.org, LTS version) and the **Expo Go** app from the App Store on your iPhone.

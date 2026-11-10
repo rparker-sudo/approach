@@ -21,7 +21,26 @@ Source of truth: Approach project → `legal/data-requirements.md` (full rules f
 ## Visibility
 - MUST: athlete data is visible only to the athlete and their **current** coach. Never teammates.
 - MUST: removing an athlete cuts the coach's access to their logs and check-ins immediately.
-- MUST NOT: messaging, comments, feeds, leaderboards, public profiles.
+- MUST NOT: messaging, comments, feeds, public profiles. (Team effort boards are allowed only under the Boards rules below.)
+
+## Permissions (pass 2)
+- MUST: six per-athlete permissions (participation, check-ins, share check-ins, boards, attendance, testing). Each feature works for a minor only when the coach has recorded that box from a signed form v2; adults choose for themselves. Enforced by RLS.
+- MUST: athletes under 18 can't change their own permissions; adults can, anytime, in Settings → Privacy.
+
+## Boards (pass 2)
+- MUST: boards show "First L." or initials only, never a full last name; athletes can hide.
+- MUST NOT show on any board: weights/loads, strength-check results, estimated maxes, check-ins or pain, body weight, nutrition.
+- MUST: the coach board is visible only to the signed-in coach of that team; no public links.
+- MUST: effort metrics count only prescribed sessions; hours capped (3 h/day, 15 h/week); rest days never break streaks.
+
+## Testing days (pass 2)
+- MUST NOT: true 1-rep-max tests, or "max out" / "your max" wording.
+- MUST: load tests locked until the coach confirms supervision that day; record who and when.
+- MUST: load tests only for coached intermediate/advanced athletes with testing permission, not within 48 h before a match, and not when the athlete reports pain or is run down that day.
+- MUST: estimated strength is always labeled an estimate and is visible only to the athlete and coach.
+
+## Fuel (pass 2)
+- MUST NOT: calorie numbers, gram or g/kg targets, weight goals, supplement advice, or body weight used for nutrition.
 
 ## Third parties
 - MUST NOT: ad SDKs, analytics that share data for the vendor's own use, tracking pixels (app or web pages), App Tracking Transparency.

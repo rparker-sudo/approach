@@ -57,3 +57,84 @@ Settings → Account → ghost/destructive button **Delete my account** →
 
 ## Accessibility
 Chips and banners use text plus color (never color alone). Tap targets ≥ 44 pt. Destructive actions use the existing error color and require typed confirmation.
+
+---
+
+# Pass 2 flows (v2.1 pass 2)
+Draft v1.0 · Mon Nov 9, 2026 · Spec: `docs/specs/v2.1-pass-2.md`. F7 replaces F3's two-option sheet once pass 2 ships.
+
+## F7. Coach records consent (6 boxes)
+Team → Roster → tap a minor → sheet **"Record parent consent for Jordan (form v2)"**:
+- Checklist, all unchecked, each with a one-line description:
+  - 1 Participation (required)
+  - 2 Check-ins
+  - 3 Share check-ins with me
+  - 4 Team boards
+  - 5 Attendance & hours
+  - 6 Testing days
+- Box 3 is disabled until box 2 is checked; boxes 2–6 are disabled until box 1 is checked.
+- Confirm checkbox: "I have a signed parent consent form (version 2) for Jordan." **Save** is enabled only when box 1 and the confirm checkbox are checked.
+- Roster chip summarizes: **Consent needed** · **Consent: 4 of 6** · **Consent: all**. If an athlete was recorded on form v1, show **"Form v2 needed for boards & testing"** (muted, not a warning).
+- Consent tracker at the top of the roster: "Consent forms: 8 of 14 in · Print form."
+
+## F8. Adult athlete: "Your choices"
+Shown once after joining a team (and once for existing adult members). H1 "Your choices", one toggle per row (all **on** by default), each with one plain line:
+- Check-ins: "Log sleep, soreness, energy, and pain (yes/no)."
+- Share check-ins with my coach: "Your coach sees them. Teammates never do."
+- Team boards: "Your name and effort can appear on team boards."
+- Attendance & hours: "Count practices and matches toward your effort."
+- Testing days: "Jump tests and coach-supervised strength checks."
+
+Button "Save" (they can change these later in Settings → Privacy).
+
+## F9. Coach board (`/board/[teamId]`)
+- **Entry:** Team → secondary button **Open coach board** → opens full screen (web: new tab; suggest "Press F11 for full screen").
+- **Layout (landscape, 16:9, dark):**
+  - Header row: team name · date · today's session per group, around 48 px type.
+  - Tile grid, 4–6 columns depending on roster size. Each tile: board name in 36 px bold, status pill (Not started / In progress / **Done** in the achievement color), "Sets 9 / 16" in 28 px tabular numbers, a small "PR" badge when a best was hit today.
+  - Done tiles move to the end of the grid. Tiles never show weights.
+  - Footer band (about 18% of height): team goal bar ("412 / 500 sessions"), then an effort panel that rotates every 20 s (top 5 per metric).
+- **Controls** (top-right, fade after 3 s of no mouse movement): hide effort panel, change group filter, exit.
+- **States:**
+  - Empty (no session today): "Rest day. See you tomorrow."
+  - Loading: skeleton tiles.
+  - Offline: banner "Reconnecting…", tiles keep their last values.
+- **Accessibility:** contrast ≥ 7:1 on the projector theme; never color-only status (pill text is always present).
+
+## F10. Effort board
+- **Coach:** Team → tab **Effort**.
+- **Athlete:** Progress → card **Team effort** → full list.
+- Metric chips across the top: Consistency (default) · Sessions · Streak · Attendance · Hours · Improvement. The athlete sees only chips their permissions allow.
+- Rows: rank, board name, value ("92%", "5 wk", "+1.5 in"). The athlete's own row is highlighted. If they're outside the top 10, their row is pinned at the bottom.
+- Filter: Season / This block.
+- Footer note: "Effort board ranks work, not weight. Change how you appear in Settings → Privacy."
+- **Athlete Settings → Privacy:** "Show me on boards as" (segmented): **Jordan M.** · **J.M.** · **Hidden**.
+- **Coach Team settings:** toggles "Effort board" and "Show effort on coach board", plus a "Team goal" number field with the suggested default.
+
+## F11. Testing day
+**Coach scheduling:** Calendar → tap a date → **Add testing day** → choose Full battery / Jump tests / Mid-season check → Save.
+- A date within 2 days before a match shows an inline error: "Testing can't be within 2 days before a match."
+- The calendar shows a "Test" chip on the date.
+
+**Coach on the day:** Team screen banner "Testing day: Full battery". Button **Start strength check** opens a sheet with a checkbox "I'll be supervising this test, with safeties or spotters set." and a **Confirm** button. Afterward the banner reads "Strength checks open · confirmed 3:42 pm."
+
+**Athlete:**
+- Today shows **Testing session** instead of the lift.
+- Steps in order: Warm-up → Approach touch → Broad jump → Med-ball throw → Strength checks.
+- **Jump test:** 3 attempt fields, with the best one highlighted automatically. Big numeric keypad, inches (throw in feet).
+- **Strength check:**
+  - Locked state: "Strength checks open when your coach confirms they're supervising."
+  - Ineligible states use neutral copy (see spec P6.4).
+  - If the athlete has no check-in permission, ask on the spot: "Any pain today?" with Yes / No (not saved).
+  - Each lift: the warm-up ladder as a checklist, then the attempt logger (weight × reps, rest timer 3:00), then "Enter your last good-form set."
+  - Cue under the logger: "Your coach stops the set when form breaks. Never grind."
+- **Result screen:** "Estimated strength: ~233 lb (estimate)" for each lift, and "Updated your starting weights" with before → after for each tested lift.
+
+**Coach athlete detail:** a Tests section with dates, jump results, strength checks (weight × reps, estimate), and Edit / Void.
+
+## F12. Fuel phase 1
+- The Fuel tab header keeps the day-type title and summary.
+- **Remove** the grams/ounces target tiles.
+- Below that: the plate visual, then meal timing, then **Fuel cards** (today's matching cards first, then the rest in a list). Each card has a title, 2–4 short lines, a source line (12 px muted), and the disclaimer at the bottom of the tab.
+- Today screen: replace the fuel-targets row with today's top card title, which links to Fuel.
+- Onboarding: the **Body weight** step is removed.

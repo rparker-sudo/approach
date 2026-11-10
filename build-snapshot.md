@@ -31,7 +31,7 @@
 
 **In progress / not finished:**
 - Pass 2 of v2.1 (waiting for its spec).
-- **Migrations 002 and 003 have not been run** on the live Supabase project. Until 003 is run, the app treats every team athlete as `pending` (read-only), because it can't read consent.
+- Migrations 002 and 003 were run on the live Supabase project on November 10, 2026 (owner confirmed; the check query showed the 2.0 tables and 2.1 consent column present and `readiness.pain_note` gone). Live account deletion and consent flows haven't been tried on the real project yet **(unverified)**.
 - No iPhone build (EAS/TestFlight/App Store). Apple Developer Program not purchased.
 
 ---
@@ -148,7 +148,7 @@ Not stored on the server: body weight, touch height, net height, fuel targets, s
 ## 7. Deployment and usage
 
 - **Website:** https://rparker-sudo.github.io/approach/ (deploys on push to `main`). Legal pages at `/approach/privacy.html`, `/terms.html`, `/consent.html` after the 2.1 deploy.
-- **Supabase project:** live, Free plan; 1.0 schema applied; **002 and 003 not applied**.
+- **Supabase project:** live, Free plan; 1.0 schema plus migrations 002 and 003 applied (November 10, 2026).
 - **Who has used it:** the owner plus fewer than 10 others, all 18+, per the owner **(unverified count)**. No known use by minors.
 
 ---
@@ -162,7 +162,7 @@ $0/month now (Supabase Free, GitHub free, Expo free). Future: Apple Developer Pr
 ## 9. Known bugs, shortcuts and TODOs
 
 **Before real athletes (founder checklist from the spec)**
-- Run migrations 002 (if not yet) and 003 on the live project.
+- ~~Run migrations 002 and 003 on the live project.~~ Done November 10, 2026.
 - Fill in `[CONTACT EMAIL]` and `[publish date]` in `public/privacy.html`, `terms.html` and `consent.html` (they come from `docs/legal/`, which also has the placeholder). Use a personal or business address, not a district one.
 - Attorney review of the consent form and notice; R1 policy check; soft-launch team outside the owner's district.
 

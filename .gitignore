@@ -43,3 +43,5 @@ yarn-error.*
 # web builds
 dist-single/
 .env
+.env.*
+!.env.example

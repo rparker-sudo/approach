@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { View } from 'react-native';
+import type { AgeAnswer } from '../lib/age';
 import { isDemoMode } from '../lib/backend';
+import { openLegal } from '../lib/legal';
+import { useStore } from '../lib/store';
 import type { Account } from '../lib/backend';
 import { useTeams } from '../lib/team';
 import type { Role } from '../lib/types';
@@ -11,12 +14,18 @@ export default function AccountForm({
   role,
   onDone,
   submitLabel,
+  age,
 }: {
   role: Role;
+  /** From the onboarding age question; otherwise the saved profile's birth year is used. */
+  age?: Pick<AgeAnswer, 'birthYear' | 'isMinor'> | null;
   onDone: (account: Account) => void;
   submitLabel?: string;
 }) {
   const { signUp, signIn } = useTeams();
+  const { data } = useStore();
+  const birthYear = age?.birthYear ?? data.profile?.birthYear;
+  const isMinor = age?.isMinor ?? data.profile?.isMinor ?? true;
   const [mode, setMode] = useState<'signup' | 'signin'>('signup');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -24,13 +33,17 @@ export default function AccountForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const ready = email.includes('@') && password.length >= 6 && (mode === 'signin' || name.trim().length > 0);
+  const ready = email.includes('@') && password.length >= 6 && (mode === 'signin' || (name.trim().length > 0 && birthYear != null));
 
   async function submit() {
     setBusy(true);
     setError(null);
     try {
-      const a = mode === 'signup' ? await signUp({ email, password, name, role }) : await signIn(email, password);
+      const a =
+        mode === 'signup'
+          ? // Coach accounts are for adults 18 and older (the server enforces this too).
+            await signUp({ email, password, name, role: isMinor ? 'athlete' : role, birthYear: birthYear!, isMinor })
+          : await signIn(email, password);
       onDone(a);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't sign in. Try again.");
@@ -56,7 +69,7 @@ export default function AccountForm({
       ) : null}
       <Field
         label="Email"
-        placeholder="you@school.org"
+        placeholder="you@example.com"
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
@@ -78,6 +91,19 @@ export default function AccountForm({
         disabled={!ready || busy}
         onPress={submit}
       />
+      {mode === 'signup' ? (
+        <Text style={{ fontSize: 13, color: colors.muted, lineHeight: 19 }}>
+          By creating an account you agree to the{' '}
+          <Text accessibilityRole="link" onPress={() => openLegal('terms')} style={{ fontSize: 13, color: colors.muted, textDecorationLine: 'underline' }}>
+            Terms
+          </Text>{' '}
+          and{' '}
+          <Text accessibilityRole="link" onPress={() => openLegal('privacy')} style={{ fontSize: 13, color: colors.muted, textDecorationLine: 'underline' }}>
+            Privacy Notice
+          </Text>
+          .
+        </Text>
+      ) : null}
       {isDemoMode ? (
         <Note>
           Demo mode: accounts and teams are saved on this device only. Connect Supabase (see the README) to sync teams

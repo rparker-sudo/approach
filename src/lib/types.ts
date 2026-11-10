@@ -186,6 +186,10 @@ export type Profile = {
   liftDays?: number[];
   /** Default gym equipment for new programs. */
   equipment?: Equipment[];
+  /** Birth year only (never a full date); set by the age question. */
+  birthYear?: number;
+  /** Under 18 when they answered the age question. */
+  isMinor?: boolean;
 };
 
 export type LoggedSet = { weight: string; reps: string; done: boolean };
@@ -231,6 +235,10 @@ export type AppData = {
   teamCalendars?: Record<string, LocalTeamCalendar>;
   /** Athlete: daily readiness check-ins. */
   readinessLog?: ReadinessEntry[];
+  /** Athletes: last known parent-consent status per team (so logging works offline). */
+  teamConsent?: Record<string, 'not_required' | 'pending' | 'training_only' | 'full'>;
+  /** The athlete has seen "Your coach sees your check-ins" once. */
+  checkinNoticeSeen?: boolean;
 };
 
 export type LocalTeamCalendar = {
@@ -246,7 +254,6 @@ export type ReadinessEntry = {
   soreness: number;
   energy: number;
   pain: boolean;
-  painNote?: string;
   /** Teams this check-in has been sent to. */
   sentTo: string[];
 };

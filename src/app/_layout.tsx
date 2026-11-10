@@ -8,6 +8,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
+import { NotEligible } from '../components/AgeGate';
 import DialogHost from '../components/DialogHost';
 import { colors, DisplayTitle } from '../components/ui';
 import { StoreProvider, useStore } from '../lib/store';
@@ -32,7 +33,7 @@ export default function RootLayout() {
 }
 
 function ThemedApp() {
-  const { ready, data } = useStore();
+  const { ready, data, blocked } = useStore();
   const mode = data.theme ?? 'dark';
   applyTheme(mode);
 
@@ -42,6 +43,8 @@ function ThemedApp() {
   }, [ready, mode]);
 
   if (!ready) return null;
+  // Under 13 on this device: only the block screen, on every route and after reloads.
+  if (blocked) return <NotEligible />;
 
   // Keyed on the theme so every screen re-renders with the new colors.
   return (

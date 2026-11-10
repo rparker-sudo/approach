@@ -5,7 +5,11 @@ import {
   Account,
   Backend,
   BackendError,
+  canCheckIn,
+  canLog,
+  ConsentStatus,
   Group,
+  initialConsent,
   makeJoinCode,
   Member,
   normalizeCode,
@@ -29,7 +33,15 @@ const KEY = 'load-and-launch/demo-server/v1';
 type DB = {
   users: (Account & { password: string })[];
   teams: Team[];
-  members: { teamId: string; userId: string; joinedAt: string; groupId?: string | null }[];
+  members: {
+    teamId: string;
+    userId: string;
+    joinedAt: string;
+    groupId?: string | null;
+    consentStatus?: ConsentStatus;
+    consentRecordedAt?: string | null;
+    consentRecordedBy?: string | null;
+  }[];
   programs: TeamProgram[];
   logs: TeamLog[];
   groups: Group[];
@@ -46,6 +58,12 @@ async function load(): Promise<DB> {
     if (!raw) return { ...EMPTY };
     const db = { ...EMPTY, ...(JSON.parse(raw) as DB) };
     db.programs = db.programs.map((p) => ({ ...p, groupKey: p.groupKey ?? 'all' })); // 1.0 data
+    // 2.0 data: no pain notes (2.1), and memberships start with a consent status like the server's.
+    db.readiness = db.readiness.map(({ painNote: _n, ...r }: Readiness & { painNote?: string }) => r);
+    db.members = db.members.map((m) => ({
+      ...m,
+      consentStatus: m.consentStatus ?? initialConsent(db.users.find((u) => u.id === m.userId)?.isMinor),
+    }));
     return db;
   } catch {
     return { ...EMPTY };
@@ -75,6 +93,27 @@ async function me(db?: DB) {
   return { db: d, user: u };
 }
 
+const thisYear = () => new Date().getFullYear();
+
+/** Same rule as the server's minor_from(): the year decides unless it's the one ambiguous year. */
+function minorFrom(year: number, clientMinor: boolean) {
+  const age = thisYear() - year;
+  if (age < 18) return true;
+  if (age > 18) return false;
+  return clientMinor;
+}
+
+function consentOf(db: DB, teamId: string, userId: string): ConsentStatus | undefined {
+  return db.members.find((m) => m.teamId === teamId && m.userId === userId)?.consentStatus;
+}
+
+/** Coaches see rows only for current members (2.1); everyone sees their own. */
+function visibleTo(db: DB, viewerId: string | null, teamId: string, rowUserId: string) {
+  if (rowUserId === viewerId) return true;
+  const t = db.teams.find((x) => x.id === teamId);
+  return !!t && t.coachId === viewerId && db.members.some((m) => m.teamId === teamId && m.userId === rowUserId);
+}
+
 function coachOf(db: DB, teamId: string, userId: string) {
   const t = db.teams.find((x) => x.id === teamId);
   if (!t) throw new BackendError("That team doesn't exist anymore.");
@@ -97,7 +136,19 @@ export const localBackend: Backend = {
     if (!email.includes('@')) throw new BackendError('Enter a valid email address.');
     if (input.password.length < 6) throw new BackendError('Use a password with at least 6 characters.');
     if (db.users.some((u) => u.email === email)) throw new BackendError('That email already has an account. Sign in instead.');
-    const user = { id: uid(), email, name: input.name.trim(), role: input.role, position: input.position ?? null, password: input.password };
+    if (thisYear() - input.birthYear < 13) throw new BackendError('Not eligible.');
+    const isMinor = minorFrom(input.birthYear, input.isMinor);
+    const user = {
+      id: uid(),
+      email,
+      name: input.name.trim(),
+      // Coach accounts are for adults 18 and older.
+      role: input.role === 'coach' && !isMinor ? input.role : ('athlete' as const),
+      position: input.position ?? null,
+      birthYear: input.birthYear,
+      isMinor,
+      password: input.password,
+    };
     db.users.push(user);
     db.sessionUserId = user.id;
     await save(db);
@@ -126,6 +177,38 @@ export const localBackend: Backend = {
     return publicAccount(user);
   },
 
+  async setBirthYear(year, clientMinor) {
+    const { db, user } = await me();
+    if (thisYear() - year < 13) throw new BackendError('Not eligible.');
+    if (user.birthYear == null) {
+      user.birthYear = year;
+      user.isMinor = minorFrom(year, clientMinor);
+    }
+    if (user.isMinor === false) {
+      db.members = db.members.map((m) => (m.userId === user.id && m.consentStatus === 'pending' ? { ...m, consentStatus: 'not_required' } : m));
+    }
+    await save(db);
+    return publicAccount(user);
+  },
+
+  async deleteMyAccount() {
+    const { db, user } = await me();
+    const owned = new Set(db.teams.filter((t) => t.coachId === user.id).map((t) => t.id));
+    const gone = (teamId: string, userId?: string) => owned.has(teamId) || userId === user.id;
+    db.users = db.users.filter((u) => u.id !== user.id);
+    db.teams = db.teams.filter((t) => !owned.has(t.id));
+    db.members = db.members
+      .filter((m) => !gone(m.teamId, m.userId))
+      .map((m) => (m.consentRecordedBy === user.id ? { ...m, consentRecordedBy: null } : m));
+    db.programs = db.programs.filter((p) => !owned.has(p.teamId));
+    db.logs = db.logs.filter((l) => !gone(l.teamId, l.userId));
+    db.groups = db.groups.filter((g) => !owned.has(g.teamId));
+    db.calendars = db.calendars.filter((c) => !owned.has(c.teamId));
+    db.readiness = db.readiness.filter((r) => !gone(r.teamId, r.userId));
+    db.sessionUserId = null;
+    await save(db);
+  },
+
   async listMyTeams() {
     const { db, user } = await me();
     const ids =
@@ -138,6 +221,7 @@ export const localBackend: Backend = {
         ...t,
         coachName: db.users.find((u) => u.id === t.coachId)?.name,
         myGroupId: user.role === 'coach' ? undefined : db.members.find((m) => m.teamId === t.id && m.userId === user.id)?.groupId ?? null,
+        myConsent: user.role === 'coach' ? undefined : consentOf(db, t.id, user.id),
       }));
   },
 
@@ -177,7 +261,15 @@ export const localBackend: Backend = {
       .filter((m) => m.teamId === teamId)
       .map((m): Member => {
         const u = db.users.find((x) => x.id === m.userId);
-        return { userId: m.userId, name: u?.name ?? 'Athlete', position: u?.position ?? null, joinedAt: m.joinedAt, groupId: m.groupId ?? null };
+        return {
+          userId: m.userId,
+          name: u?.name ?? 'Athlete',
+          position: u?.position ?? null,
+          joinedAt: m.joinedAt,
+          groupId: m.groupId ?? null,
+          isMinor: u?.isMinor ?? null,
+          consentStatus: m.consentStatus ?? initialConsent(u?.isMinor),
+        };
       });
   },
 
@@ -185,6 +277,17 @@ export const localBackend: Backend = {
     const { db, user } = await me();
     coachOf(db, teamId, user.id);
     db.members = db.members.filter((m) => !(m.teamId === teamId && m.userId === userId));
+    await save(db);
+  },
+
+  async recordConsent(teamId, userId, status) {
+    const { db, user } = await me();
+    if (!db.teams.some((t) => t.id === teamId && t.coachId === user.id)) throw new BackendError('Only the team coach can record consent.');
+    const m = db.members.find((x) => x.teamId === teamId && x.userId === userId && x.consentStatus !== 'not_required');
+    if (!m) throw new BackendError("That athlete isn't on the team or doesn't need consent.");
+    m.consentStatus = status;
+    m.consentRecordedAt = status === 'pending' ? null : new Date().toISOString();
+    m.consentRecordedBy = status === 'pending' ? null : user.id;
     await save(db);
   },
 
@@ -211,7 +314,7 @@ export const localBackend: Backend = {
       );
     }
     if (!db.members.some((m) => m.teamId === team.id && m.userId === user.id)) {
-      db.members.push({ teamId: team.id, userId: user.id, joinedAt: new Date().toISOString() });
+      db.members.push({ teamId: team.id, userId: user.id, joinedAt: new Date().toISOString(), consentStatus: initialConsent(user.isMinor) });
       await save(db);
     }
     return { ...team, coachName: db.users.find((u) => u.id === team.coachId)?.name };
@@ -281,6 +384,7 @@ export const localBackend: Backend = {
   async submitReadiness(r) {
     const { db, user } = await me();
     if (!db.members.some((m) => m.teamId === r.teamId && m.userId === user.id)) throw new BackendError("You're not on that team.");
+    if (!canCheckIn(consentOf(db, r.teamId, user.id))) throw new BackendError('Check-ins need parent consent.');
     db.readiness = [...db.readiness.filter((x) => !(x.teamId === r.teamId && x.userId === user.id && x.day === r.day)), { ...r, userId: user.id }];
     await save(db);
   },
@@ -288,13 +392,14 @@ export const localBackend: Backend = {
   async listReadiness(teamId, day) {
     const db = await load();
     return db.readiness
-      .filter((r) => r.teamId === teamId && r.day === day)
+      .filter((r) => r.teamId === teamId && r.day === day && visibleTo(db, db.sessionUserId, teamId, r.userId))
       .map((r) => ({ ...r, userName: db.users.find((u) => u.id === r.userId)?.name ?? 'Athlete' }));
   },
 
   async addLog(log: WorkoutLog, teamId) {
     const { db, user } = await me();
     if (db.logs.some((l) => l.id === log.id)) return;
+    if (!canLog(consentOf(db, teamId, user.id))) throw new BackendError('Logging needs parent consent.');
     db.logs.push({
       id: log.id,
       teamId,
@@ -311,7 +416,7 @@ export const localBackend: Backend = {
   async listTeamLogs(teamId, sinceIso) {
     const db = await load();
     return db.logs
-      .filter((l) => l.teamId === teamId && l.date >= sinceIso)
+      .filter((l) => l.teamId === teamId && l.date >= sinceIso && visibleTo(db, db.sessionUserId, teamId, l.userId))
       .sort((a, b) => b.date.localeCompare(a.date));
   },
 

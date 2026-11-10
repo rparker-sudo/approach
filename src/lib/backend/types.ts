@@ -12,7 +12,25 @@ export type Account = {
   name: string;
   role: Role;
   position?: Position | null;
+  /** Birth year only (never a full date). Null for accounts made before 2.1 until they answer once. */
+  birthYear?: number | null;
+  /** Under 18 when they signed up. */
+  isMinor?: boolean | null;
 };
+
+/**
+ * Parent consent on a team (coached minors). Text values so more options can be added later.
+ *  - not_required: adult  - pending: minor, no form recorded yet
+ *  - training_only: may log workouts, no check-ins  - full: workouts and check-ins shared with the coach
+ */
+export type ConsentStatus = 'not_required' | 'pending' | 'training_only' | 'full';
+/** What a coach can record. */
+export type RecordableConsent = 'pending' | 'training_only' | 'full';
+
+export const canLog = (c: ConsentStatus | undefined) => c === 'training_only' || c === 'full' || c === 'not_required';
+export const canCheckIn = (c: ConsentStatus | undefined) => c === 'full' || c === 'not_required';
+/** Starting status when someone joins (unknown age counts as a minor until they answer). */
+export const initialConsent = (isMinor: boolean | null | undefined): ConsentStatus => (isMinor === false ? 'not_required' : 'pending');
 
 export type Team = {
   id: string;
@@ -23,6 +41,8 @@ export type Team = {
   createdAt: string;
   /** Athletes only: the group they're in on this team (null = whole team). */
   myGroupId?: string | null;
+  /** Athletes only: their parent-consent status on this team. */
+  myConsent?: ConsentStatus;
 };
 
 /** A position group inside a team. 'all' (Whole team) is implicit and not stored. */
@@ -52,7 +72,6 @@ export type Readiness = {
   soreness: number; // 1–5, 5 = very sore
   energy: number; // 1–5, 5 = great
   pain: boolean;
-  painNote?: string;
 };
 
 export type Member = {
@@ -61,6 +80,8 @@ export type Member = {
   position?: Position | null;
   joinedAt: string;
   groupId?: string | null;
+  isMinor?: boolean | null;
+  consentStatus: ConsentStatus;
 };
 
 export type TeamProgram = {
@@ -89,6 +110,8 @@ export type SignUpInput = {
   name: string;
   role: Role;
   position?: Position | null;
+  birthYear: number;
+  isMinor: boolean;
 };
 
 export interface Backend {
@@ -101,6 +124,10 @@ export interface Backend {
   signIn(email: string, password: string): Promise<Account>;
   signOut(): Promise<void>;
   updateAccount(patch: Partial<Pick<Account, 'name' | 'position'>>): Promise<Account>;
+  /** Accounts from before 2.1 answer the age question once. Throws BackendError('Not eligible.') under 13. */
+  setBirthYear(year: number, isMinor: boolean): Promise<Account>;
+  /** Deletes the signed-in account and everything it owns (teams, memberships, logs, check-ins). */
+  deleteMyAccount(): Promise<void>;
 
   /** Coaches: teams they own. Athletes: teams they've joined. */
   listMyTeams(): Promise<Team[]>;
@@ -109,6 +136,8 @@ export interface Backend {
   deleteTeam(teamId: string): Promise<void>;
   listMembers(teamId: string): Promise<Member[]>;
   removeMember(teamId: string, userId: string): Promise<void>;
+  /** Coach records (or clears, with 'pending') a minor's parent consent. */
+  recordConsent(teamId: string, userId: string, status: RecordableConsent): Promise<void>;
 
   postProgram(teamId: string, groupKey: string, program: Program): Promise<TeamProgram>;
   getPrograms(teamIds: string[]): Promise<TeamProgram[]>;

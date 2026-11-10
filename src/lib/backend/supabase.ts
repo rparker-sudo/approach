@@ -6,7 +6,9 @@ import {
   Account,
   Backend,
   BackendError,
+  ConsentStatus,
   Group,
+  initialConsent,
   makeJoinCode,
   Member,
   normalizeCode,
@@ -23,7 +25,7 @@ if (Platform.OS !== 'web') {
   require('react-native-url-polyfill/auto');
 }
 
-type ProfileRow = { id: string; name: string; role: Role; position: string | null };
+type ProfileRow = { id: string; name: string; role: Role; position: string | null; birth_year?: number | null; is_minor?: boolean | null };
 type TeamRow = {
   id: string;
   name: string;
@@ -33,12 +35,12 @@ type TeamRow = {
   coach?: { name: string } | null;
 };
 
-/** True after any call hit a table/column that only exists once the 2.0 migration has run. */
-let missing20 = false;
+/** True after any call hit a table/column/function that only exists once the 2.0 or 2.1 migration has run. */
+let missingUpdate = false;
 const MISSING = /does not exist|could not find the (table|column)|schema cache/i;
 function isMissing(error: { message: string } | null | undefined) {
   if (error && MISSING.test(error.message)) {
-    missing20 = true;
+    missingUpdate = true;
     return true;
   }
   return false;
@@ -47,8 +49,10 @@ function isMissing(error: { message: string } | null | undefined) {
 function fail(error: { message: string } | null, fallback?: string): never {
   const msg = error?.message ?? fallback ?? 'Something went wrong.';
   if (MISSING.test(msg)) {
-    missing20 = true;
-    throw new BackendError('Your database needs the 2.0 update. In Supabase, run supabase/migrations/002_approach_2.sql (see the README).');
+    missingUpdate = true;
+    throw new BackendError(
+      'Your database needs the 2.1 update. In Supabase, run the files in supabase/migrations you haven\'t run yet (see "Upgrading" in the README).',
+    );
   }
   if (/invalid login credentials/i.test(msg)) throw new BackendError("Email or password doesn't match.");
   if (/already registered/i.test(msg)) throw new BackendError('That email already has an account. Sign in instead.');
@@ -86,10 +90,24 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
     return id;
   }
 
-  async function account(id: string, email: string): Promise<Account> {
-    const { data, error } = await sb.from('profiles').select('id,name,role,position').eq('id', id).single<ProfileRow>();
+  async function profile(id: string): Promise<ProfileRow> {
+    let { data, error } = await sb.from('profiles').select('id,name,role,position,birth_year,is_minor').eq('id', id).single<ProfileRow>();
+    if (isMissing(error)) ({ data, error } = await sb.from('profiles').select('id,name,role,position').eq('id', id).single<ProfileRow>());
     if (error || !data) fail(error, 'Your profile was not found.');
-    return { id, email, name: data.name, role: data.role, position: (data.position as Position) ?? null };
+    return data;
+  }
+
+  async function account(id: string, email: string): Promise<Account> {
+    const data = await profile(id);
+    return {
+      id,
+      email,
+      name: data.name,
+      role: data.role,
+      position: (data.position as Position) ?? null,
+      birthYear: data.birth_year ?? null,
+      isMinor: data.is_minor ?? null,
+    };
   }
 
   // teams↔profiles has several links (coach, roster, workout logs); name the coach one explicitly.
@@ -97,7 +115,7 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
 
   return {
     mode: 'supabase',
-    needsUpdate: () => missing20,
+    needsUpdate: () => missingUpdate,
 
     async getAccount() {
       const { data } = await sb.auth.getSession();
@@ -110,11 +128,12 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
       }
     },
 
-    async signUp({ email, password, name, role, position }) {
+    async signUp({ email, password, name, role, position, birthYear, isMinor }) {
       const { data, error } = await sb.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
-        options: { data: { name: name.trim(), role, position: position ?? null } },
+        // Birth year and under-18 only (never a full date); handle_new_user copies them to profiles.
+        options: { data: { name: name.trim(), role, position: position ?? null, birth_year: birthYear, is_minor: isMinor } },
       });
       if (error) fail(error);
       if (!data.session || !data.user) {
@@ -141,10 +160,25 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
       return account(id, data.session?.user.email ?? '');
     },
 
+    async setBirthYear(year, isMinor) {
+      const id = await userId();
+      const { error } = await sb.rpc('set_my_birth_year', { y: year, client_minor: isMinor });
+      if (error) fail(error);
+      const { data } = await sb.auth.getSession();
+      return account(id, data.session?.user.email ?? '');
+    },
+
+    async deleteMyAccount() {
+      await userId();
+      const { error } = await sb.rpc('delete_my_account');
+      if (error) fail(error);
+      // The login no longer exists on the server; just forget the session on this device.
+      await sb.auth.signOut({ scope: 'local' }).catch(() => {});
+    },
+
     async listMyTeams() {
       const id = await userId();
-      const { data: me, error: e1 } = await sb.from('profiles').select('role').eq('id', id).single<{ role: Role }>();
-      if (e1) fail(e1);
+      const me = await profile(id);
       if (me.role === 'coach') {
         const { data, error } = await sb.from('teams').select(TEAM_SELECT).eq('coach_id', id).order('created_at');
         if (error) fail(error);
@@ -152,12 +186,15 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
       }
       // team_members has one link to teams (team_id), so this embed is unambiguous.
       type Res = { data: unknown; error: { message: string } | null };
-      let { data, error }: Res = await sb.from('team_members').select(`group_id,team:teams!team_members_team_id_fkey(${TEAM_SELECT})`).eq('user_id', id);
-      if (isMissing(error)) ({ data, error } = (await sb.from('team_members').select(`team:teams!team_members_team_id_fkey(${TEAM_SELECT})`).eq('user_id', id)) as Res);
+      const embed = `team:teams!team_members_team_id_fkey(${TEAM_SELECT})`;
+      let { data, error }: Res = await sb.from('team_members').select(`group_id,consent_status,${embed}`).eq('user_id', id);
+      if (isMissing(error)) ({ data, error } = (await sb.from('team_members').select(`group_id,${embed}`).eq('user_id', id)) as Res);
+      if (isMissing(error)) ({ data, error } = (await sb.from('team_members').select(embed).eq('user_id', id)) as Res);
       if (error) fail(error);
-      return (data as unknown as { group_id: string | null; team: TeamRow | null }[])
+      // Before the 2.1 update there's no consent on file, so a minor (or unknown age) stays read-only.
+      return (data as unknown as { group_id?: string | null; consent_status?: ConsentStatus; team: TeamRow | null }[])
         .filter((r) => r.team)
-        .map((r) => ({ ...toTeam(r.team!), myGroupId: r.group_id }));
+        .map((r) => ({ ...toTeam(r.team!), myGroupId: r.group_id ?? null, myConsent: r.consent_status ?? initialConsent(me.is_minor) }));
     },
 
     async createTeam(name) {
@@ -185,30 +222,58 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
     },
 
     async listMembers(teamId) {
-      const { data, error } = await sb
+      type Row = {
+        user_id: string;
+        joined_at: string;
+        group_id: string | null;
+        consent_status?: ConsentStatus;
+        profile: { name: string; position: string | null; is_minor?: boolean | null } | null;
+      };
+      type Res = { data: unknown; error: { message: string } | null };
+      let { data, error }: Res = await sb
         .from('team_members')
-        .select('user_id,joined_at,group_id,profile:profiles!team_members_user_id_fkey(name,position)')
+        .select('user_id,joined_at,group_id,consent_status,profile:profiles!team_members_user_id_fkey(name,position,is_minor)')
         .eq('team_id', teamId)
         .order('joined_at');
+      if (isMissing(error)) {
+        ({ data, error } = (await sb
+          .from('team_members')
+          .select('user_id,joined_at,group_id,profile:profiles!team_members_user_id_fkey(name,position)')
+          .eq('team_id', teamId)
+          .order('joined_at')) as Res);
+      }
       if (isMissing(error)) {
         const old = await sb.from('team_members').select('user_id,joined_at,profile:profiles!team_members_user_id_fkey(name,position)').eq('team_id', teamId).order('joined_at');
         if (old.error) fail(old.error);
         return (old.data as unknown as { user_id: string; joined_at: string; profile: { name: string; position: string | null } | null }[]).map(
-          (r): Member => ({ userId: r.user_id, name: r.profile?.name || 'Athlete', position: (r.profile?.position as Position) ?? null, joinedAt: r.joined_at, groupId: null }),
+          (r): Member => ({
+            userId: r.user_id,
+            name: r.profile?.name || 'Athlete',
+            position: (r.profile?.position as Position) ?? null,
+            joinedAt: r.joined_at,
+            groupId: null,
+            isMinor: null,
+            consentStatus: 'pending',
+          }),
         );
       }
       if (error) fail(error);
-      return (
-        data as unknown as { user_id: string; joined_at: string; group_id: string | null; profile: { name: string; position: string | null } | null }[]
-      ).map(
+      return (data as unknown as Row[]).map(
         (r): Member => ({
           userId: r.user_id,
           name: r.profile?.name || 'Athlete',
           position: (r.profile?.position as Position) ?? null,
           joinedAt: r.joined_at,
           groupId: r.group_id,
+          isMinor: r.profile?.is_minor ?? null,
+          consentStatus: r.consent_status ?? initialConsent(r.profile?.is_minor),
         }),
       );
+    },
+
+    async recordConsent(teamId, memberId, status) {
+      const { error } = await sb.rpc('record_consent', { t: teamId, athlete: memberId, status });
+      if (error) fail(error);
     },
 
     async removeMember(teamId, memberId) {
@@ -306,18 +371,17 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
           soreness: r.soreness,
           energy: r.energy,
           pain: r.pain,
-          pain_note: r.painNote ?? null,
         },
         { onConflict: 'team_id,user_id,day' },
       );
-      if (isMissing(error)) return; // coach hasn't run the 2.0 update yet; nothing to send to
+      if (isMissing(error)) return; // coach hasn't run the database update yet; nothing to send to
       if (error) fail(error);
     },
 
     async listReadiness(teamId, day) {
       const { data, error } = await sb
         .from('readiness')
-        .select('team_id,user_id,day,sleep,soreness,energy,pain,pain_note,profile:profiles!readiness_user_id_fkey(name)')
+        .select('team_id,user_id,day,sleep,soreness,energy,pain,profile:profiles!readiness_user_id_fkey(name)')
         .eq('team_id', teamId)
         .eq('day', day);
       if (isMissing(error)) return [];
@@ -331,7 +395,6 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
           soreness: number;
           energy: number;
           pain: boolean;
-          pain_note: string | null;
           profile: { name: string } | null;
         }[]
       ).map(
@@ -344,7 +407,6 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
           soreness: r.soreness,
           energy: r.energy,
           pain: r.pain,
-          painNote: r.pain_note ?? undefined,
         }),
       );
     },

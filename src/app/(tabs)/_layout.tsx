@@ -1,18 +1,47 @@
 import { Redirect } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
 import { Platform } from 'react-native';
+import { useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AgeQuestionScreen } from '../../components/AgeGate';
 import { colors, fonts, Icon } from '../../components/ui';
+import type { AgeAnswer } from '../../lib/age';
+import { backend } from '../../lib/backend';
 import { useStore } from '../../lib/store';
+import { useTeams } from '../../lib/team';
 
 /**
  * Tabs: Lift (training), Fuel (nutrition), Plan (season/week), Progress (touch height and strength).
  * Route files keep their original names; only the labels changed.
  */
 export default function TabsLayout() {
-  const { data } = useStore();
+  const { data, setProfile, block } = useStore();
+  const { account, checked, deleteAccount, signOut, refresh } = useTeams();
+  const [busy, setBusy] = useState(false);
   const insets = useSafeAreaInsets();
   if (!data.profile) return <Redirect href="/onboarding" />;
+
+  // Set up before 2.1 with no birth year on file: ask once, before anything else.
+  const needsAge = data.profile.birthYear == null && account?.birthYear == null;
+  if (needsAge) {
+    if (!checked) return null;
+    const profile = data.profile;
+    const answer = async (a: AgeAnswer) => {
+      if (a.under13) {
+        setBusy(true);
+        if (account) {
+          // Request deletion of the account (S5's RPC); if that fails, at least sign out.
+          await deleteAccount().catch(() => signOut().catch(() => {}));
+        }
+        block();
+        return;
+      }
+      setProfile({ ...profile, birthYear: a.birthYear, isMinor: a.isMinor });
+      // Team sync also sends it when the account loads; do it now so consent applies right away.
+      if (account) backend.setBirthYear(a.birthYear, a.isMinor).then(refresh, () => {});
+    };
+    return <AgeQuestionScreen onAnswer={answer} busy={busy} />;
+  }
   const coach = data.profile.role === 'coach';
 
   return (

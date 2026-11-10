@@ -4,6 +4,8 @@ import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Body, Button, Card, colors, Field, H1, H2, Label, Lockup, NetTape, Note, OptionCard, Screen } from '../components/ui';
 import AccountForm from '../components/AccountForm';
+import { AgeQuestion } from '../components/AgeGate';
+import type { AgeAnswer } from '../lib/age';
 import JoinTeamForm from '../components/JoinTeamForm';
 import { LiftDayPicker, WeekEditor } from '../components/week';
 import type { Team } from '../lib/backend';
@@ -29,10 +31,11 @@ function useOnboardingAccount() {
 // Practices only. Matches and tournaments go on the season calendar by date, since they change week to week.
 const DEFAULT_WEEK: DayType[] = ['practice', 'practice', 'practice', 'practice', 'practice', 'off', 'off'];
 
-type Step = 'role' | 'account' | 'join' | 'name' | 'position' | 'level' | 'week' | 'weight';
+type Step = 'age' | 'role' | 'account' | 'join' | 'name' | 'position' | 'level' | 'week' | 'weight';
 
 export default function Onboarding() {
-  const { setProfile, saveProgram } = useStore();
+  const { setProfile, saveProgram, block } = useStore();
+  const [age, setAge] = useState<AgeAnswer | null>(null);
   const { account, updatePosition } = useOnboardingAccount();
   const [stepIndex, setStepIndex] = useState(0);
   const { code: linkCode } = useLocalSearchParams<{ code?: string }>();
@@ -60,8 +63,9 @@ export default function Onboarding() {
   const effectiveRole: Role | null = account?.role ?? role;
   const steps: Step[] =
     effectiveRole === 'coach'
-      ? ['role', 'account']
+      ? ['age', 'role', 'account']
       : [
+          'age',
           'role',
           'account',
           ...(account ? (['join'] as Step[]) : []),
@@ -90,6 +94,8 @@ export default function Onboarding() {
       liftDays,
       volleyballWeek: week,
       equipment,
+      // Birth year and under-18 only; the month isn't kept. A signed-in account's own values win (team sync copies them).
+      ...(age ? { birthYear: account?.birthYear ?? age.birthYear, isMinor: account?.isMinor ?? age.isMinor } : {}),
     };
     setProfile(profile);
     if (r === 'athlete') {
@@ -117,6 +123,21 @@ export default function Onboarding() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'bottom']}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Screen>
+          {step === 'age' && (
+            <AgeQuestion
+              onAnswer={(a) => {
+                if (a.under13) {
+                  block(); // saves only the not-eligible flag
+                  return;
+                }
+                setAge(a);
+                // Coach accounts are for adults 18 and older.
+                if (a.isMinor && role === 'coach') setRole(null);
+                next();
+              }}
+            />
+          )}
+
           {step === 'role' && (
             <>
               <View style={{ gap: 20, marginTop: 24, marginBottom: 8 }}>
@@ -141,6 +162,8 @@ export default function Onboarding() {
                 subtitle="Build programs and send them to players"
                 selected={role === 'coach'}
                 onPress={() => setRole('coach')}
+                disabled={!!age?.isMinor}
+                caption={age?.isMinor ? 'Coach accounts are for adults 18 and older.' : undefined}
               />
             </>
           )}
@@ -155,6 +178,7 @@ export default function Onboarding() {
               </Body>
               <AccountForm
                 role={role ?? 'athlete'}
+                age={age}
                 onDone={(a) => {
                   if (a.role === 'coach') finish('coach', a.name);
                   else next();
@@ -258,7 +282,7 @@ export default function Onboarding() {
             </>
           )}
 
-          {step === 'account' || step === 'join' ? (
+          {step === 'age' ? null : step === 'account' || step === 'join' ? (
             stepIndex > 0 ? <Button kind="ghost" title="Back" onPress={back} /> : null
           ) : (
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>

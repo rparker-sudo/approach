@@ -1,10 +1,12 @@
 import { SymbolView } from 'expo-symbols';
 import type { AndroidSymbol } from 'expo-symbols';
 import type { SFSymbol } from 'sf-symbols-typescript';
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  FlatList,
   Image,
+  Modal,
   Pressable,
   Text as RNText,
   TextInput as RNTextInput,
@@ -125,6 +127,8 @@ const WEB_ICON: Partial<Record<string, AndroidSymbol>> = {
   'chevron.down': 'expand_more',
   checkmark: 'check',
   'checkmark.circle': 'check_circle',
+  square: 'check_box_outline_blank',
+  'checkmark.square.fill': 'check_box',
   'play.fill': 'play_arrow',
   'wand.and.stars': 'auto_awesome',
   plus: 'add',
@@ -280,20 +284,28 @@ export function OptionCard({
   selected,
   onPress,
   icon,
+  disabled,
+  caption,
 }: {
   title: string;
   subtitle?: string;
   selected: boolean;
   onPress: () => void;
   icon?: SFSymbol;
+  disabled?: boolean;
+  /** Shown under the card (e.g. why it's disabled). */
+  caption?: string;
 }) {
-  return (
+  const card = (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ selected }}
+      accessibilityState={{ selected, disabled }}
       aria-selected={selected}
+      aria-disabled={disabled}
+      disabled={disabled}
       onPress={onPress}
       style={{
+        opacity: disabled ? 0.45 : 1,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 14,
@@ -311,6 +323,123 @@ export function OptionCard({
       </View>
       {selected ? <Icon name="checkmark.circle" size={22} color={colors.ink} /> : null}
     </Pressable>
+  );
+  if (!caption) return card;
+  return (
+    <View style={{ gap: 6 }}>
+      {card}
+      <Text style={{ fontSize: 13, color: colors.muted }}>{caption}</Text>
+    </View>
+  );
+}
+
+/** Warning banner (text + color; not an error). */
+export function Banner({ children, action }: { children: ReactNode; action?: { label: string; onPress: () => void } }) {
+  return (
+    <View
+      accessibilityRole="alert"
+      style={{
+        backgroundColor: colors.raised,
+        padding: 12,
+        gap: 8,
+        borderRadius: BRAND.radius.sm,
+        borderLeftWidth: 4,
+        borderLeftColor: colors.warning,
+      }}
+    >
+      <Text style={{ fontSize: 14, fontWeight: '500', lineHeight: 20 }}>{children}</Text>
+      {action ? (
+        <Pressable accessibilityRole="link" onPress={action.onPress} style={{ minHeight: 44, justifyContent: 'center' }}>
+          <Text style={{ fontSize: 14, fontWeight: '600', textDecorationLine: 'underline' }}>{action.label}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+/** Small status label. `warning` adds the warning color, but the text always carries the meaning. */
+export function StatusChip({ label, tone = 'muted' }: { label: string; tone?: 'warning' | 'muted' }) {
+  const warn = tone === 'warning';
+  return (
+    <View
+      style={{
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: BRAND.radius.pill,
+        borderWidth: 1,
+        borderColor: warn ? colors.warning : colors.line,
+        alignSelf: 'flex-start',
+      }}
+    >
+      <Text style={{ fontSize: 12, fontWeight: '600', color: warn ? colors.warning : colors.muted }}>{label}</Text>
+    </View>
+  );
+}
+
+/** A tap-to-choose field that opens a list (used for the month/year question). Starts empty. */
+export function SelectField<T extends string | number>({
+  label,
+  placeholder,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  value: T | null;
+  options: { value: T; label: string }[];
+  onChange: (v: T) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const current = options.find((o) => o.value === value);
+  return (
+    <View style={{ gap: 6, flex: 1 }}>
+      <Label>{label}</Label>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${label}: ${current ? current.label : 'not set'}`}
+        onPress={() => setOpen(true)}
+        style={[inputStyle(), { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+      >
+        <Text style={{ fontSize: 16, color: current ? colors.ink : colors.faint }}>{current ? current.label : placeholder}</Text>
+        <Icon name="chevron.down" size={16} color={colors.muted} />
+      </Pressable>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }} onPress={() => setOpen(false)}>
+          <Pressable
+            onPress={() => {}}
+            style={{
+              backgroundColor: colors.card,
+              borderTopLeftRadius: BRAND.radius.lg,
+              borderTopRightRadius: BRAND.radius.lg,
+              maxHeight: '70%',
+              paddingBottom: 24,
+            }}
+          >
+            <View style={{ padding: 16 }}>
+              <H2>{label}</H2>
+            </View>
+            <FlatList
+              data={options}
+              keyExtractor={(o) => String(o.value)}
+              initialNumToRender={20}
+              renderItem={({ item }) => (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    onChange(item.value);
+                    setOpen(false);
+                  }}
+                  style={{ minHeight: 48, paddingHorizontal: 16, justifyContent: 'center', backgroundColor: item.value === value ? colors.raised : 'transparent' }}
+                >
+                  <Text style={{ fontSize: 16 }}>{item.label}</Text>
+                </Pressable>
+              )}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
   );
 }
 

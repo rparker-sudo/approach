@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { dateKey, today } from '../lib/calendar';
+import { canCheckIn } from '../lib/backend';
 import { useStore } from '../lib/store';
 import { useTeams } from '../lib/team';
-import { Button, Card, Chip, ChipRow, colors, Label, Row, Text, TextInput } from './ui';
+import { Button, Card, Chip, ChipRow, colors, Label, Note, Row, Text } from './ui';
+
+const SHARING = 'Your coach sees your check-ins. Teammates never do.';
 
 const SCALES = [
   { key: 'sleep', label: 'Sleep', low: 'Bad', high: 'Great' },
@@ -18,15 +21,17 @@ type Scores = { sleep: number; soreness: number; energy: number };
  * athletes it goes to the coach, who decides whether to lighten the day.
  */
 export default function ReadinessCard() {
-  const { data } = useStore();
-  const { teams, checkIn } = useTeams();
+  const { data, mutate } = useStore();
+  const { teams, checkIn, consentFor } = useTeams();
   const day = dateKey(today());
   const existing = (data.readinessLog ?? []).find((r) => r.day === day);
   const [editing, setEditing] = useState(!existing);
   const [scores, setScores] = useState<Scores>({ sleep: existing?.sleep ?? 0, soreness: existing?.soreness ?? 0, energy: existing?.energy ?? 0 });
   const [pain, setPain] = useState<boolean | null>(existing ? existing.pain : null);
-  const [note, setNote] = useState(existing?.painNote ?? '');
-  const onTeam = teams.length > 0;
+  // Only teams with check-in consent (or adults) get check-ins.
+  const sharedWith = teams.filter((t) => canCheckIn(consentFor(t.id)));
+  const onTeam = sharedWith.length > 0 || Object.values(data.teamConsent ?? {}).some((c) => canCheckIn(c));
+  const showNotice = onTeam && !data.checkinNoticeSeen;
   const ready = scores.sleep && scores.soreness && scores.energy && pain !== null;
 
   if (existing && !editing) {
@@ -39,11 +44,11 @@ export default function ReadinessCard() {
           </Row>
           <Text style={{ fontSize: 13 }}>
             Sleep {existing.sleep}/5 · Soreness {existing.soreness}/5 · Energy {existing.energy}/5
-            {existing.pain ? ` · Pain${existing.painNote ? `: ${existing.painNote}` : ''}` : ''}
+            {existing.pain ? ' · Pain' : ''}
           </Text>
           {onTeam ? (
             <Text style={{ fontSize: 12, color: colors.muted }}>
-              {teams.every((t) => existing.sentTo.includes(t.id)) ? 'Sent to your coach.' : 'Sending to your coach…'}
+              {sharedWith.every((t) => existing.sentTo.includes(t.id)) ? 'Sent to your coach.' : 'Sending to your coach…'}
             </Text>
           ) : null}
         </Card>
@@ -54,6 +59,12 @@ export default function ReadinessCard() {
   return (
     <Card>
       <Label>How are you today?</Label>
+      {showNotice ? (
+        <View style={{ gap: 8 }}>
+          <Note>{SHARING}</Note>
+          <Button small kind="secondary" title="Got it." onPress={() => mutate((d) => ({ ...d, checkinNoticeSeen: true }))} />
+        </View>
+      ) : null}
       {SCALES.map((sc) => (
         <View key={sc.key} style={{ gap: 6 }}>
           <Row style={{ justifyContent: 'space-between' }}>
@@ -96,19 +107,17 @@ export default function ReadinessCard() {
         <Chip label="No" selected={pain === false} onPress={() => setPain(false)} />
         <Chip label="Yes" selected={pain === true} onPress={() => setPain(true)} />
       </ChipRow>
-      {pain ? <TextInput placeholder="Where? (optional)" value={note} onChangeText={setNote} maxLength={200} /> : null}
+      <Text style={{ fontSize: 13, color: colors.muted }}>Tell your coach, parent, or athletic trainer in person about any pain.</Text>
       <Button
         title="Check in"
         disabled={!ready}
         onPress={() => {
-          checkIn({ day, ...scores, pain: !!pain, painNote: pain && note.trim() ? note.trim() : undefined });
+          checkIn({ day, ...scores, pain: !!pain });
           setEditing(false);
         }}
       />
       <Text style={{ fontSize: 12, color: colors.muted }}>
-        {onTeam
-          ? "Your coach sees this. It doesn't change your workout; your coach decides if the team goes lighter."
-          : "Just for you. It doesn't change your workout."}
+        {onTeam ? (showNotice ? "It doesn't change your workout; your coach decides if the team goes lighter." : SHARING) : "Just for you. It doesn't change your workout."}
       </Text>
     </Card>
   );

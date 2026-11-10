@@ -3,8 +3,11 @@ import { showAlert } from '../lib/dialog';
 import { useState } from 'react';
 
 import Constants from 'expo-constants';
+import { myConsentLine } from '../components/Consent';
+import DeleteAccountDialog from '../components/DeleteAccountDialog';
 import { Body, Button, Card, Chip, ChipRow, colors, Field, H2, Label, Lockup, Row, Screen, Text } from '../components/ui';
 import { isDemoMode, syncConfigProblem } from '../lib/backend';
+import { LEGAL_TITLES, LegalPage, openLegal } from '../lib/legal';
 import { useStore } from '../lib/store';
 import { useTeams } from '../lib/team';
 import { POSITIONS } from '../lib/types';
@@ -13,7 +16,8 @@ import { NUTRITION_DISCLAIMER } from '../lib/nutrition';
 
 export default function Settings() {
   const { data, setProfile, resetAll, setTheme } = useStore();
-  const { account, teams, signOut, leaveTeam } = useTeams();
+  const { account, teams, signOut, leaveTeam, deleteAccount, consentFor } = useTeams();
+  const [deleting, setDeleting] = useState(false);
   const [name, setName] = useState(data.profile?.name ?? '');
   const [weight, setWeight] = useState(data.profile?.bodyWeightLb ? String(data.profile.bodyWeightLb) : '');
   if (!data.profile) return null;
@@ -84,6 +88,18 @@ export default function Settings() {
               ))
             ) : null}
             <Button kind="ghost" title="Sign out" onPress={() => signOut().then(() => router.back())} />
+            <Button kind="danger" title="Delete my account" onPress={() => setDeleting(true)} />
+            <DeleteAccountDialog
+              visible={deleting}
+              coach={coach}
+              onCancel={() => setDeleting(false)}
+              onDelete={async () => {
+                await deleteAccount();
+                setDeleting(false);
+                resetAll(); // erase this phone's data too
+                router.replace('/onboarding');
+              }}
+            />
           </>
         ) : (
           <>
@@ -100,6 +116,8 @@ export default function Settings() {
         <Button
           kind="ghost"
           title={coach ? 'Switch to athlete mode' : 'Switch to coach mode'}
+          // Coach accounts are for adults 18 and older.
+          disabled={!coach && profile.isMinor !== false}
           onPress={() => {
             setProfile({ ...profile, role: coach ? 'athlete' : 'coach' });
             router.back();
@@ -111,6 +129,17 @@ export default function Settings() {
       <Card>
         <H2>Your data</H2>
         <Body muted>{account ? 'Your profile and team workouts sync with your team. Body weight and personal notes stay on this phone.' : 'Everything is stored only on this phone. Nothing is uploaded.'}</Body>
+        {!coach && account
+          ? teams.map((t) => {
+              const line = myConsentLine(consentFor(t.id));
+              return line ? (
+                <Text key={t.id} style={{ fontSize: 14 }}>
+                  {teams.length > 1 ? `${t.name}: ` : ''}
+                  {line}
+                </Text>
+              ) : null;
+            })
+          : null}
         <Button
           kind="danger"
           title="Erase all data"
@@ -129,6 +158,13 @@ export default function Settings() {
             ])
           }
         />
+      </Card>
+
+      <Card>
+        <H2>Legal</H2>
+        {(['privacy', 'terms', 'consent'] as LegalPage[]).map((p) => (
+          <Button key={p} kind="ghost" title={LEGAL_TITLES[p]} onPress={() => openLegal(p)} />
+        ))}
       </Card>
 
       <Card style={{ alignItems: 'center', paddingVertical: 24 }}>

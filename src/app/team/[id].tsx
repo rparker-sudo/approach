@@ -1,9 +1,12 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { rosterChip } from '../../components/Consent';
+import ConsentSheet from '../../components/ConsentSheet';
 import { weekStart } from '../../components/TeamHome';
-import { Body, Button, Card, Chip, ChipRow, colors, display, Field, H2, Icon, Label, Note, Pill, Row, Text } from '../../components/ui';
-import { isDemoMode } from '../../lib/backend';
+import { Body, Button, Card, Chip, ChipRow, colors, display, Field, Icon, Label, Note, Pill, Row, StatusChip, Text } from '../../components/ui';
+import { canCheckIn, isDemoMode } from '../../lib/backend';
+import { openLegal } from '../../lib/legal';
 import { dateKey, today } from '../../lib/calendar';
 import { showAlert } from '../../lib/dialog';
 import { shareTeamInvite } from '../../lib/share';
@@ -23,6 +26,7 @@ export default function TeamScreen() {
   const [addingGroup, setAddingGroup] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [openMember, setOpenMember] = useState<string | null>(null);
+  const [consentFor, setConsentFor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (!team) {
@@ -45,11 +49,13 @@ export default function TeamScreen() {
   const anyUnposted = t.hasUnposted(team.id);
   const firstProgram = data.programs.find((p) => p.teamId === team.id);
 
-  // Readiness: whole team, and per group.
+  // Readiness: whole team, and per group. Only athletes with check-in consent (or adults) count.
   const checkins = t.readiness[team.id] ?? [];
-  const overall = summarizeReadiness(checkins, roster.length);
+  const canCheck = roster.filter((m) => canCheckIn(m.consentStatus));
+  const withoutConsent = roster.length - canCheck.length;
+  const overall = summarizeReadiness(checkins, canCheck.length);
   const perGroup = groups.map((g) => {
-    const ids = roster.filter((m) => m.groupId === g.id).map((m) => m.userId);
+    const ids = canCheck.filter((m) => m.groupId === g.id).map((m) => m.userId);
     return { g, s: summarizeReadiness(checkins.filter((r) => ids.includes(r.userId)), ids.length) };
   });
 
@@ -94,6 +100,11 @@ export default function TeamScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <Stack.Screen options={{ title: team.name }} />
+      <ConsentSheet
+        member={roster.find((m) => m.userId === consentFor) ?? null}
+        onClose={() => setConsentFor(null)}
+        onSave={(status) => t.recordConsent(team.id, consentFor!, status)}
+      />
       {error ? <Text style={{ color: colors.error, fontSize: 13 }}>{error}</Text> : null}
 
       {anyUnposted ? (
@@ -112,8 +123,14 @@ export default function TeamScreen() {
         ) : (
           <>
             <Text style={{ fontSize: 16, fontWeight: '600' }}>
-              {overall.checkedIn} of {roster.length} checked in · {overall.low.length} run down · {overall.pain.length} pain
+              {overall.checkedIn} of {canCheck.length} checked in
+              {withoutConsent ? ` · ${withoutConsent} without check-in consent` : ''}
             </Text>
+            {overall.checkedIn ? (
+              <Text style={{ fontSize: 13, color: colors.muted }}>
+                {overall.low.length} run down · {overall.pain.length} pain
+              </Text>
+            ) : null}
             {overall.suggest ? <Note>Several athletes are run down. Consider a lighter workout today. It's your call.</Note> : null}
             {perGroup
               .filter((x) => x.s.suggest)
@@ -129,7 +146,7 @@ export default function TeamScreen() {
                     <Text style={{ color: colors.muted }}>
                       {' '}
                       · sleep {r.sleep}/5 · soreness {r.soreness}/5 · energy {r.energy}/5
-                      {r.pain ? ` · pain${r.painNote ? `: ${r.painNote}` : ''}` : ''}
+                      {r.pain ? ' · pain' : ''}
                     </Text>
                   </Text>
                 ))}
@@ -166,6 +183,10 @@ export default function TeamScreen() {
             <Button kind="secondary" title="Share link" icon="square.and.arrow.up" onPress={() => shareTeamInvite(team.name, team.joinCode, t.account?.name)} />
           </View>
         </Row>
+        <Button kind="ghost" small title="Print parent consent form" onPress={() => openLegal('consent')} />
+        <Text style={{ fontSize: 12, color: colors.muted, textAlign: 'center' }}>
+          Athletes under 18 can view the plan but can't log until you record their signed form.
+        </Text>
       </Card>
 
       {/* ---------- Workouts by group ---------- */}
@@ -301,12 +322,31 @@ export default function TeamScreen() {
               const week = mine.filter((l) => l.date >= since).length;
               const open = openMember === m.userId;
               const ci = checkins.find((r) => r.userId === m.userId);
+              const chip = rosterChip(m.consentStatus);
               return (
                 <View key={m.userId} style={{ paddingVertical: 12, borderTopWidth: i ? 1 : 0, borderTopColor: colors.line, gap: 8 }}>
-                  <Pressable accessibilityRole="button" onPress={() => setOpenMember(open ? null : m.userId)}>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => {
+                      // A minor with no form recorded: tapping the row records consent (F3).
+                      if (m.consentStatus === 'pending' && !open) setConsentFor(m.userId);
+                      setOpenMember(open ? null : m.userId);
+                    }}
+                  >
                     <Row style={{ alignItems: 'flex-start' }}>
                       <View style={{ flex: 1, gap: 2 }}>
                         <Text style={{ fontSize: 16, fontWeight: '600' }}>{m.name}</Text>
+                        {chip ? (
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`${chip.label}. Parent consent for ${m.name}`}
+                            onPress={() => setConsentFor(m.userId)}
+                            hitSlop={12}
+                            style={{ alignSelf: 'flex-start', paddingVertical: 2 }}
+                          >
+                            <StatusChip label={chip.label} tone={chip.tone} />
+                          </Pressable>
+                        ) : null}
                         <Text style={{ fontSize: 13, color: colors.muted }}>
                           {m.position ?? 'Position not set'} · {groupName_(m.groupId)}
                           {mine[0] ? ` · Last lift ${formatDate(mine[0].date)}` : ' · No lifts logged'}
@@ -323,6 +363,14 @@ export default function TeamScreen() {
                   </Pressable>
                   {open ? (
                     <View style={{ gap: 8 }}>
+                      {chip ? (
+                        <Button
+                          small
+                          kind="secondary"
+                          title={m.consentStatus === 'pending' ? 'Record parent consent' : 'Change parent consent'}
+                          onPress={() => setConsentFor(m.userId)}
+                        />
+                      ) : null}
                       <Text style={{ fontSize: 12, color: colors.muted }}>Group</Text>
                       <ChipRow>
                         <Chip label="Whole team" selected={!m.groupId} onPress={() => act(() => t.assignGroup(team.id, m.userId, null))} />

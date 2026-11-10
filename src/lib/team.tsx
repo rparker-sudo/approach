@@ -4,9 +4,13 @@ import {
   Account,
   backend,
   BackendError,
+  canCheckIn,
+  canLog,
+  ConsentStatus,
   Group,
   Member,
   Readiness,
+  RecordableConsent,
   SignUpInput,
   Team,
   TeamCalendar,
@@ -105,6 +109,12 @@ type TeamState = {
   setLightDay: (teamId: string, groupKey: string, day: string, light: boolean) => Promise<void>;
   /** Athlete daily check-in. */
   checkIn: (entry: Omit<ReadinessEntry, 'sentTo'>) => void;
+  /** Athletes: this team's consent status (last known, so it works offline). */
+  consentFor: (teamId: string | undefined) => ConsentStatus | undefined;
+  /** Coach records (or clears) a minor's parent consent. */
+  recordConsent: (teamId: string, userId: string, status: RecordableConsent) => Promise<void>;
+  /** Deletes the account on the server; the caller then erases local data. */
+  deleteAccount: () => Promise<void>;
 };
 
 const Ctx = createContext<TeamState | null>(null);
@@ -234,7 +244,9 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   teamsRef.current = teams;
 
   const flushLogs = useCallback(async () => {
-    const pending = dataRef.current.logs.filter((l) => l.teamId && !l.synced);
+    // Only teams where the athlete may log (parent consent on file, or an adult).
+    const allowed = new Set(teamsRef.current.filter((t) => canLog(t.myConsent)).map((t) => t.id));
+    const pending = dataRef.current.logs.filter((l) => l.teamId && !l.synced && allowed.has(l.teamId));
     const sent: string[] = [];
     for (const l of pending) {
       try {
@@ -256,9 +268,9 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     if (!entry) return;
     const sent: string[] = [];
     for (const t of teamsRef.current) {
-      if (entry.sentTo.includes(t.id)) continue;
+      if (entry.sentTo.includes(t.id) || !canCheckIn(t.myConsent)) continue;
       try {
-        await backend.submitReadiness({ teamId: t.id, day, sleep: entry.sleep, soreness: entry.soreness, energy: entry.energy, pain: entry.pain, painNote: entry.painNote });
+        await backend.submitReadiness({ teamId: t.id, day, sleep: entry.sleep, soreness: entry.soreness, energy: entry.energy, pain: entry.pain });
         sent.push(t.id);
       } catch {
         break;
@@ -289,7 +301,10 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       teamsRef.current = t;
       setGroups(groupMap);
       setPosted(Object.fromEntries(tps.map((p) => [postedKey(p.teamId, p.groupKey), p])));
-      mutate((d) => applyPosted(d, acct.role, { teams: t, posted: tps, calendars: cals, groups: groupMap }));
+      mutate((d) => ({
+        ...applyPosted(d, acct.role, { teams: t, posted: tps, calendars: cals, groups: groupMap }),
+        teamConsent: acct.role === 'athlete' ? Object.fromEntries(t.map((x) => [x.id, x.myConsent ?? 'pending'])) : {},
+      }));
       if (acct.role === 'coach') {
         const since = new Date(Date.now() - LOG_WINDOW_DAYS * 864e5).toISOString();
         const day = dateKey(today());
@@ -322,14 +337,26 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       .finally(() => setChecked(true));
   }, []);
 
-  // The signed-in account decides coach vs athlete mode on this device.
+  // The signed-in account decides coach vs athlete mode (and age) on this device.
   useEffect(() => {
     if (!account) return;
+    const age = account.birthYear != null ? { birthYear: account.birthYear, isMinor: account.isMinor ?? true } : {};
     mutate((d) =>
-      d.profile && (d.profile.role !== account.role || (account.name && d.profile.name !== account.name))
-        ? { ...d, profile: { ...d.profile, role: account.role, name: account.name || d.profile.name } }
+      d.profile &&
+      (d.profile.role !== account.role ||
+        (account.name && d.profile.name !== account.name) ||
+        (account.birthYear != null && (d.profile.birthYear !== account.birthYear || d.profile.isMinor !== (account.isMinor ?? true))))
+        ? { ...d, profile: { ...d.profile, role: account.role, name: account.name || d.profile.name, ...age } }
         : d,
     );
+    // Accounts from before 2.1: send the age answered on this device once.
+    const p = dataRef.current.profile;
+    if (account.birthYear == null && p?.birthYear != null) {
+      backend
+        .setBirthYear(p.birthYear, p.isMinor ?? true)
+        .then((a) => setAccount(a))
+        .catch(() => {});
+    }
   }, [account, mutate]);
 
   // Refresh when the account changes and whenever the app comes back to the foreground.
@@ -355,7 +382,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     if (account?.role === 'athlete' && pendingCount > 0) flushLogs();
   }, [account, pendingCount, flushLogs]);
   const todayEntry = (data.readinessLog ?? []).find((r) => r.day === dateKey(today()));
-  const readinessPending = !!todayEntry && teams.some((t) => !todayEntry.sentTo.includes(t.id));
+  const readinessPending = !!todayEntry && teams.some((t) => canCheckIn(t.myConsent) && !todayEntry.sentTo.includes(t.id));
   useEffect(() => {
     if (account?.role === 'athlete' && readinessPending) flushReadiness();
   }, [account, readinessPending, flushReadiness]);
@@ -403,6 +430,27 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     [mutate],
   );
 
+  /** Forget the account's team data on this device (sign out / account deleted). */
+  const clearTeamState = useCallback(() => {
+    setAccount(null);
+    setTeams([]);
+    setMembers({});
+    setGroups({});
+    setLogs({});
+    setReadiness({});
+    setPosted({});
+    mutate((d) => {
+      const programs = d.programs.filter((p) => !p.teamId);
+      return {
+        ...d,
+        programs,
+        teamCalendars: {},
+        teamConsent: {},
+        activeProgramId: programs.some((p) => p.id === d.activeProgramId) ? d.activeProgramId : null,
+      };
+    });
+  }, [mutate]);
+
   const value = useMemo<TeamState>(
     () => ({
       account,
@@ -428,22 +476,19 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       },
       async signOut() {
         await backend.signOut();
-        setAccount(null);
-        setTeams([]);
-        setMembers({});
-        setGroups({});
-        setLogs({});
-        setReadiness({});
-        setPosted({});
-        mutate((d) => {
-          const programs = d.programs.filter((p) => !p.teamId);
-          return {
-            ...d,
-            programs,
-            teamCalendars: {},
-            activeProgramId: programs.some((p) => p.id === d.activeProgramId) ? d.activeProgramId : null,
-          };
-        });
+        clearTeamState();
+      },
+      async deleteAccount() {
+        await backend.deleteMyAccount();
+        clearTeamState();
+      },
+      consentFor(teamId) {
+        if (!teamId) return undefined;
+        return teams.find((t) => t.id === teamId)?.myConsent ?? data.teamConsent?.[teamId];
+      },
+      async recordConsent(teamId, userId, status) {
+        await backend.recordConsent(teamId, userId, status);
+        await refresh();
       },
       async createTeam(name) {
         const t = await backend.createTeam(name);
@@ -534,7 +579,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         }));
       },
     }),
-    [account, checked, teams, members, groups, logs, readiness, posted, syncing, lastError, refresh, mutate, data, postCalendarIfNeeded, postProgram, writeCalendar],
+    [account, checked, teams, members, groups, logs, readiness, posted, syncing, lastError, refresh, mutate, data, postCalendarIfNeeded, postProgram, writeCalendar, clearTeamState],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

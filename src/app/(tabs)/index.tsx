@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
+import { ConsentBanner } from '../../components/Consent';
 import ReadinessCard from '../../components/ReadinessCard';
 import ScreenHeader from '../../components/ScreenHeader';
 import TeamHome from '../../components/TeamHome';
@@ -24,6 +25,7 @@ import { getExercise } from '../../lib/exercises';
 import { captainLine, dayAdvice } from '../../lib/generator';
 import { fuelDay, fuelTargets } from '../../lib/nutrition';
 import { sessionForDate } from '../../lib/progression';
+import { canCheckIn, canLog } from '../../lib/backend';
 import { useStore } from '../../lib/store';
 import { useTeams } from '../../lib/team';
 import { DAY_TYPES, WEEKDAYS } from '../../lib/types';
@@ -44,7 +46,7 @@ function startOfWeek(d = new Date()) {
 
 function Today() {
   const { data, activeProgram } = useStore();
-  const { account, teams } = useTeams();
+  const { account, teams, consentFor } = useTeams();
   const profile = data.profile!;
   const i = weekdayIndex();
   const now = new Date();
@@ -74,6 +76,12 @@ function Today() {
     );
   }
 
+  // Parent consent (coached minors): the team plan is read-only until the coach records the form.
+  const loggingLocked = !!activeProgram.teamId && !canLog(consentFor(activeProgram.teamId));
+  // Check-ins: solo athletes keep them on the phone; team athletes need a team that allows them.
+  const teamIds = teams.length ? teams.map((t) => t.id) : Object.keys(data.teamConsent ?? {});
+  const showCheckIn = teamIds.length === 0 || teamIds.some((id) => canCheckIn(consentFor(id)));
+
   // Real dates: the season calendar and automatic lift moves apply.
   const day = today();
   const week = weekPlan(activeProgram, mondayOf(day));
@@ -94,8 +102,9 @@ function Today() {
   return (
     <Screen tab>
       <ScreenHeader title="Lift" subtitle={dateLine} />
+      {loggingLocked ? <ConsentBanner /> : null}
       <Text style={{ fontSize: 20, fontWeight: '600' }}>{captainLine(activeProgram, day)}</Text>
-      <ReadinessCard />
+      {showCheckIn ? <ReadinessCard /> : null}
 
       <Card>
         <Row style={{ justifyContent: 'space-between' }}>
@@ -123,11 +132,15 @@ function Today() {
               ) : null}
             </View>
             {doneToday ? <Pill text="Done today" achievement /> : null}
-            <Button
-              title={doneToday ? 'Log it again' : 'Start workout'}
-              icon="play.fill"
-              onPress={() => router.push({ pathname: '/workout', params: { programId: activeProgram.id, sessionId: session.id } })}
-            />
+            {loggingLocked ? (
+              <Button title="Logging unlocks after consent." disabled onPress={() => {}} />
+            ) : (
+              <Button
+                title={doneToday ? 'Log it again' : 'Start workout'}
+                icon="play.fill"
+                onPress={() => router.push({ pathname: '/workout', params: { programId: activeProgram.id, sessionId: session.id } })}
+              />
+            )}
           </>
         ) : (
           <>

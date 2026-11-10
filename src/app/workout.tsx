@@ -12,7 +12,10 @@ import { CATEGORY_LABEL, getExercise } from '../lib/exercises';
 import { formatRest, restSecFor } from '../lib/generator';
 import { repRange, sessionForDate, suggestWeight, Suggestion } from '../lib/progression';
 import { adjustRest, clock, Rest, secondsLeft, startRest } from '../lib/restTimer';
+import { ConsentBanner } from '../components/Consent';
+import { canLog } from '../lib/backend';
 import { useStore } from '../lib/store';
+import { useTeams } from '../lib/team';
 import type { LoggedSet, ProgramExercise, WorkoutLog } from '../lib/types';
 import { estimate1RM, uid } from '../lib/util';
 
@@ -38,6 +41,7 @@ export default function Workout() {
   useKeepAwake();
   const { programId, sessionId } = useLocalSearchParams<{ programId: string; sessionId: string }>();
   const { data, addLog } = useStore();
+  const { consentFor } = useTeams();
   const insets = useSafeAreaInsets();
   const program = data.programs.find((p) => p.id === programId);
   const session = program?.sessions.find((s) => s.id === sessionId);
@@ -106,6 +110,16 @@ export default function Workout() {
   }, [rest, left]);
 
   if (!program || !session || !day) return <View style={{ flex: 1, backgroundColor: colors.bg }}><Body muted>Workout not found.</Body></View>;
+  // Team workouts need parent consent on file for minors (the server enforces this too).
+  if (program.teamId && !canLog(consentFor(program.teamId))) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg, padding: 16, gap: 16, paddingTop: insets.top + 16 }}>
+        <Stack.Screen options={{ title: session.name }} />
+        <ConsentBanner />
+        <Button kind="ghost" title="Back" onPress={() => router.back()} />
+      </View>
+    );
+  }
   if (!draft) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
 
   const entries = draft.entries;

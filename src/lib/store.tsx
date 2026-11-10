@@ -1,9 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import type { AppData, BodyLog, Profile, Program, TouchLog, WorkoutLog } from './types';
+import type { AppData, BodyLog, Profile, Program, ReadinessEntry, TouchLog, WorkoutLog } from './types';
 import { uid } from './util';
 
 const KEY = 'volley-strength/data/v1';
+/** Not-eligible flag (2.1, S1). Kept apart from app data so erasing data doesn't clear it. Nothing else is saved. */
+const BLOCK_KEY = 'approach/not-eligible/v1';
 
 const EMPTY: AppData = {
   version: 1,
@@ -31,6 +33,10 @@ type Store = {
   addTouchLog: (t: TouchLog) => void;
   deleteTouchLog: (date: string) => void;
   setNetHeight: (inches: number) => void;
+  /** This device answered the age question as under 13. */
+  blocked: boolean;
+  /** Erase everything and remember only the not-eligible flag. */
+  block: () => void;
   /** Low-level update used by team sync. */
   mutate: (fn: (d: AppData) => AppData) => void;
 };
@@ -40,21 +46,29 @@ const Ctx = createContext<Store | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(EMPTY);
   const [ready, setReady] = useState(false);
+  const [blocked, setBlocked] = useState(false);
   const loaded = useRef(false);
 
   useEffect(() => {
-    AsyncStorage.getItem(KEY)
+    const flag = AsyncStorage.getItem(BLOCK_KEY)
+      .then((v) => {
+        if (v === '1') setBlocked(true);
+      })
+      .catch(() => {});
+    const app = AsyncStorage.getItem(KEY)
       .then((raw) => {
         if (raw) {
           const parsed = JSON.parse(raw) as AppData;
-          setData({ ...EMPTY, ...parsed });
+          // 2.1: free-text pain notes are no longer kept, even on the device.
+          const readinessLog = parsed.readinessLog?.map(({ painNote: _n, ...r }: ReadinessEntry & { painNote?: string }) => r);
+          setData({ ...EMPTY, ...parsed, ...(readinessLog ? { readinessLog } : {}) });
         }
       })
-      .catch(() => {})
-      .finally(() => {
-        loaded.current = true;
-        setReady(true);
-      });
+      .catch(() => {});
+    Promise.all([flag, app]).finally(() => {
+      loaded.current = true;
+      setReady(true);
+    });
   }, []);
 
   useEffect(() => {
@@ -95,13 +109,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           profile: d.profile ? { ...d.profile, bodyWeightLb: b.weightLb } : d.profile,
         })),
       resetAll: () => setData((d) => ({ ...EMPTY, theme: d.theme })),
+      blocked,
+      block: () => {
+        setBlocked(true);
+        AsyncStorage.setItem(BLOCK_KEY, '1').catch(() => {});
+        setData((d) => ({ ...EMPTY, theme: d.theme }));
+      },
       setTheme: (theme) => update((d) => ({ ...d, theme })),
       addTouchLog: (t) => update((d) => ({ ...d, touchLogs: [...(d.touchLogs ?? []), t] })),
       deleteTouchLog: (date) => update((d) => ({ ...d, touchLogs: (d.touchLogs ?? []).filter((x) => x.date !== date) })),
       setNetHeight: (netHeightIn) => update((d) => ({ ...d, netHeightIn })),
       mutate: update,
     }),
-    [data, ready, update],
+    [data, ready, blocked, update],
   );
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>;

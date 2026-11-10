@@ -9,8 +9,7 @@
 ## 1. Version and changes
 
 **Current version:** 2.1.1 (`app.json`, `package.json`).
-- Pass 1 (`docs/specs/v2.1-soft-launch.md`, S1–S11) is on `main`.
-- Pass 2 (`docs/specs/v2.1-pass-2.md`, P1–P8) is on branch **`v2.1-pass-2`** of GitHub `rparker-sudo/approach`, waiting for the owner's approval before it's merged to `main` and tagged `v2.1`.
+- Pass 1 (`docs/specs/v2.1-soft-launch.md`, S1–S11) and pass 2 (`docs/specs/v2.1-pass-2.md`, P1–P8) are both on `main` of GitHub `rparker-sudo/approach`. The owner approved and merged pass 2 on November 10, 2026, and the site deployed. The `v2.1` tag is still to be pushed from the Mac.
 
 **History (from `CHANGELOG.md` and git):**
 - Before 1.0 the app was called "Volley Strength", then "Load & Launch", then renamed "Approach".
@@ -94,7 +93,7 @@
 - **Improvement format:** the spec and Privacy Notice say "% gain"; the design doc F10 shows "+1.5 in". The owner chose **% gain**.
 
 **In progress / not finished:**
-- Owner approval, merge to `main`, tag `v2.1` (from the Mac), and running migration 004 on the live project.
+- Tag `v2.1` (from the Mac). Live check of the coach board's update speed on two devices.
 - No iPhone build (EAS/TestFlight/App Store). Apple Developer Program not purchased.
 
 ---
@@ -171,8 +170,8 @@ Supabase and GitHub (Pages, Actions) only. No new services in 2.1. No analytics,
 
 ## 6. Deployment and usage
 
-- **Website:** https://rparker-sudo.github.io/approach/ (deploys from `main`; pass 2 isn't deployed until it's merged).
-- **Supabase:** live, Free plan; migrations 002 and 003 applied November 10, 2026 (owner confirmed); **004 not applied**.
+- **Website:** https://rparker-sudo.github.io/approach/ (deploys from `main`; 2.1.1 deployed November 10, 2026).
+- **Supabase:** live, Free plan; migrations 002, 003 and 004 applied November 10, 2026. The owner confirmed 004 with a check query: pass 2 columns present, `consent_status` gone, the four new tables present.
 - **Users:** the owner plus fewer than 10 others, all 18+, per the owner **(unverified count)**.
 
 ---

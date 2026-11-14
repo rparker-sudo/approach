@@ -4,6 +4,37 @@ Version numbers: whole numbers (1.0, 2.0) for big changes, decimals (1.1, 1.2) f
 The number is in `app.json` (`expo.version`, written as 1.1.0 for 1.1) and shows in the app under Settings.
 Each version has a matching GitHub tag (`v1.0`, `v1.1`, …) and download (`approach-1.0.zip`).
 
+## 2.2.0 — levels, boards and racks, home workouts and stations
+One release, built in three passes (`docs/specs/v2.2.md`). Supabase migrations `005`, `006`, `007` (run once each, in order, after 004).
+
+### Pass 1 — safety gates
+- **Coach-set levels** (beginner / intermediate / advanced) per team. Self-reported until the coach confirms; roster chip, "Level not confirmed", Review filter, set-level sheet. Athletes see their level per team in Settings → Program.
+- **Every athlete session goes through one function (`resolveSession`):** exercises resolve to the athlete's level (the lower one across their teams), Olympic lifts become a jump below advanced, effort is capped (beginner 7, intermediate/advanced 8, in-season 7), and rest and a session estimate are added. "Your version (team: …)" line with a why sheet; coach athlete detail shows "N exercises adjusted to level" and "Adjusted for this athlete" (never another team's level).
+- **Strength checks for minors** need a coach-confirmed intermediate/advanced level (and no coach-set beginner on another team); checked on the server (`can_load_test`) with the union of all teams' calendars, breaks, and pain/run-down check-ins.
+- **Two teams, one lifting program:** choose on joining a second team, switch in Settings → Teams, fall back when leaving. Plan and Today show every team's practices and matches with the team name. The other coach sees "Following another team's lift program" (no team name).
+- **Break weeks** on the team calendar (no lifting for that program; another team's break doesn't stop lifting) and **easing back in** after 14+ days without a log (RPE 6 cap and about 10% lighter suggestions for 7 days).
+- **Rest times by demand tier** (P/A/B/C/D) with floors (heavy lifts ≥ 2:00, power ≥ 1:30); the coach's rest wins within the floors; session estimates in the builder and on Today.
+- **Effort clamp** in the builder: for teams with a minor, strength effort above RPE 8 (7 in-season), "failure" and "max" are blocked (a warning on adult-only teams); posting is blocked too.
+- **Pain and head-injury copy** (Legal final): Today card after a pain = yes check-in; roster "Check in with [name] in person"; Settings → Safety head-injury line.
+- **Library:** 22 copy fixes and 2 data fixes, claim-word search clean, 6 mobility exercises, `nordic` partner/anchor note.
+- **Lift-day caps on the final week** so no path (onboarding, schedule, calendar, coach lift days, automatic moves) exceeds the cap or removes the rest day.
+- **Testing days:** coach checklist before the first strength check (read on the device), Training's testing warm-up, suggested testing dates per phase, break and spacing checks.
+- **Retention fix (C12):** minimal consent and supervision proof records kept 5 years after an account or team is deleted (no results), monthly purge; delete-dialog line.
+
+### Pass 2 — boards and racks
+- **Live coach board:** current (resolved) exercise, set x of y, last-set reps, rest countdown, header stats, live ticker, paging; testing-day mode with jump-test changes only (inches/feet) and "Strength check ✓"; team accent color with an automatic contrast fix; "Use a personal device and network" note.
+- **Season view:** team goal with pace, Overall leaderboard (top 10) and the points legend.
+- **Effort board:** Overall points (session 10, extra recovery 5 up to 2 a week, full week 5), Extra recovery tab, **Jump gains** in inches (never %), two-team rules, break weeks never count against anyone.
+- **Extra recovery sessions** ER1–ER5 from Today (optional, no equipment, no weight suggestions).
+- **Rack groups:** count or size, here-today filter, four auto-assign methods, rename, tap-to-move, Unassigned tray; board "Arrange by rack"; athlete Today card "You're on Rack 2 · with 2 teammates" (names off until Legal confirms).
+- **Change since last test** for athletes and coaches (private).
+
+### Pass 3 — home workouts, supersets, circuits, stations
+- **School + home weeks:** coach picks weight-room days and a total (or Recommend); home sessions use their own prescriptions and a home exercise pool; per-athlete caps with one light home day; 4 new home exercises.
+- **Home equipment** set by the athlete, stored only on the phone; each athlete gets their version for the same home slot.
+- **Supersets and circuits:** pairing and circuit rules with one-line reasons, 15 s transitions and rest after the round, auto-pairing only until a session fits its length target, fillers during heavy rest; A1/A2 labels and rounds in the workout and on the board.
+- **Stations:** Part 1 together, 2–6 stations, checks and estimate; Start stations needs everyone on a rack (one-tap balanced fill); Rotate now / +1 min / End; athletes see their station and countdown; board station grid.
+
 ## 2.1.1 — boards, testing days, Fuel phase 1 (2.1 pass 2)
 - Consent becomes six permissions (parent consent form v2): participation, check-ins, sharing check-ins, team boards, attendance & hours, testing days. Coach six-box checklist with box rules; roster chips (Consent needed / Consent: N of 6 / Consent: all / Form v2 needed for boards & testing) and a consent tracker. Adults choose for themselves ("Your choices", Settings → Privacy). Enforced on the server.
 - Board names: "Jordan M." by default, or initials, or hidden. Never a full last name.

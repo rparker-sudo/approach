@@ -334,13 +334,17 @@ export default function Workout() {
     if (isHome && !data.homeHintSeen) mutate((d) => ({ ...d, homeHintSeen: true }));
     // New best estimated strength vs. earlier logs.
     const prs: string[] = [];
+    const prBests: string[] = [];
     for (const e of isRecovery ? [] : entries) {
       const ex = getExercise(e.exerciseId);
       if (!ex.weighted || (ex.category !== 'lower' && ex.category !== 'upper')) continue;
       const best = (sets: LoggedSet[]) => Math.max(0, ...sets.filter((s) => s.done).map((s) => estimateStrength(parseFloat(s.weight) || 0, parseFloat(s.reps) || 0)));
       const now1 = best(e.sets);
       const before = Math.max(0, ...data.logs.map((l) => best(l.entries.find((x) => x.exerciseId === e.exerciseId)?.sets ?? [])));
-      if (now1 > 0 && before > 0 && now1 > before) prs.push(`${ex.name}: estimated strength ~${now1} lb (estimate, +${now1 - before})`);
+      if (now1 > 0 && before > 0 && now1 > before) {
+        prs.push(`${ex.name}: estimated strength ~${now1} lb (estimate, +${now1 - before})`);
+        prBests.push(ex.name);
+      }
     }
     // Lift minutes count toward effort hours (capped at 120 per workout); bests show as a "PR" badge on the board.
     addLog({ ...log, durationMin: Math.min(120, minutes), prCount: prs.length });
@@ -353,7 +357,8 @@ export default function Workout() {
         setsTotal: total,
         status: 'done',
         state: 'done',
-        exerciseName: null,
+        // The ticker's "hit a PR on [exercise]" uses this (exercise name only, never the number).
+        exerciseName: prBests[0] ?? null,
         restEndsAt: null,
         prToday: prs.length,
         finishedAt: new Date().toISOString(),

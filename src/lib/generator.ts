@@ -1,4 +1,5 @@
 import { ALL_EQUIPMENT, EXERCISES, fits, getExercise } from './exercises';
+import { restFor, RestContext, withFloor } from './rest';
 import type {
   DayType,
   Equipment,
@@ -239,12 +240,21 @@ export const REST_BY_ROLE: Record<SlotRole, number> = {
   mobility: 30,
 };
 
-/** Rest for an exercise in a program: the coach's setting, else a default by role/category (older programs). */
-export function restSecFor(pe: ProgramExercise): number {
-  if (typeof pe.restSec === 'number') return pe.restSec;
-  if (pe.role) return REST_BY_ROLE[pe.role];
-  const c = getExercise(pe.exerciseId).category;
-  return c === 'power' ? 120 : c === 'lower' || c === 'upper' ? 90 : c === 'core' ? 60 : 45;
+/**
+ * Rest for an exercise in a program (v2.2): the coach's setting wins, but never below the floors
+ * (tier A 2:00, tier P 1:30). Without a coach setting, the default comes from `restFor` (tier, reps, effort).
+ * Programs built before v2.2 stored the old role default in `restSec`; that value is treated as "no coach setting".
+ */
+export function restSecFor(pe: ProgramExercise, ctx: RestContext = {}): number {
+  const ex = getExercise(pe.exerciseId);
+  if (isCoachRest(pe)) return withFloor(ex, pe.restSec!, ctx.equipment);
+  return restFor(ex, pe, ctx);
+}
+
+/** True when the coach typed a rest (not a stored pre-v2.2 role default). */
+export function isCoachRest(pe: ProgramExercise): boolean {
+  if (typeof pe.restSec !== 'number') return false;
+  return !(pe.role && pe.restSec === REST_BY_ROLE[pe.role] && !pe.restSetByCoach);
 }
 
 /** 150 → "2:30" */
@@ -253,7 +263,7 @@ export function formatRest(sec: number): string {
   return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 }
 
-const HOLDS = new Set(['plank', 'side-plank', 'wall-sit', 'spanish-squat', 'copenhagen']);
+export const HOLDS = new Set(['plank', 'side-plank', 'wall-sit', 'spanish-squat', 'copenhagen', 'hip-flexor-stretch', 'lat-reach', 'band-hamstring']);
 const CARRIES = new Set(['suitcase-carry', 'farmer-carry']);
 
 /** Reps written the way athletes read them: holds in seconds, one-sided work "each". */
@@ -264,6 +274,13 @@ const REP_OVERRIDE: Record<string, string> = {
   'tib-raise': '15',
   'band-er': '15 each',
   'wrist-roller': '15',
+  // v2.2 mobility (drill-library §4)
+  'crocodile-breathing': '5 breaths',
+  'cat-camel': '8',
+  'hip-flexor-stretch': '30s each',
+  'ankle-rock': '10 each',
+  'lat-reach': '20s each',
+  'band-hamstring': '30s each',
 };
 
 function repsFor(ex: Exercise, rx: Rx, phase: Phase): string {
@@ -355,7 +372,7 @@ function buildSession(arch: Archetype, input: GeneratorInput, usedWeek: Set<stri
       reps: repsFor(ex, rx, input.phase),
       effort,
       role: slot.role,
-      restSec: REST_BY_ROLE[slot.role],
+      // v2.2: rest comes from restFor() (tier, reps, effort) unless the coach sets one.
       notes:
         ex.id === 'hang-clean'
           ? 'Only with coaching. Swap for a jump otherwise.'

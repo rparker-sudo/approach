@@ -107,6 +107,8 @@ export type Exercise = {
   easier?: string;
   harder?: string;
   howTo: HowTo;
+  /** Demand tier (rest-and-supersets §2, §7): P power, A heavy compound, B compound, C accessory, D care/mobility. */
+  tier: 'P' | 'A' | 'B' | 'C' | 'D';
 };
 
 /** What an exercise does in a session. Sets the prescription and default rest. */
@@ -122,6 +124,8 @@ export type ProgramExercise = {
   role?: SlotRole;
   /** Rest between sets, seconds. 0 = no timer. */
   restSec?: number;
+  /** v2.2: the coach set restSec in the builder (distinguishes it from a stored pre-v2.2 default). */
+  restSetByCoach?: boolean;
 };
 
 export type Session = {

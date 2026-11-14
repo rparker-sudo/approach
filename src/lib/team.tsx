@@ -30,6 +30,8 @@ import { dateKey, today } from './calendar';
 import { LEVEL_OF } from './athlete';
 import { isLow } from './readiness';
 import { effortProblem } from './resolve';
+import { blocksOf, clockProblem, CLOCK_REASON } from './groups';
+import { mustBePart1, PART1_REASON } from './stations';
 import { useStore } from './store';
 import type { AppData, CalendarEvent, LocalTeamCalendar, Position, Program, ReadinessEntry, TestBattery } from './types';
 
@@ -499,6 +501,15 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       const hasMinor = (membersRef.current[teamId] ?? []).some((m) => m.isMinor !== false);
       const blocked = local.sessions.flatMap((s) => s.exercises).map((e) => effortProblem(e, local.phase, hasMinor)).find((x) => x?.block);
       if (blocked) throw new BackendError(`${blocked.message} Fix the effort on the highlighted exercises, then post.`);
+      if (hasMinor) {
+        for (const ses of local.sessions) {
+          const blocks = blocksOf(ses.exercises);
+          if (ses.exercises.some((e) => clockProblem(e, (blocks.get(e.group ?? '')?.length ?? 0) >= 3, local.equipment))) throw new BackendError(CLOCK_REASON);
+          if (ses.format === 'stations' && ses.exercises.some((e) => e.group && (ses.stations ?? []).some((st) => st.groups.includes(e.group!)) && mustBePart1(e, local.equipment))) {
+            throw new BackendError(PART1_REASON);
+          }
+        }
+      }
       const team = teamsRef.current.find((t) => t.id === teamId);
       // The calendar travels separately (team_calendars); per-date lift choices stay with the program.
       const { unposted: _u, postedAt: _p, lightDates: _l, ...program } = local;

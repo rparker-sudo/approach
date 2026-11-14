@@ -8,11 +8,15 @@ import { useStore } from '../lib/store';
 import { resolveFor } from '../lib/athlete';
 import { estimateMinutes, FLOOR_MESSAGE, formatMinutes, REST_FLOOR, tierOf } from '../lib/rest';
 import { effortProblem } from '../lib/resolve';
+import { blockRests, blocksOf, clockProblem, CLOCK_REASON, groupRows, labelOf, straightRests, ungroup } from '../lib/groups';
+import { lengthTarget } from '../lib/rest';
+import StationsEditor from '../components/StationsEditor';
 import { useTeams } from '../lib/team';
 import VersionLine, { DroppedLine } from '../components/VersionLine';
 import type { ExerciseCategory, ProgramExercise, Session } from '../lib/types';
 
 const CATS: ExerciseCategory[] = ['power', 'lower', 'upper', 'core', 'prehab'];
+const TIER_WORD = { P: 'Power', A: 'Heavy', B: 'Compound', C: 'Accessory', D: 'Care' } as const;
 
 export default function SessionScreen() {
   const { programId, sessionId } = useLocalSearchParams<{ programId: string; sessionId: string }>();
@@ -21,6 +25,8 @@ export default function SessionScreen() {
   const session = program?.sessions.find((s) => s.id === sessionId);
   const [picker, setPicker] = useState<{ replaceIndex: number | null } | null>(null);
   const [floorNote, setFloorNote] = useState<Record<number, string>>({});
+  const [selected, setSelected] = useState<number[]>([]);
+  const [groupMsg, setGroupMsg] = useState<string | null>(null);
   const { members } = useTeams();
 
   if (!program || !session) return <Screen><Body muted>Session not found.</Body></Screen>;
@@ -64,6 +70,14 @@ export default function SessionScreen() {
   }
 
   const gym = program.equipment ?? ALL_EQUIPMENT;
+  const home = session.location === 'home';
+  const restCtx = { phase: program.phase, equipment: home ? [] : program.equipment, home, light: !!session.light };
+  const rests = blockRests(session.exercises, session.exercises.map((e) => (e.group ? straightRests([e], restCtx)[0] : restSecFor(e, restCtx))), restCtx);
+  const minutes = estimateMinutes(
+    session.exercises.map((e, i) => ({ ex: getExercise(e.exerciseId), sets: e.filler ? 0 : e.sets, reps: e.reps, restSec: rests[i] })),
+    home ? 'home' : 'school',
+  );
+  const target = lengthTarget(program.phase, session.light ? 'light' : home ? 'home' : 'school');
   const hasMinor = !!program.teamId && (members[program.teamId] ?? []).some((m) => m.isMinor !== false);
   const swapping = picker?.replaceIndex != null ? getExercise(session.exercises[picker.replaceIndex].exerciseId) : null;
   const usable = EXERCISES.filter((x) => fits(x, gym));
@@ -85,7 +99,21 @@ export default function SessionScreen() {
     });
   }
   function setEx(i: number, patch: Partial<ProgramExercise>) {
-    update({ ...session!, exercises: session!.exercises.map((e, k) => (k === i ? { ...e, ...patch } : e)) });
+    // Any manual change to a grouped row removes its "Auto" tag.
+    update({ ...session!, exercises: session!.exercises.map((e, k) => (k === i ? { ...e, ...patch, ...(e.group ? { autoGroup: false } : {}) } : e)) });
+  }
+  function toggleSelect(i: number) {
+    setGroupMsg(null);
+    setSelected((sel) => (sel.includes(i) ? sel.filter((x) => x !== i) : [...sel, i]));
+  }
+  function groupSelected() {
+    const res = groupRows(session!.exercises, selected, program!.equipment);
+    if (res.reason) {
+      setGroupMsg(res.reason);
+      return;
+    }
+    update({ ...session!, exercises: res.list! });
+    setSelected([]);
   }
   function move(i: number, dir: -1 | 1) {
     const j = i + dir;
@@ -131,21 +159,61 @@ export default function SessionScreen() {
       ) : null}
 
       <Field label="Session name" value={session.name} onChangeText={(t) => update({ ...session, name: t })} />
-      <Body muted style={{ fontSize: 14 }}>
-        {`${session.focus} · ${formatMinutes(
-          estimateMinutes(session.exercises.map((e) => ({ ex: getExercise(e.exerciseId), sets: e.sets, reps: e.reps, restSec: restSecFor(e, { phase: program.phase, equipment: program.equipment }) }))),
-        )}`}
-      </Body>
+      <Row style={{ gap: 6, flexWrap: 'wrap' }}>
+        <Text style={{ fontSize: 13, fontWeight: '600' }}>{session.light ? '🏠 Light home' : home ? '🏠 Home' : '🏋 Weight room'}</Text>
+        <Text style={{ fontSize: 13, color: colors.muted }}>{session.focus}</Text>
+      </Row>
+      {home ? (
+        <Body muted style={{ fontSize: 13 }}>
+          Each athlete gets the best version for their home equipment and level. Your sets, reps, and effort stay the same.
+        </Body>
+      ) : null}
+      {program.teamId ? <StationsEditor program={program} session={session} hasMinor={hasMinor} onChange={update} /> : null}
 
       {session.exercises.map((e, i) => {
         const info = getExercise(e.exerciseId);
-        const rest = restSecFor(e, { phase: program.phase, equipment: program.equipment });
+        const rest = rests[i];
+        const label = labelOf(session.exercises, i);
+        const block = e.group ? blocksOf(session.exercises).get(e.group) ?? [] : [];
+        const firstInBlock = block.length >= 2 && block[0] === i;
+        const lastInBlock = block.length >= 2 && block[block.length - 1] === i;
         const problem = program.teamId ? effortProblem(e, program.phase, hasMinor) : null;
+        const clock = clockProblem(e, block.length >= 3, program.equipment);
+        const prevHeavy = i > 0 && ['A', 'P'].includes(tierOf(getExercise(session.exercises[i - 1].exerciseId), program.equipment));
         return (
-          <Card key={`${e.exerciseId}-${i}`}>
+          <View key={`${e.exerciseId}-${i}`} style={{ gap: 6 }}>
+          {firstInBlock ? (
+            <Row style={{ justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 14, fontWeight: '700' }}>
+                {`${block.length === 2 ? 'Superset' : 'Circuit'} · ${Math.min(...block.map((k) => session.exercises[k].sets))} rounds`}
+                {e.autoGroup ? '  · Auto' : ''}
+              </Text>
+              <Text accessibilityRole="button" onPress={() => update({ ...session, exercises: ungroup(session.exercises, e.group!) })} style={{ fontSize: 13, textDecorationLine: 'underline' }}>
+                {block.length === 2 ? 'Unpair' : 'Ungroup'}
+              </Text>
+            </Row>
+          ) : null}
+          <Card style={block.length >= 2 ? { borderLeftWidth: 4, borderLeftColor: colors.ink } : undefined}>
             <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <View style={{ flex: 1 }}>
-                <Text style={[display(12), { color: colors.muted }]}>{CATEGORY_LABEL[info.category]}</Text>
+                <Row style={{ gap: 8 }}>
+                  <Pressable
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: selected.includes(i) }}
+                    accessibilityLabel={`Select ${info.name}`}
+                    onPress={() => toggleSelect(i)}
+                    hitSlop={8}
+                  >
+                    <Text style={{ fontSize: 18 }}>{selected.includes(i) ? '☑' : '☐'}</Text>
+                  </Pressable>
+                  {label ? <Text style={{ fontSize: 16, fontWeight: '800' }}>{label}</Text> : null}
+                  <Text style={[display(12), { color: colors.muted }]}>{CATEGORY_LABEL[info.category]}</Text>
+                  {/* Coach-only tier chip (F19c), words not letters. */}
+                  <Text style={{ fontSize: 11, color: colors.muted, borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingHorizontal: 6 }}>
+                    {TIER_WORD[tierOf(info, program.equipment)]}
+                  </Text>
+                  {e.filler ? <Text style={{ fontSize: 12, color: colors.muted }}>During rest</Text> : null}
+                </Row>
                 <Pressable accessibilityRole="link" onPress={() => router.push(`/exercise/${info.id}`)}>
                   <H2>{info.name}</H2>
                 </Pressable>
@@ -185,6 +253,9 @@ export default function SessionScreen() {
                 {problem.block ? problem.message : `${problem.message} This team is all adults, so you can still post it.`}
               </Text>
             ) : null}
+            {clock ? (
+              <Text accessibilityRole="alert" style={{ fontSize: 13, color: hasMinor ? colors.error : colors.warning }}>{CLOCK_REASON}</Text>
+            ) : null}
             <Row style={{ justifyContent: 'space-between' }}>
               <Label>Rest</Label>
               <Row style={{ gap: 6 }}>
@@ -194,6 +265,16 @@ export default function SessionScreen() {
               </Row>
             </Row>
             {floorNote[i] ? <Text style={{ fontSize: 13, color: colors.muted }}>{floorNote[i]}</Text> : null}
+            {block.length >= 2 ? (
+              <Text style={{ fontSize: 13, color: colors.muted }}>
+                {lastInBlock ? `Rest ${formatRest(rest)} after the ${block.length === 2 ? 'pair' : 'round'}.` : `15 s to ${labelOf(session.exercises, block[block.indexOf(i) + 1])}.`}
+              </Text>
+            ) : null}
+            {tierOf(info, program.equipment) === 'D' && prevHeavy && !e.group ? (
+              <Text accessibilityRole="button" onPress={() => setEx(i, { filler: !e.filler })} style={{ fontSize: 13, textDecorationLine: 'underline' }}>
+                {e.filler ? 'Do as its own exercise' : 'Do during the rest of the lift above'}
+              </Text>
+            ) : null}
             <TextInput
               style={{ fontSize: 14 }}
               placeholder="Notes (optional)"
@@ -210,8 +291,27 @@ export default function SessionScreen() {
               </View>
             </Row>
           </Card>
+          {lastInBlock && block.length === 4 ? (
+            <Text style={{ fontSize: 13, color: colors.muted }}>Beginners do A1–A3 as the circuit, then A4 as straight sets after.</Text>
+          ) : null}
+          {lastInBlock && new Set(block.map((k) => session.exercises[k].sets)).size > 1 ? (
+            <Text style={{ fontSize: 13, color: colors.muted }}>Extra sets are done on their own at the end.</Text>
+          ) : null}
+          </View>
         );
       })}
+
+      {selected.length >= 2 ? (
+        <Card>
+          <Button title={selected.length === 2 ? 'Pair as superset' : 'Group as circuit'} onPress={groupSelected} />
+          {groupMsg ? <Text accessibilityRole="alert" style={{ fontSize: 13, color: colors.error }}>{groupMsg}</Text> : null}
+          <Button small kind="ghost" title="Clear selection" onPress={() => setSelected([])} />
+        </Card>
+      ) : null}
+
+      <Text style={{ fontSize: 14, fontWeight: '600', color: minutes > target ? colors.warning : colors.ink }}>
+        {`${formatMinutes(minutes)} · target ${target}${minutes > target ? ' ●' : ''}`}
+      </Text>
 
       <Button kind="secondary" title="Add exercise" icon="plus" onPress={() => setPicker({ replaceIndex: null })} />
 

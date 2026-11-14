@@ -2,7 +2,7 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Platform } from 'react-native';
 import Sheet from '../components/Sheet';
-import { canLog } from '../lib/backend';
+import { backend, canLog } from '../lib/backend';
 import { possessive } from '../lib/util';
 import AccountForm from '../components/AccountForm';
 import JoinTeamForm from '../components/JoinTeamForm';
@@ -103,7 +103,12 @@ export default function JoinScreen() {
         <>
           <H2>Enter your team code</H2>
           <Body muted>Your coach has a 6-character code. Once you join, the team workout becomes your plan.</Body>
-          <JoinTeamForm initialCode={code} autoJoin={!!code} onJoined={(team) => (teams.some((t) => t.id !== team.id) ? setChoose({ joined: team.id, coachName: team.coachName }) : done(team.name, team.coachName))} />
+          <JoinTeamForm initialCode={code} autoJoin={!!code} onJoined={async (team) => {
+            // Ask the server: a join link can open the app before the team list has loaded.
+            const mine = await backend.listMyTeams().catch(() => teams);
+            if (mine.some((t) => t.id !== team.id)) setChoose({ joined: team.id, coachName: team.coachName });
+            else done(team.name, team.coachName);
+          }} />
         </>
       )}
     </Screen>

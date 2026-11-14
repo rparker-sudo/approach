@@ -14,6 +14,7 @@ import { repRange, suggestWeight, Suggestion } from '../lib/progression';
 import { resolveFor } from '../lib/athlete';
 import type { ResolvedExercise } from '../lib/resolve';
 import VersionLine, { DroppedLine } from '../components/VersionLine';
+import { EXTRA_RECOVERY_SESSIONS, RECOVERY_NOTE, recoveryProgram } from '../lib/recovery';
 import { adjustRest, clock, Rest, secondsLeft, startRest } from '../lib/restTimer';
 import { ConsentBanner } from '../components/Consent';
 import { canLog } from '../lib/backend';
@@ -42,12 +43,22 @@ function buzz() {
 
 export default function Workout() {
   useKeepAwake();
-  const { programId, sessionId } = useLocalSearchParams<{ programId: string; sessionId: string }>();
-  const { data, addLog } = useStore();
+  const { programId, sessionId, recovery } = useLocalSearchParams<{ programId: string; sessionId: string; recovery?: string }>();
+  const { data, addLog, activeProgram } = useStore();
   const { consentFor, shareLiveProgress } = useTeams();
   const insets = useSafeAreaInsets();
-  const program = data.programs.find((p) => p.id === programId);
-  const session = program?.sessions.find((s) => s.id === sessionId);
+  // v2.2 extra recovery (T4): a Training Content session wrapped as a one-session program (still resolved, G-1).
+  const recoverySession = recovery ? EXTRA_RECOVERY_SESSIONS.find((x) => x.id === recovery) : undefined;
+  const isRecovery = !!recoverySession;
+  const program = useMemo(
+    () =>
+      recoverySession
+        ? { ...recoveryProgram(recoverySession, activeProgram?.phase ?? 'off'), teamId: activeProgram?.teamId, teamName: activeProgram?.teamName }
+        : data.programs.find((p) => p.id === programId),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [recoverySession, programId, data.programs],
+  );
+  const session = program?.sessions.find((s) => s.id === (recoverySession?.id ?? sessionId));
   // G-1: the athlete's version of today's session (day version, level, effort ceilings, easing, rest).
   // Resolved once when the workout opens, so finishing a set doesn't change the plan mid-workout.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -56,6 +67,7 @@ export default function Workout() {
   const suggestions = useMemo(
     () =>
       plan.map((pe) => {
+        if (isRecovery) return null; // extra recovery never creates weight suggestions
         const est = data.strengthEstimates?.[pe.exerciseId];
         return suggestWeight(data.logs, pe, program?.equipment, est && program ? { e1rm: est.e1rm, phase: program.phase } : undefined, day?.easing.active);
       }),
@@ -110,7 +122,7 @@ export default function Workout() {
   const totalCount = draft ? draft.entries.reduce((n, e) => n + e.sets.length, 0) : 0;
   const lastShared = useRef(-1);
   useEffect(() => {
-    if (!program?.teamId || !session || !draft || summary || doneCount === lastShared.current || doneCount === 0) return;
+    if (isRecovery || !program?.teamId || !session || !draft || summary || doneCount === lastShared.current || doneCount === 0) return;
     const timer = setTimeout(() => {
       lastShared.current = doneCount;
       shareLiveProgress({ teamId: program.teamId!, day: dateKey(today()), sessionId: session.id, setsDone: doneCount, setsTotal: totalCount, status: 'in_progress' });
@@ -140,8 +152,9 @@ export default function Workout() {
   }, [restDone]);
 
   if (!program || !session || !day) return <View style={{ flex: 1, backgroundColor: colors.bg }}><Body muted>Workout not found.</Body></View>;
-  // Team workouts need parent consent on file for minors (the server enforces this too).
-  if (program.teamId && !canLog(consentFor(program.teamId))) {
+  // Team workouts need parent consent on file for minors (the server enforces this too). Extra recovery stays on the
+  // device until logging is allowed.
+  if (program.teamId && !isRecovery && !canLog(consentFor(program.teamId))) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, padding: 16, gap: 16, paddingTop: insets.top + 16 }}>
         <Stack.Screen options={{ title: session.name }} />
@@ -185,7 +198,9 @@ export default function Workout() {
       return;
     }
     setRestDone(false);
-    setRest(startRest(plan[ei].restSecResolved, getExercise(plan[ei].exerciseId).name));
+    // No rest timer for 0 s (extra recovery: move straight on).
+    if (plan[ei].restSecResolved > 0) setRest(startRest(plan[ei].restSecResolved, getExercise(plan[ei].exerciseId).name));
+    else setRest(null);
     // Last set of this exercise: move on while you rest.
     if (remainingHere === 0 && mode === 'focus' && ei < plan.length - 1) update({ index: ei + 1 });
   }
@@ -208,12 +223,13 @@ export default function Workout() {
       sessionName: session!.name,
       entries,
       note: draft!.note.trim() || undefined,
-      teamId: program!.teamId,
+      teamId: program!.teamId && canLog(consentFor(program!.teamId)) ? program!.teamId : undefined,
       synced: false,
+      ...(isRecovery ? { kind: 'extra_recovery' as const, programId: 'extra-recovery' } : {}),
     };
     // New best estimated strength vs. earlier logs.
     const prs: string[] = [];
-    for (const e of entries) {
+    for (const e of isRecovery ? [] : entries) {
       const ex = getExercise(e.exerciseId);
       if (!ex.weighted || (ex.category !== 'lower' && ex.category !== 'upper')) continue;
       const best = (sets: LoggedSet[]) => Math.max(0, ...sets.filter((s) => s.done).map((s) => estimateStrength(parseFloat(s.weight) || 0, parseFloat(s.reps) || 0)));
@@ -223,7 +239,7 @@ export default function Workout() {
     }
     // Lift minutes count toward effort hours (capped at 120 per workout); bests show as a "PR" badge on the board.
     addLog({ ...log, durationMin: Math.min(120, minutes), prCount: prs.length });
-    if (program!.teamId) {
+    if (program!.teamId && !isRecovery) {
       shareLiveProgress({ teamId: program!.teamId, day: dateKey(today()), sessionId: session!.id, setsDone: done, setsTotal: total, status: 'done' });
     }
     clearDraft();
@@ -295,6 +311,7 @@ export default function Workout() {
         {day.easing.active ? <Pill text="Easing back in this week" /> : null}
       </Row>
       <DroppedLine count={day.dropped} />
+      {isRecovery ? <Note>{RECOVERY_NOTE}</Note> : null}
     </View>
   );
 
@@ -436,7 +453,7 @@ function ExerciseCard({
       </Pressable>
       <VersionLine exerciseId={pe.exerciseId} teamExerciseId={pe.teamExerciseId} teamId={teamId} />
       <Text style={{ fontSize: 16, fontWeight: '600' }}>
-        {pe.sets} × {pe.reps} <Text style={{ fontSize: 13, color: colors.muted }}>· {pe.effort} · Rest {formatRest(pe.restSecResolved)}</Text>
+        {pe.sets} × {pe.reps} <Text style={{ fontSize: 13, color: colors.muted }}>· {pe.effort} {pe.restSecResolved > 0 ? ` · Rest ${formatRest(pe.restSecResolved)}` : ''}</Text>
       </Text>
       {info.weighted && !timed ? (
         suggestion ? (

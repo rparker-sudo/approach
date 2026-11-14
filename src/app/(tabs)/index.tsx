@@ -185,6 +185,7 @@ function Today() {
           <>
             <H2>Break week</H2>
             <Body muted>Extra recovery is optional.</Body>
+            <Button kind="secondary" title="Extra recovery" onPress={() => router.push('/recovery')} />
           </>
         ) : todayPlan.test && activeProgram.teamId ? (
           <>
@@ -241,6 +242,7 @@ function Today() {
           </>
         )}
         {advice ? <Note>{advice}</Note> : null}
+        {!onBreak ? <Button kind="ghost" small title="Extra recovery" onPress={() => router.push('/recovery')} /> : null}
       </Card>
 
       <NetTape />

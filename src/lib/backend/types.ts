@@ -68,6 +68,8 @@ export type TeamSettings = {
   /** Season target of team sessions; null = suggested default. */
   teamGoal: number | null;
   medBallLb: number;
+  /** v2.2 board accent color (#RRGGBB); null = Approach default. The coach's original choice (adjusted at render time). */
+  accentColor: string | null;
 };
 export const DEFAULT_TEAM_SETTINGS: TeamSettings = {
   practiceMin: 120,
@@ -77,6 +79,7 @@ export const DEFAULT_TEAM_SETTINGS: TeamSettings = {
   boardEffortPanel: true,
   teamGoal: null,
   medBallLb: 6,
+  accentColor: null,
 };
 
 export type Team = {
@@ -168,7 +171,11 @@ export type TeamLog = {
   note?: string;
   prCount?: number;
   durationMin?: number | null;
+  /** v2.2: extra recovery sessions don't count as prescribed sessions. */
+  kind?: LogKind;
 };
+
+export type LogKind = 'lift' | 'extra_recovery';
 
 /** A teammate on the boards (only members with boards permission who aren't hidden). */
 export type BoardMember = { userId: string; boardName: string; groupId: string | null };
@@ -184,7 +191,30 @@ export type LiveProgress = {
   setsTotal: number;
   status: LiveStatus;
   updatedAt: string;
+  /** v2.2 live board (P3.3). The resolved exercise name; never loads or RPE. */
+  state?: LiveState;
+  exerciseName?: string | null;
+  setIndex?: number | null;
+  setCount?: number | null;
+  lastReps?: number | null;
+  restEndsAt?: string | null;
+  prToday?: number;
+  finishedAt?: string | null;
 };
+export type LiveState = 'idle' | 'lifting' | 'resting' | 'done';
+
+/** Testing-day board mode (P3.6, P6.10): jump changes only (null delta = first result), strength check done or not. */
+export type BoardTest = {
+  userId: string;
+  jumpsDone: number;
+  strengthDone: boolean;
+  changes: { test: 'touch' | 'broad' | 'throw'; delta: number | null; unit: string }[];
+};
+
+/** Rack groups (D-026). */
+export type Rack = { id: string; name: string; sortOrder: number; userIds: string[] };
+/** The athlete's own rack. partnerNames is null until the names flag is on (count only). */
+export type MyRack = { groupId: string; rackName: string; partners: number; partnerNames: string[] | null; others: number | null };
 
 /** Effort-board inputs for one member (no weights, results, check-ins or nutrition). */
 export type EffortInput = {
@@ -192,11 +222,14 @@ export type EffortInput = {
   boardName: string;
   groupId: string | null;
   isMe: boolean;
-  logs: { at: string; session: string; minutes: number | null }[];
+  /** v2.2 (D-027): follows this team's lift program. Otherwise left off Overall, Sessions, Extra recovery, Consistency, Streak. */
+  ranked: boolean;
+  logs: { at: string; session: string; minutes: number | null; kind?: LogKind }[];
   /** Null when the member hasn't allowed attendance. */
   attendance: { day: string; kind: AttendanceKind; minutes: number }[] | null;
-  /** % gain in jump tests (touch, broad) since the start date; null without testing permission or 2 tests. */
-  improvement: number | null;
+  /** Inches gained in touch + broad jump since the athlete's first test in the range (FA-4: never %); null without
+   *  testing permission or 2 tests. */
+  jumpGain: number | null;
 };
 
 export type AttendanceKind = 'practice' | 'match' | 'tournament';
@@ -280,6 +313,12 @@ export interface Backend {
   /** Members (on boards) with a personal best logged since the given time: userId → count. */
   bestsSince(teamId: string, sinceIso: string): Promise<Record<string, number>>;
   teamEffort(teamId: string, since: string): Promise<EffortInput[]>;
+  /** v2.2 testing-day board chips (coach board only). */
+  boardTests(teamId: string, day: string): Promise<BoardTest[]>;
+  /** v2.2 rack groups (D-026): coach reads/saves all racks; athletes read their own. */
+  listRacks(teamId: string): Promise<Rack[]>;
+  saveRacks(teamId: string, racks: { name: string; userIds: string[] }[]): Promise<void>;
+  myRack(teamId: string): Promise<MyRack | null>;
   /** Live updates for the coach board. onStatus reports connection drops. */
   subscribeBoard(teamId: string, onChange: () => void, onStatus?: (connected: boolean) => void): () => void;
 

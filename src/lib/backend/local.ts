@@ -34,6 +34,7 @@ import {
   TeamProgram,
   TestResult,
   TestSession,
+  Rack,
 } from './types';
 
 /**
@@ -63,6 +64,8 @@ type DB = {
     levelSetBy?: string | null;
     levelSetAt?: string | null;
   }[];
+  /** v2.2 pass 2: rack groups (D-026). */
+  racks?: (Rack & { teamId: string })[];
   /** v2.2: userId → the team whose lift program they follow (same as profiles.lift_program_team_id). */
   liftProgram?: Record<string, string | null>;
   programs: TeamProgram[];
@@ -229,6 +232,11 @@ function canLoadTest(db: DB, userId: string, day: string, teamId?: string | null
     if (db.members.some((o) => o.userId === userId && o.teamId !== team && o.level === 1 && o.levelSetBy)) return false;
   } else if ((resolveLevelOf(db, userId) ?? 2) < 2) return false;
   return true;
+}
+
+/** Leaving or being removed from a team removes the athlete from its racks (the rack keeps its name). */
+function dropFromRacks(db: DB, teamId: string, userId: string) {
+  db.racks = (db.racks ?? []).map((r) => (r.teamId === teamId ? { ...r, userIds: r.userIds.filter((u) => u !== userId) } : r));
 }
 
 function coachOf(db: DB, teamId: string, userId: string) {
@@ -412,6 +420,7 @@ export const localBackend: Backend = {
     db.attendance = db.attendance.filter((r) => r.teamId !== teamId);
     db.testSessions = db.testSessions.filter((r) => r.teamId !== teamId);
     db.tests = db.tests.filter((r) => r.teamId !== teamId);
+    db.racks = (db.racks ?? []).filter((r) => r.teamId !== teamId);
     await save(db);
   },
 
@@ -441,6 +450,7 @@ export const localBackend: Backend = {
     const { db, user } = await me();
     coachOf(db, teamId, user.id);
     db.members = db.members.filter((m) => !(m.teamId === teamId && m.userId === userId));
+    dropFromRacks(db, teamId, userId);
     await save(db);
   },
 
@@ -535,7 +545,7 @@ export const localBackend: Backend = {
     const viewer = db.sessionUserId;
     if (!isCoach(db, teamId, viewer) && !db.members.some((m) => m.teamId === teamId && m.userId === viewer)) return [];
     return db.members
-      .filter((m) => m.teamId === teamId && onBoards(db, teamId, m.userId))
+      .filter((m) => m.teamId === teamId && onBoards(db, teamId, m.userId) && liftTeamOf(db, m.userId) === teamId)
       .map((m) => {
         const u = db.users.find((x) => x.id === m.userId);
         return { userId: m.userId, boardName: boardName(u?.name ?? '', u?.boardNameMode ?? 'short') ?? 'Athlete', groupId: m.groupId ?? null };
@@ -583,30 +593,91 @@ export const localBackend: Backend = {
         const mode = me && u?.boardNameMode === 'hidden' ? 'short' : u?.boardNameMode ?? 'short';
         const perms = m.perms;
         const sinceMs = new Date(`${since}T00:00:00`).getTime() - 864e5;
-        // % gain in jump tests (touch, broad): latest vs first since the start date, averaged.
-        let improvement: number | null = null;
+        // FA-4 Jump gains: inches gained in touch + broad jump, latest vs first since the start date. Never %.
+        let jumpGain: number | null = null;
         if (canTest(perms)) {
-          const gains: number[] = [];
+          let any = false;
+          let sum = 0;
           for (const id of ['touch', 'broad'] as const) {
             const list = db.tests.filter((x) => x.teamId === teamId && x.userId === m.userId && x.testId === id && !x.voided && x.day >= since).sort((a, b) => a.day.localeCompare(b.day));
-            if (list.length >= 2) gains.push(((list[list.length - 1].value - list[0].value) / list[0].value) * 100);
+            if (list.length >= 2) {
+              any = true;
+              sum += list[list.length - 1].value - list[0].value;
+            }
           }
-          if (gains.length) improvement = Math.round((gains.reduce((a, b) => a + b, 0) / gains.length) * 10) / 10;
+          if (any) jumpGain = Math.round(sum * 10) / 10;
         }
         return {
           userId: m.userId,
           boardName: boardName(u?.name ?? '', mode) ?? 'Athlete',
           groupId: m.groupId ?? null,
           isMe: me,
+          ranked: liftTeamOf(db, m.userId) === teamId,
           logs: db.logs
             .filter((l) => l.teamId === teamId && l.userId === m.userId && new Date(l.date).getTime() >= sinceMs)
-            .map((l) => ({ at: l.date, session: l.sessionName, minutes: l.durationMin ?? null })),
+            .map((l) => ({ at: l.date, session: l.sessionName, minutes: l.durationMin ?? null, kind: l.kind ?? 'lift' })),
           attendance: canAttend(perms)
             ? db.attendance.filter((a) => a.teamId === teamId && a.userId === m.userId && a.day >= since && a.minutes > 0).map((a) => ({ day: a.day, kind: a.kind, minutes: a.minutes }))
             : null,
-          improvement,
+          jumpGain,
         };
       });
+  },
+
+  async boardTests(teamId, day) {
+    const db = await load();
+    if (!isCoach(db, teamId, db.sessionUserId)) return [];
+    return db.members
+      .filter((m) => m.teamId === teamId && onBoards(db, teamId, m.userId) && canTest(m.perms))
+      .map((m) => {
+        const mine = db.tests.filter((x) => x.teamId === teamId && x.userId === m.userId && !x.voided);
+        const today = mine.filter((x) => x.day === day);
+        const jumps = (['touch', 'broad', 'throw'] as const).filter((id) => today.some((x) => x.testId === id));
+        return {
+          userId: m.userId,
+          jumpsDone: jumps.length,
+          strengthDone: today.some((x) => x.reps != null),
+          changes: jumps.map((id) => {
+            const list = mine.filter((x) => x.testId === id);
+            const latest = today.filter((x) => x.testId === id).pop()!;
+            const prev = list.filter((x) => x !== latest && x.day <= day && list.indexOf(x) < list.indexOf(latest)).pop();
+            return { test: id, unit: latest.unit, delta: prev ? Math.round((latest.value - prev.value) * 10) / 10 : null };
+          }),
+        };
+      });
+  },
+
+  async listRacks(teamId) {
+    const db = await load();
+    const viewer = db.sessionUserId;
+    const racks = (db.racks ?? []).filter((r) => r.teamId === teamId).sort((a, b) => a.sortOrder - b.sortOrder);
+    if (isCoach(db, teamId, viewer)) return racks.map(({ teamId: _t, ...r }) => r);
+    return racks.map(({ teamId: _t, ...r }) => ({ ...r, userIds: r.userIds.filter((u) => u === viewer) }));
+  },
+
+  async saveRacks(teamId, racks) {
+    const { db, user } = await me();
+    coachOf(db, teamId, user.id);
+    const current = new Set(db.members.filter((m) => m.teamId === teamId).map((m) => m.userId));
+    const placed = new Set<string>();
+    const next = racks.map((r, i) => ({
+      id: uid(),
+      teamId,
+      name: (r.name.trim() || `Rack ${i + 1}`).slice(0, 20),
+      sortOrder: i,
+      // At most one rack per athlete per team; only current members.
+      userIds: r.userIds.filter((u) => current.has(u) && !placed.has(u) && (placed.add(u), true)),
+    }));
+    db.racks = [...(db.racks ?? []).filter((r) => r.teamId !== teamId), ...next];
+    await save(db);
+  },
+
+  async myRack(teamId) {
+    const { db, user } = await me();
+    const r = (db.racks ?? []).find((x) => x.teamId === teamId && x.userIds.includes(user.id));
+    if (!r) return null;
+    // Partner names stay off until Legal confirms box 4 covers them (B5): count only, same as the server flag.
+    return { groupId: r.id, rackName: r.name, partners: r.userIds.filter((u) => u !== user.id).length, partnerNames: null, others: null };
   },
 
   subscribeBoard(_teamId, onChange, onStatus) {
@@ -729,6 +800,7 @@ export const localBackend: Backend = {
   async leaveTeam(teamId) {
     const { db, user } = await me();
     db.members = db.members.filter((m) => !(m.teamId === teamId && m.userId === user.id));
+    dropFromRacks(db, teamId, user.id);
     // Leaving the program team falls back to the remaining team (liftTeamOf), or the personal program.
     if (db.liftProgram?.[user.id] === teamId) db.liftProgram = { ...db.liftProgram, [user.id]: null };
     await save(db);
@@ -824,6 +896,7 @@ export const localBackend: Backend = {
       note: log.note,
       prCount: log.prCount ?? 0,
       durationMin: log.durationMin ?? null,
+      kind: log.kind ?? 'lift',
     });
     await save(db);
   },

@@ -25,6 +25,7 @@ import {
   setsDone,
   Readiness,
   Team,
+  BoardTest,
   TeamCalendar,
   TeamLog,
   TeamProgram,
@@ -59,6 +60,7 @@ type TeamRow = {
   board_effort_panel?: boolean;
   team_goal?: number | null;
   med_ball_lb?: number | string;
+  accent_color?: string | null;
 };
 
 /** team_members permission columns (migration 004). */
@@ -140,6 +142,7 @@ function toTeam(r: TeamRow): Team {
     boardEffortPanel: r.board_effort_panel ?? d.boardEffortPanel,
     teamGoal: r.team_goal ?? d.teamGoal,
     medBallLb: r.med_ball_lb != null ? Number(r.med_ball_lb) : d.medBallLb,
+    accentColor: r.accent_color ?? d.accentColor,
   };
   return { id: r.id, name: r.name, joinCode: r.join_code, coachId: r.coach_id, coachName: r.coach?.name, createdAt: r.created_at, settings };
 }
@@ -152,6 +155,7 @@ const SETTINGS_COLS: Record<keyof TeamSettings, string> = {
   boardEffortPanel: 'board_effort_panel',
   teamGoal: 'team_goal',
   medBallLb: 'med_ball_lb',
+  accentColor: 'accent_color',
 };
 
 type TestRow = {
@@ -224,10 +228,15 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
   // teams↔profiles has several links (coach, roster, workout logs); name the coach one explicitly.
   const TEAM_BASE = 'id,name,join_code,coach_id,created_at,coach:profiles!teams_coach_id_fkey(name)';
   const TEAM_P2 = `${TEAM_BASE},practice_min,match_min,tournament_min,effort_board,board_effort_panel,team_goal,med_ball_lb`;
-  // Falls back to the 2.1 columns until migration 004 has run.
-  let TEAM_SELECT = TEAM_P2;
+  const TEAM_P3 = `${TEAM_P2},accent_color`;
+  // Falls back to older columns until migrations 006 / 004 have run.
+  let TEAM_SELECT = TEAM_P3;
   async function withTeamCols<T extends { error: { message: string } | null }>(run: (cols: string) => PromiseLike<T>): Promise<T> {
-    const res = await run(TEAM_SELECT);
+    let res = await run(TEAM_SELECT);
+    if (TEAM_SELECT === TEAM_P3 && isMissing(res.error)) {
+      TEAM_SELECT = TEAM_P2;
+      res = await run(TEAM_SELECT);
+    }
     if (TEAM_SELECT === TEAM_P2 && isMissing(res.error)) {
       TEAM_SELECT = TEAM_BASE;
       return run(TEAM_SELECT);
@@ -530,34 +539,72 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
     },
 
     async shareLiveProgress(p) {
-      const { error } = await sb.from('live_progress').upsert(
-        {
-          team_id: p.teamId,
-          day: p.day,
-          session_id: p.sessionId,
-          sets_done: p.setsDone,
-          sets_total: p.setsTotal,
-          status: p.status,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'team_id,user_id,day' },
-      );
+      const base = {
+        team_id: p.teamId,
+        day: p.day,
+        session_id: p.sessionId,
+        sets_done: p.setsDone,
+        sets_total: p.setsTotal,
+        status: p.status,
+        updated_at: new Date().toISOString(),
+      };
+      // v2.2 live fields (migration 006). Never loads or RPE.
+      const live = {
+        state: p.state ?? (p.status === 'done' ? 'done' : 'lifting'),
+        exercise_name: p.exerciseName?.slice(0, 60) ?? null,
+        set_index: p.setIndex ?? null,
+        set_count: p.setCount ?? null,
+        last_reps: p.lastReps ?? null,
+        rest_ends_at: p.restEndsAt ?? null,
+        pr_today: p.prToday ?? 0,
+        finished_at: p.finishedAt ?? null,
+      };
+      let { error } = await sb.from('live_progress').upsert({ ...base, ...live }, { onConflict: 'team_id,user_id,day' });
+      if (isMissing(error)) ({ error } = await sb.from('live_progress').upsert(base, { onConflict: 'team_id,user_id,day' }));
       if (isMissing(error)) return;
       if (error) fail(error);
     },
 
     async listLiveProgress(teamId, day) {
-      // Sets only. Never weights.
-      const { data, error } = await sb
+      // Sets, the exercise name and rest timing only. Never weights or RPE.
+      type Res = { data: unknown; error: { message: string } | null };
+      const BASE = 'team_id,user_id,day,session_id,sets_done,sets_total,status,updated_at';
+      let { data, error }: Res = await sb
         .from('live_progress')
-        .select('team_id,user_id,day,session_id,sets_done,sets_total,status,updated_at')
+        .select(`${BASE},state,exercise_name,set_index,set_count,last_reps,rest_ends_at,pr_today,finished_at`)
         .eq('team_id', teamId)
         .eq('day', day);
+      if (isMissing(error)) ({ data, error } = (await sb.from('live_progress').select(BASE).eq('team_id', teamId).eq('day', day)) as Res);
       if (isMissing(error)) return [];
       if (error) fail(error);
       return (
-        data as { team_id: string; user_id: string; day: string; session_id: string | null; sets_done: number; sets_total: number; status: LiveProgress['status']; updated_at: string }[]
+        data as {
+          team_id: string;
+          user_id: string;
+          day: string;
+          session_id: string | null;
+          sets_done: number;
+          sets_total: number;
+          status: LiveProgress['status'];
+          updated_at: string;
+          state?: LiveProgress['state'];
+          exercise_name?: string | null;
+          set_index?: number | null;
+          set_count?: number | null;
+          last_reps?: number | null;
+          rest_ends_at?: string | null;
+          pr_today?: number;
+          finished_at?: string | null;
+        }[]
       ).map((r) => ({
+        state: r.state,
+        exerciseName: r.exercise_name ?? null,
+        setIndex: r.set_index ?? null,
+        setCount: r.set_count ?? null,
+        lastReps: r.last_reps ?? null,
+        restEndsAt: r.rest_ends_at ?? null,
+        prToday: r.pr_today ?? 0,
+        finishedAt: r.finished_at ?? null,
         teamId: r.team_id,
         userId: r.user_id,
         day: r.day,
@@ -589,25 +636,72 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
           board_name: string;
           group_id: string | null;
           is_me: boolean;
+          ranked?: boolean | null;
           logs: EffortInput['logs'] | null;
           attendance: EffortInput['attendance'];
-          improvement: number | string | null;
+          jump_gain?: number | string | null;
         }[]
       ).map((r) => ({
         userId: r.user_id,
         boardName: r.board_name,
         groupId: r.group_id,
         isMe: r.is_me,
+        ranked: r.ranked ?? true,
         logs: r.logs ?? [],
         attendance: r.attendance,
-        improvement: r.improvement != null ? Number(r.improvement) : null,
+        // Before migration 006 the function returned a % ("improvement"); FA-4 never shows %, so it's dropped.
+        jumpGain: r.jump_gain != null ? Number(r.jump_gain) : null,
       }));
+    },
+
+    async boardTests(teamId, day) {
+      const { data, error } = await sb.rpc('board_tests', { t: teamId, d: day });
+      if (isMissing(error)) return [];
+      if (error) fail(error);
+      return (data as { user_id: string; jumps_done: number; strength_done: boolean; changes: BoardTest['changes'] | null }[]).map((r) => ({
+        userId: r.user_id,
+        jumpsDone: r.jumps_done,
+        strengthDone: r.strength_done,
+        changes: (r.changes ?? []).map((c) => ({ ...c, delta: c.delta != null ? Number(c.delta) : null })),
+      }));
+    },
+
+    async listRacks(teamId) {
+      const [g, m] = await Promise.all([
+        sb.from('rack_groups').select('id,name,sort_order').eq('team_id', teamId).order('sort_order'),
+        sb.from('rack_group_members').select('group_id,user_id').eq('team_id', teamId),
+      ]);
+      if (isMissing(g.error) || isMissing(m.error)) return [];
+      if (g.error) fail(g.error);
+      if (m.error) fail(m.error);
+      const members = m.data as { group_id: string; user_id: string }[];
+      return (g.data as { id: string; name: string; sort_order: number }[]).map((r) => ({
+        id: r.id,
+        name: r.name,
+        sortOrder: r.sort_order,
+        userIds: members.filter((x) => x.group_id === r.id).map((x) => x.user_id),
+      }));
+    },
+
+    async saveRacks(teamId, racks) {
+      const { error } = await sb.rpc('save_racks', { t: teamId, racks: racks.map((r) => ({ name: r.name, users: r.userIds })) });
+      if (error) fail(error);
+    },
+
+    async myRack(teamId) {
+      const { data, error } = await sb.rpc('my_rack', { t: teamId });
+      if (isMissing(error)) return null;
+      if (error) fail(error);
+      const r = (data as { group_id: string; rack_name: string; partners: number; partner_names: string[] | null; others: number | null }[])[0];
+      return r ? { groupId: r.group_id, rackName: r.rack_name, partners: r.partners, partnerNames: r.partner_names, others: r.others } : null;
     },
 
     subscribeBoard(teamId, onChange, onStatus) {
       const channel = sb
         .channel(`board-${teamId}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'live_progress', filter: `team_id=eq.${teamId}` }, onChange)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'test_results', filter: `team_id=eq.${teamId}` }, onChange)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rack_group_members', filter: `team_id=eq.${teamId}` }, onChange)
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') onStatus?.(true);
           else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') onStatus?.(false);
@@ -861,9 +955,12 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
           entries: log.entries,
           pr_count: log.prCount ?? 0,
           duration_min: log.durationMin ?? null,
+          ...(log.kind === 'extra_recovery' ? { kind: 'extra_recovery' } : {}),
         },
         { onConflict: 'id', ignoreDuplicates: true },
       );
+      // An extra recovery session is never sent without its kind (it would count as a prescribed session).
+      if (isMissing(error) && log.kind === 'extra_recovery') return;
       if (isMissing(error)) {
         // Database without migration 004: send the log without the new columns.
         const old = await sb.from('workout_logs').upsert(

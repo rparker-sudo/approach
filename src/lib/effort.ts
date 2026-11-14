@@ -1,5 +1,5 @@
 import type { EffortInput } from './backend/types';
-import { addDays, dateKey, fromKey, mondayOf, planForDate, today as todayDate } from './calendar';
+import { addDays, breakOn, dateKey, fromKey, mondayOf, planForDate, today as todayDate } from './calendar';
 import type { Program } from './types';
 
 /**
@@ -11,18 +11,32 @@ import type { Program } from './types';
  *  - Consistency: completed ÷ scheduled (sessions the calendar moved count on their new day). Today counts only once done.
  *  - Week streak: consecutive weeks with every prescribed session done. Weeks with no lifts (rest) never break it.
  *  - Hours: lift minutes + attended practice/match minutes, capped at 3 h a day and 15 h a week.
- *  - Improvement: % gain in jump tests (touch, broad) only. Never lift numbers.
+ *  - Jump gains (FA-4): inches gained in touch + broad jump vs. the first test in the range. Never %, never lift numbers.
+ *  - Overall (D-024): points per OVERALL_POINTS. Extra recovery counts toward Hours and Overall only.
+ *  - Breaks (TM-3): break days aren't scheduled, so they never lower Consistency; an all-break week neither breaks
+ *    nor extends a streak, and earns no full-week points.
+ *  - Two teams (D-027): athletes who follow another team's program (ranked = false) are left off Overall, Sessions,
+ *    Extra recovery, Consistency and Streak; they stay on Attendance, Hours and Jump gains.
  */
 
-export type EffortMetric = 'consistency' | 'sessions' | 'streak' | 'attendance' | 'hours' | 'improvement';
+export type EffortMetric = 'overall' | 'sessions' | 'extra' | 'consistency' | 'streak' | 'attendance' | 'hours' | 'jumpGains';
 export const METRICS: { id: EffortMetric; label: string }[] = [
-  { id: 'consistency', label: 'Consistency' },
+  { id: 'overall', label: 'Overall' },
   { id: 'sessions', label: 'Sessions' },
+  { id: 'extra', label: 'Extra recovery' },
+  { id: 'consistency', label: 'Consistency' },
   { id: 'streak', label: 'Streak' },
   { id: 'attendance', label: 'Attendance' },
   { id: 'hours', label: 'Hours' },
-  { id: 'improvement', label: 'Improvement' },
+  { id: 'jumpGains', label: 'Jump gains' },
 ];
+
+/** Overall points (D-024, signed off by Training Content 11/10). One config object. */
+export const OVERALL_POINTS = { session: 10, extraRecovery: 5, extraPerWeek: 2, fullWeek: 5 } as const;
+export const POINTS_LINE = `Session ${OVERALL_POINTS.session} · Extra recovery ${OVERALL_POINTS.extraRecovery} (up to ${OVERALL_POINTS.extraPerWeek} a week) · Full week ${OVERALL_POINTS.fullWeek}`;
+
+/** Metrics that only count for athletes following this team's lift program (D-027). */
+export const PROGRAM_METRICS: EffortMetric[] = ['overall', 'sessions', 'extra', 'consistency', 'streak'];
 
 export const DAY_CAP_MIN = 180;
 export const WEEK_CAP_MIN = 900;
@@ -31,6 +45,11 @@ export type EffortStats = {
   userId: string;
   boardName: string;
   isMe: boolean;
+  /** Follows this team's lift program (D-027). */
+  ranked: boolean;
+  overall: number;
+  /** Extra recovery sessions done (all of them; Overall counts at most 2 a week). */
+  extra: number;
   sessions: number;
   scheduled: number;
   /** % (0–100), null when nothing was scheduled yet. */
@@ -39,8 +58,8 @@ export type EffortStats = {
   /** Null without attendance permission. */
   attendance: number | null;
   hours: number;
-  /** Null without testing permission or fewer than 2 jump tests. */
-  improvement: number | null;
+  /** Inches. Null without testing permission or fewer than 2 jump tests. */
+  jumpGains: number | null;
 };
 
 /** Dates (YYYY-MM-DD) from `since` through `until` with a prescribed lift session (mobility-only and testing days don't count). */
@@ -106,7 +125,9 @@ export function computeEffort(
   const weekEnd = addDays(mondayOf(today), 6);
   return rows.map((r) => {
     const program = programFor(r.groupId);
-    const logDays = new Set(r.logs.map((l) => dateKey(new Date(l.at))));
+    const lifts = r.logs.filter((l) => (l.kind ?? 'lift') === 'lift');
+    const extras = r.logs.filter((l) => l.kind === 'extra_recovery' && dateKey(new Date(l.at)) >= dateKey(since) && dateKey(new Date(l.at)) <= todayKey);
+    const logDays = new Set(lifts.map((l) => dateKey(new Date(l.at))));
     // Scheduled through the end of this week (for streaks); consistency uses past days plus today once done.
     const planned = program ? scheduledDays(program, since, weekEnd) : [];
     const pastOrToday = planned.filter((d) => d < todayKey || (d === todayKey && logDays.has(d)));
@@ -121,23 +142,47 @@ export function computeEffort(
       if (a.day < dateKey(since) || a.day > todayKey) continue;
       perDay[a.day] = (perDay[a.day] ?? 0) + a.minutes;
     }
+    // Overall: 10 per prescribed session, 5 per extra recovery (max 2 counted per Mon–Sun week), 5 per full week
+    // (every prescribed session that week done), awarded when the week ends.
+    const extraWeeks: Record<string, number> = {};
+    for (const l of extras) {
+      const w = weekKey(dateKey(new Date(l.at)));
+      extraWeeks[w] = (extraWeeks[w] ?? 0) + 1;
+    }
+    const extraPts = Object.values(extraWeeks).reduce((n, c) => n + Math.min(OVERALL_POINTS.extraPerWeek, c), 0) * OVERALL_POINTS.extraRecovery;
+    const fullWeeks = fullWeeksDone(planned, logDays, today);
     return {
       userId: r.userId,
       boardName: r.boardName,
       isMe: r.isMe,
+      ranked: r.ranked ?? true,
+      overall: done.size * OVERALL_POINTS.session + extraPts + fullWeeks * OVERALL_POINTS.fullWeek,
+      extra: extras.length,
       sessions: done.size,
       scheduled: pastOrToday.length,
       consistency: pastOrToday.length ? Math.round((done.size / pastOrToday.length) * 100) : null,
       streak: weekStreak(planned, logDays, today),
       attendance: r.attendance ? r.attendance.filter((a) => a.day >= dateKey(since) && a.day <= todayKey).length : null,
       hours: cappedHours(perDay),
-      improvement: r.improvement,
+      jumpGains: r.jumpGain,
     };
   });
 }
 
+/** Weeks that have ended with at least one prescribed session and all of them done (rest and break days don't matter). */
+export function fullWeeksDone(scheduled: string[], done: Set<string>, today: Date): number {
+  const thisWeek = dateKey(mondayOf(today));
+  const byWeek = new Map<string, string[]>();
+  for (const d of scheduled) byWeek.set(weekKey(d), [...(byWeek.get(weekKey(d)) ?? []), d]);
+  return [...byWeek.entries()].filter(([w, days]) => w < thisWeek && days.every((d) => done.has(d))).length;
+}
+
 export function metricValue(s: EffortStats, m: EffortMetric): number | null {
   switch (m) {
+    case 'overall':
+      return s.overall;
+    case 'extra':
+      return s.extra;
     case 'consistency':
       return s.consistency;
     case 'sessions':
@@ -148,8 +193,8 @@ export function metricValue(s: EffortStats, m: EffortMetric): number | null {
       return s.attendance;
     case 'hours':
       return s.hours;
-    case 'improvement':
-      return s.improvement;
+    case 'jumpGains':
+      return s.jumpGains;
   }
 }
 
@@ -162,8 +207,10 @@ export function formatMetric(v: number | null, m: EffortMetric): string {
       return `${v} wk`;
     case 'hours':
       return `${v} h`;
-    case 'improvement':
-      return `${v > 0 ? '+' : ''}${v}%`;
+    case 'overall':
+      return `${v} pts`;
+    case 'jumpGains':
+      return `${v > 0 ? '+' : ''}${v} in`;
     default:
       return String(v);
   }
@@ -178,7 +225,7 @@ export type Ranked = { stats: EffortStats; rank: number; value: number | null };
  * scheduled yet at the end, unranked.
  */
 export function rank(stats: EffortStats[], m: EffortMetric): Ranked[] {
-  const all = stats.map((s) => ({ stats: s, value: metricValue(s, m) }));
+  const all = stats.filter((s) => s.ranked || !PROGRAM_METRICS.includes(m)).map((s) => ({ stats: s, value: metricValue(s, m) }));
   const rows = all
     .filter((r): r is { stats: EffortStats; value: number } => r.value != null)
     .sort((a, b) => b.value - a.value || a.stats.boardName.localeCompare(b.stats.boardName));
@@ -207,15 +254,22 @@ export function defaultTeamGoal(athletes: number, sessionsPerWeek: number, weeks
   return Math.round(athletes * sessionsPerWeek * Math.max(1, weeksRemaining) * 0.8);
 }
 
-/** Weeks from today to the team's last match or tournament on the calendar (8 when none are set). */
+/** Weeks from today to the team's last match or tournament on the calendar (8 when none are set).
+ *  Weeks that are entirely a coach-set break are left out (TM-3: excluded from the default team goal). */
 export function weeksRemaining(program: Program | undefined, today: Date = todayDate()): number {
   const last = (program?.events ?? [])
-    .filter((e) => e.type === 'game' || e.type === 'tournament')
+    .filter((e) => (e.type === 'game' || e.type === 'tournament') && !e.teamName)
     .map((e) => e.date)
     .sort()
     .pop();
-  if (!last) return 8;
-  return Math.max(1, Math.ceil((fromKey(last).getTime() - today.getTime()) / (7 * 864e5)));
+  const weeks = last ? Math.max(1, Math.ceil((fromKey(last).getTime() - today.getTime()) / (7 * 864e5))) : 8;
+  if (!program) return weeks;
+  let breakWeeks = 0;
+  for (let w = 0; w < weeks; w++) {
+    const mon = addDays(mondayOf(today), 7 * w);
+    if (Array.from({ length: 7 }, (_, i) => addDays(mon, i)).every((d) => !!breakOn(program, d))) breakWeeks++;
+  }
+  return Math.max(1, weeks - breakWeeks);
 }
 
 /** Private badges (P4.7), for the athlete's own Progress tab only. */

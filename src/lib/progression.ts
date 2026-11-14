@@ -75,6 +75,8 @@ const round5 = (n: number) => Math.max(5, Math.round(n / 5) * 5);
 type SetRecord = { weight: number; reps: number };
 
 function doneSets(log: WorkoutLog, exerciseId: string): SetRecord[] {
+  // Extra recovery sessions never feed weight suggestions (T4).
+  if (log.kind === 'extra_recovery') return [];
   const entry = log.entries.find((e) => e.exerciseId === exerciseId);
   if (!entry) return [];
   return entry.sets

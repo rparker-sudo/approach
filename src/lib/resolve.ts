@@ -54,7 +54,8 @@ export type Easing = { active: boolean; until?: string };
  * The window starts on the first day back (the first log after the gap, or today if not logged yet).
  */
 export function easingFor(logs: WorkoutLog[], today: Date = todayDate()): Easing {
-  const days = [...new Set(logs.map((l) => dateKey(new Date(l.date))))].sort();
+  // Lift sessions only: gentle extra recovery doesn't end a break from lifting (judgment call, the safer reading).
+  const days = [...new Set(logs.filter((l) => l.kind !== 'extra_recovery').map((l) => dateKey(new Date(l.date))))].sort();
   if (!days.length) return { active: false };
   const t = dateKey(today);
   const gap = (a: string, b: string) => Math.round((fromKey(b).getTime() - fromKey(a).getTime()) / 864e5);

@@ -220,6 +220,8 @@ export type WorkoutLog = {
   prCount?: number;
   /** Start to finish, capped at 120 minutes. */
   durationMin?: number;
+  /** v2.2: 'extra_recovery' sessions (T4) never count as prescribed sessions or feed weight suggestions. */
+  kind?: 'lift' | 'extra_recovery';
 };
 
 export type BodyLog = { date: string; weightLb: number };

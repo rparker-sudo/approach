@@ -23,3 +23,6 @@ export function parseNum(s: string): number {
   const n = parseFloat(s.replace(',', '.'));
   return Number.isFinite(n) ? n : 0;
 }
+
+/** "Varsity's" / "Club 16s'" */
+export const possessive = (name: string) => (/s$/i.test(name) ? `${name}'` : `${name}'s`);

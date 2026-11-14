@@ -8,6 +8,7 @@ import EffortBoard, { useTeamProgramFor } from '../../components/EffortBoard';
 import TeamSettingsCard from '../../components/TeamSettingsCard';
 import TestingBanner from '../../components/TestingBanner';
 import TestsSection from '../../components/TestsSection';
+import { LevelChip, LevelSwaps, levelSetLine, SetLevelSheet } from '../../components/LevelRoster';
 import { defaultTeamGoal, liftDaysOf, weeksRemaining } from '../../lib/effort';
 import { weekStart } from '../../components/TeamHome';
 import { Body, Button, Card, Chip, ChipRow, colors, display, Field, Icon, Label, Note, Pill, Row, StatusChip, Text } from '../../components/ui';
@@ -34,6 +35,8 @@ export default function TeamScreen() {
   const [groupName, setGroupName] = useState('');
   const [openMember, setOpenMember] = useState<string | null>(null);
   const [consentFor, setConsentFor] = useState<string | null>(null);
+  const [levelFor, setLevelFor] = useState<string | null>(null);
+  const [reviewLevels, setReviewLevels] = useState(false);
   const [tab, setTab] = useState<'team' | 'effort'>('team');
   const programFor = useTeamProgramFor(id);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +50,10 @@ export default function TeamScreen() {
   }
 
   const groups = t.groups[team.id] ?? [];
-  const roster = t.members[team.id] ?? [];
+  const allMembers = t.members[team.id] ?? [];
+  const extras = t.coachExtras[team.id];
+  const unconfirmed = allMembers.filter((m) => !m.levelConfirmed);
+  const roster = reviewLevels ? unconfirmed : allMembers;
   const logs = t.logs[team.id] ?? [];
   const since = weekStart().toISOString();
   const day = dateKey(today());
@@ -117,6 +123,17 @@ export default function TeamScreen() {
         onClose={() => setConsentFor(null)}
         onSave={(status) => t.recordConsent(team.id, consentFor!, status)}
       />
+      {levelFor && allMembers.find((m) => m.userId === levelFor) ? (
+        <SetLevelSheet
+          member={allMembers.find((m) => m.userId === levelFor)!}
+          onClose={() => setLevelFor(null)}
+          onSave={async (lv) => {
+            await t.setMemberLevel(team.id, levelFor, lv);
+            setLevelFor(null);
+            showAlert('Level saved.');
+          }}
+        />
+      ) : null}
       {error ? <Text style={{ color: colors.error, fontSize: 13 }}>{error}</Text> : null}
 
       <ChipRow>
@@ -349,7 +366,15 @@ export default function TeamScreen() {
 
       {/* ---------- Roster ---------- */}
       <View style={{ gap: 8 }}>
-        <Label>{`Roster · ${roster.length}`}</Label>
+        <Label>{`Roster · ${allMembers.length}`}</Label>
+        {unconfirmed.length || reviewLevels ? (
+          <Text style={{ fontSize: 13, color: colors.muted }}>
+            {reviewLevels ? 'Showing levels not confirmed · ' : `${unconfirmed.length} level${unconfirmed.length === 1 ? '' : 's'} not confirmed · `}
+            <Text accessibilityRole="button" onPress={() => setReviewLevels(!reviewLevels)} style={{ fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' }}>
+              {reviewLevels ? 'Show everyone' : 'Review'}
+            </Text>
+          </Text>
+        ) : null}
         {minors.length ? (
           <Text style={{ fontSize: 13, color: colors.muted }}>
             {`Consent forms: ${formsIn} of ${minors.length} in · `}
@@ -384,6 +409,11 @@ export default function TeamScreen() {
                     <Row style={{ alignItems: 'flex-start' }}>
                       <View style={{ flex: 1, gap: 2 }}>
                         <Text style={{ fontSize: 16, fontWeight: '600' }}>{m.name}</Text>
+                        {!m.levelConfirmed ? <Text style={{ fontSize: 13, color: colors.muted }}>Level not confirmed</Text> : null}
+                        {extras?.followingOther.includes(m.userId) ? (
+                          <Text style={{ fontSize: 13, color: colors.muted }}>Following another team&apos;s lift program.</Text>
+                        ) : null}
+                        <Row style={{ gap: 6, flexWrap: 'wrap' }}>
                         {chips.length ? (
                           <Pressable
                             accessibilityRole="button"
@@ -397,6 +427,8 @@ export default function TeamScreen() {
                             ))}
                           </Pressable>
                         ) : null}
+                        <LevelChip member={m} onPress={() => setLevelFor(m.userId)} />
+                        </Row>
                         <Text style={{ fontSize: 13, color: colors.muted }}>
                           {m.position ?? 'Position not set'} · {groupName_(m.groupId)}
                           {mine[0] ? ` · Last lift ${formatDate(mine[0].date)}` : ' · No lifts logged'}
@@ -407,12 +439,18 @@ export default function TeamScreen() {
                             {ci.pain ? ' · pain' : ''}
                           </Text>
                         ) : null}
+                        {ci?.pain ? (
+                          <Text style={{ fontSize: 12, color: colors.warning }}>{`Check in with ${m.name.split(' ')[0] || m.name} in person.`}</Text>
+                        ) : null}
                       </View>
                       <Pill text={`${week} this week`} achievement={week > 0} />
                     </Row>
                   </Pressable>
                   {open ? (
                     <View style={{ gap: 8 }}>
+                      {levelSetLine(m) ? <Text style={{ fontSize: 13, color: colors.muted }}>{levelSetLine(m)}</Text> : null}
+                      {extras?.returning.includes(m.userId) ? <StatusChip label="Returning from a break: lighter week" /> : null}
+                      <LevelSwaps program={programFor(m.groupId ?? null)} member={m} info={extras?.levels[m.userId]} />
                       {chips.length ? (
                         <Button
                           small

@@ -126,12 +126,15 @@ language sql stable security definer set search_path = public as $$
   select min(level)::smallint from team_members where user_id = u and level is not null;
 $$;
 
--- Coach athlete detail: this team's level (and whether it's confirmed) and the level exercises resolve to.
--- No team names, coach names or other-team details. The coach shows a lower value only as "Adjusted for this athlete".
-create or replace function public.member_levels(t uuid)
-returns table (user_id uuid, team_level smallint, confirmed boolean, set_at timestamptz, resolve_level smallint)
+-- Coach athlete detail: this team's level (and whether it's confirmed), plus swap_level: the level exercises resolve to,
+-- returned only when it's lower than this team's level (otherwise null). No team names, coach names or other-team details.
+-- The coach app uses swap_level only to list the swaps under "Adjusted for this athlete" and never names it (copy review §4).
+drop function if exists public.member_levels(uuid);
+create function public.member_levels(t uuid)
+returns table (user_id uuid, team_level smallint, confirmed boolean, set_at timestamptz, swap_level smallint)
 language sql stable security definer set search_path = public as $$
-  select m.user_id, m.level, (m.level_set_by is not null), m.level_set_at, public.resolve_level_of(m.user_id)
+  select m.user_id, m.level, (m.level_set_by is not null), m.level_set_at,
+    case when m.level is not null and public.resolve_level_of(m.user_id) < m.level then public.resolve_level_of(m.user_id) end
   from team_members m
   where m.team_id = t and public.is_team_coach(t);
 $$;

@@ -14,16 +14,57 @@ import { useStore } from '../lib/store';
 import { useTeams } from '../lib/team';
 import { POSITIONS } from '../lib/types';
 import { NUTRITION_DISCLAIMER } from '../lib/nutrition';
+import { followsLowerLevel, ownLevel } from '../lib/athlete';
+import { possessive } from '../lib/util';
+import { levelLine } from '../components/VersionLine';
+import { StatusChip } from '../components/ui';
+
+/** G4 (Legal copy review §3). */
+const HEAD_INJURY_LINE =
+  "If you hit your head or have any signs of a concussion, stop training and tell your coach (and a parent or guardian if you're under 18). Follow your school's or club's concussion protocol. Only a licensed health care provider can clear you to return.";
 
 export default function Settings() {
-  const { data, setProfile, resetAll, setTheme } = useStore();
-  const { account, teams, signOut, leaveTeam, deleteAccount, consentFor, setMyChoices, setBoardNameMode } = useTeams();
+  const { data, setProfile, resetAll, setTheme, mutate } = useStore();
+  const { account, teams, signOut, leaveTeam, deleteAccount, consentFor, setMyChoices, setBoardNameMode, setLiftProgram } = useTeams();
   const [savedChoices, setSavedChoices] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [name, setName] = useState(data.profile?.name ?? '');
   if (!data.profile) return null;
   const profile = data.profile;
   const coach = profile.role === 'coach';
+
+  function leave(teamId: string) {
+    const t = teams.find((x) => x.id === teamId)!;
+    const rest = teams.filter((x) => x.id !== teamId);
+    const wasProgram = t.isLiftProgram || (!teams.some((x) => x.isLiftProgram) && teams[0]?.id === teamId);
+    leaveTeam(teamId)
+      .then(() => {
+        if (!wasProgram) return;
+        // F15c: one-time notice on Today. The server falls back to the remaining (first-joined) team.
+        const next = rest[0]; // listMyTeams is in joined order
+        mutate((d) => ({
+          ...d,
+          leaveNotice: next
+            ? `You left ${t.name}. You're now following ${possessive(next.name)} lift program.`
+            : `You left ${t.name}. You're on your personal program now.`,
+        }));
+      })
+      .catch(() => {});
+  }
+
+  function follow(teamId: string) {
+    const t = teams.find((x) => x.id === teamId)!;
+    showAlert(`Switch to ${possessive(t.name)} lift program?`, 'Starts with your next session. Your weight suggestions carry over.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Switch',
+        onPress: () =>
+          setLiftProgram(teamId)
+            .then(() => showAlert(`Following ${possessive(t.name)} lift program from your next session.`))
+            .catch(() => showAlert("Couldn't switch. Check your connection and try again.")),
+      },
+    ]);
+  }
 
   function save() {
     setProfile({ ...profile, name: name.trim() || profile.name });
@@ -70,20 +111,28 @@ export default function Settings() {
             </Body>
             {!coach && teams.length ? (
               teams.map((t) => (
-                <Row key={t.id} style={{ justifyContent: 'space-between' }}>
-                  <Text style={{ fontWeight: '600', flex: 1 }}>{t.name}</Text>
-                  <Button
-                    small
-                    kind="ghost"
-                    title="Leave"
-                    onPress={() =>
-                      showAlert(`Leave ${t.name}?`, "You'll stop getting this team's workouts.", [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Leave', style: 'destructive', onPress: () => leaveTeam(t.id).catch(() => {}) },
-                      ])
-                    }
-                  />
-                </Row>
+                <View key={t.id} style={{ gap: 6 }}>
+                  <Row style={{ justifyContent: 'space-between' }}>
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <Text style={{ fontWeight: '600' }}>{t.name}</Text>
+                      {teams.length > 1 && t.isLiftProgram ? <StatusChip label="Lift program" /> : null}
+                    </View>
+                    <Button
+                      small
+                      kind="ghost"
+                      title="Leave"
+                      onPress={() =>
+                        showAlert(`Leave ${t.name}?`, "You'll stop getting this team's workouts.", [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Leave', style: 'destructive', onPress: () => leave(t.id) },
+                        ])
+                      }
+                    />
+                  </Row>
+                  {teams.length > 1 && !t.isLiftProgram ? (
+                    <Button small kind="secondary" title="Follow this team's lift program" onPress={() => follow(t.id)} />
+                  ) : null}
+                </View>
               ))
             ) : null}
             <Button kind="ghost" title="Sign out" onPress={() => signOut().then(() => router.back())} />
@@ -107,6 +156,19 @@ export default function Settings() {
           </>
         )}
       </Card>
+
+      {!coach && account && teams.length ? (
+        <Card>
+          <H2>Program</H2>
+          {teams.map((t) => (
+            <Text key={t.id} style={{ fontSize: 14 }}>
+              {levelLine(t.name, t.myLevel ?? ownLevel(data), !!t.myLevelConfirmed)}
+            </Text>
+          ))}
+          {followsLowerLevel(data) ? <Text style={{ fontSize: 14 }}>Your exercises follow the lower of your teams&apos; levels.</Text> : null}
+          <Text style={{ fontSize: 13, color: colors.muted }}>Only your coach can change your level.</Text>
+        </Card>
+      ) : null}
 
       {account ? null : (
       <Card>
@@ -206,6 +268,14 @@ export default function Settings() {
       </Card>
 
       <Card>
+        <H2>Safety</H2>
+        <Body>{HEAD_INJURY_LINE}</Body>
+        <Body muted style={{ fontSize: 13 }}>
+          Training guidance is general education for healthy athletes. Learn new lifts with a qualified coach, and stop if anything hurts.
+        </Body>
+      </Card>
+
+      <Card>
         <H2>Legal</H2>
         {(['privacy', 'terms', 'consent'] as LegalPage[]).map((p) => (
           <Button key={p} kind="ghost" title={LEGAL_TITLES[p]} onPress={() => openLegal(p)} />
@@ -217,10 +287,7 @@ export default function Settings() {
         <Text style={{ fontSize: 12, color: colors.faint }}>Version {(Constants.expoConfig?.version ?? '1.0.0').replace(/\.0$/, '')}</Text>
       </Card>
 
-      <Body muted style={{ fontSize: 12 }}>
-        Training guidance is general education for healthy athletes. Learn new lifts with a qualified coach, and stop if
-        anything hurts. {NUTRITION_DISCLAIMER}
-      </Body>
+      <Body muted style={{ fontSize: 12 }}>{NUTRITION_DISCLAIMER}</Body>
     </Screen>
   );
 }

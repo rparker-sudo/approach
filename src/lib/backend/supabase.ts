@@ -445,12 +445,12 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
       const { data, error } = await sb.rpc('member_levels', { t: teamId });
       if (isMissing(error)) return [];
       if (error) fail(error);
-      return (data as { user_id: string; team_level: number | null; confirmed: boolean; set_at: string | null; resolve_level: number | null }[]).map((r) => ({
+      return (data as { user_id: string; team_level: number | null; confirmed: boolean; set_at: string | null; swap_level: number | null }[]).map((r) => ({
         userId: r.user_id,
         teamLevel: r.team_level,
         confirmed: r.confirmed,
         setAt: r.set_at,
-        resolveLevel: r.resolve_level,
+        swapLevel: r.swap_level,
       }));
     },
 

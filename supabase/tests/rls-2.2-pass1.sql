@@ -28,7 +28,7 @@ reset role; select team_id = :'A'::uuid as team_a, level, level_set_by is null a
 \echo == L2 coach A confirms intermediate; coach B sets beginner; coach A sees resolve 1 but no team/coach names
 select pg_temp.u(:'CA'); select set_member_level(:'A', :'J', 2::smallint);
 select pg_temp.u(:'CB'); select set_member_level(:'B', :'J', 1::smallint);
-select pg_temp.u(:'CA'); select team_level, confirmed, resolve_level from member_levels(:'A') where user_id = :'J';
+select pg_temp.u(:'CA'); select team_level, confirmed, swap_level from member_levels(:'A') where user_id = :'J';
 \echo == L3 coach A cannot see team B membership row, lift program column, or set B level (expect 2 errors)
 select count(*) as coach_a_sees_team_b_rows from team_members where team_id = :'B';
 select lift_program_team_id from profiles where id = :'J';

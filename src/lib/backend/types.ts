@@ -146,7 +146,7 @@ export type Member = {
 };
 
 /** Coach view of an athlete's levels (v2.2). resolveLevel can be lower than teamLevel because of another team; never named. */
-export type MemberLevel = { userId: string; teamLevel: number | null; confirmed: boolean; setAt: string | null; resolveLevel: number | null };
+export type MemberLevel = { userId: string; teamLevel: number | null; confirmed: boolean; setAt: string | null; /** Lower level exercises resolve to because of another team (null when not lower). Never shown as a name. */ swapLevel: number | null };
 
 export type TeamProgram = {
   teamId: string;

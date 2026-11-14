@@ -357,6 +357,7 @@ export const localBackend: Backend = {
         : db.members.filter((m) => m.userId === user.id).map((m) => m.teamId);
     return db.teams
       .filter((t) => ids.includes(t.id))
+      .sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id)) // athletes: joined order (same as the server)
       .map((t) => ({
         ...t,
         coachName: db.users.find((u) => u.id === t.coachId)?.name,
@@ -472,7 +473,7 @@ export const localBackend: Backend = {
         teamLevel: m.level ?? null,
         confirmed: !!m.levelSetBy,
         setAt: m.levelSetAt ?? null,
-        resolveLevel: resolveLevelOf(db, m.userId),
+        swapLevel: m.level != null && (resolveLevelOf(db, m.userId) ?? m.level) < m.level ? resolveLevelOf(db, m.userId) : null,
       }));
   },
 

@@ -47,6 +47,10 @@ export default function DeleteAccountDialog({
             can&apos;t be undone.
             {coach ? " Your teams and every athlete's logs for those teams are deleted too." : ''}
           </Body>
+          <Body muted>
+            We keep a short record of parent consent and coach supervision for 5 years, with no workout, check-in, or test results, as our
+            Privacy Notice explains.
+          </Body>
           <Field
             label="Type DELETE to confirm."
             value={typed}

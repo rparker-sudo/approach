@@ -14,7 +14,7 @@ import { weekStart } from '../../components/TeamHome';
 import { Body, Button, Card, Chip, ChipRow, colors, display, Field, Icon, Label, Note, Pill, Row, StatusChip, Text } from '../../components/ui';
 import { canShareCheckIns, isDemoMode } from '../../lib/backend';
 import { openLegal } from '../../lib/legal';
-import { dateKey, today } from '../../lib/calendar';
+import { dateKey, planForDate, today } from '../../lib/calendar';
 import { showAlert } from '../../lib/dialog';
 import { shareTeamInvite } from '../../lib/share';
 import { useStore } from '../../lib/store';
@@ -53,6 +53,11 @@ export default function TeamScreen() {
   const allMembers = t.members[team.id] ?? [];
   const extras = t.coachExtras[team.id];
   const unconfirmed = allMembers.filter((m) => !m.levelConfirmed);
+  const strengthDay = (gid: string | null | undefined) => {
+    const p = programFor(gid ?? null);
+    const b = p ? planForDate(p, today()).test : undefined;
+    return !!b && b !== 'jump';
+  };
   const roster = reviewLevels ? unconfirmed : allMembers;
   const logs = t.logs[team.id] ?? [];
   const since = weekStart().toISOString();
@@ -152,7 +157,7 @@ export default function TeamScreen() {
       ) : null}
       {tab === 'team' ? (
       <>
-      <TestingBanner team={team} />
+      <TestingBanner team={team} onReviewLevels={() => setReviewLevels(true)} />
       <Button
         kind="secondary"
         title="Open coach board"
@@ -438,6 +443,9 @@ export default function TeamScreen() {
                             Today: sleep {ci.sleep} · soreness {ci.soreness} · energy {ci.energy}
                             {ci.pain ? ' · pain' : ''}
                           </Text>
+                        ) : null}
+                        {strengthDay(m.groupId) && extras?.eligibleToday[m.userId] === false ? (
+                          <Text style={{ fontSize: 13, color: colors.muted }}>Not eligible for testing today.</Text>
                         ) : null}
                         {ci?.pain ? (
                           <Text style={{ fontSize: 12, color: colors.warning }}>{`Check in with ${m.name.split(' ')[0] || m.name} in person.`}</Text>

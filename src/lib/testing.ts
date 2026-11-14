@@ -61,14 +61,19 @@ export type Eligibility = { jumps: boolean; strength: boolean; note: string | nu
 export function eligibility(opts: {
   onTeam: boolean;
   perms: Perms | undefined;
-  experience: Experience;
+  /** v2.2 level rule (spec 1.1, Q-7): minors need this team's coach-confirmed intermediate/advanced and no coach-set
+   *  beginner on another team; adults need the lower of their levels to be intermediate or above. */
+  levelOk: boolean;
+  /** v2.2: a match or tournament within 48 hours on any of the athlete's teams (union), or a break. */
+  scheduleBlocked?: boolean;
   todayCheckIn?: Pick<ReadinessEntry, 'sleep' | 'soreness' | 'energy' | 'pain'>;
   /** Answer to "Any pain today?" when the athlete has no check-in permission (not saved). */
   painToday?: boolean | null;
 }): Eligibility {
   if (!opts.onTeam) return { jumps: true, strength: false, note: 'Strength checks are for athletes on a team, with their coach.' };
   if (!canTest(opts.perms)) return { jumps: false, strength: false, note: "Testing isn't turned on for you on this team." };
-  if (opts.experience === 'beginner') return { jumps: true, strength: false, note: 'Strength checks are for intermediate and advanced athletes' };
+  if (!opts.levelOk) return { jumps: true, strength: false, note: 'Strength checks are for intermediate and advanced athletes, with a level your coach has confirmed.' };
+  if (opts.scheduleBlocked) return { jumps: true, strength: false, note: 'Skip strength checks today. Talk to your coach.' };
   const ci = opts.todayCheckIn;
   if ((ci && (ci.pain || isLow(ci))) || opts.painToday) return { jumps: true, strength: false, note: 'Skip strength checks today. Talk to your coach.' };
   return { jumps: true, strength: true, note: null };

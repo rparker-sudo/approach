@@ -1,9 +1,11 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { TEST_WARMUP } from '../lib/testingContent';
 import { Body, Button, Card, Chip, ChipRow, colors, Field, H2, Label, Note, Row, Screen, Text } from '../components/ui';
 import { backend, canCheckIn, e1rm, JumpTestId, LoadTestId, TestResult } from '../lib/backend';
-import { dateKey, planForDate, today } from '../lib/calendar';
+import { breakOn, dateKey, planForDate, testBlocked, today } from '../lib/calendar';
+import { levelAllowsLoadTest } from '../lib/athlete';
 import { ALL_EQUIPMENT } from '../lib/exercises';
 import { suggestWeight } from '../lib/progression';
 import { useStore } from '../lib/store';
@@ -44,7 +46,8 @@ export default function TestingScreen() {
   const elig = eligibility({
     onTeam: !isSolo,
     perms,
-    experience: data.profile?.experience ?? 'beginner',
+    levelOk: !!team && levelAllowsLoadTest(data, team.id),
+    scheduleBlocked: !!program && (!!testBlocked(program, day) || !!breakOn(program, today())),
     todayCheckIn,
     painToday,
   });
@@ -88,9 +91,23 @@ export default function TestingScreen() {
 
       {current === 'warmup' ? (
         <Card>
-          <H2>Warm-up</H2>
-          <Body>Warm up with your team: 5–10 minutes of easy movement, then a few practice jumps at medium effort.</Body>
-          <Button title="I'm warmed up" onPress={next} />
+          <H2>{TEST_WARMUP.title}</H2>
+          <Body>{TEST_WARMUP.intro}</Body>
+          {TEST_WARMUP.blocks.map((b, i) => (
+            <View key={b.title} style={{ gap: 2 }}>
+              <Text style={{ fontSize: 15, fontWeight: '600' }}>{`${i + 1}. ${b.title}`}</Text>
+              {b.links.map((l) => (
+                <Pressable key={l.id} accessibilityRole="link" onPress={() => router.push(`/exercise/${l.id}`)} style={{ minHeight: 32, justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 14, textDecorationLine: 'underline' }}>{l.label}</Text>
+                </Pressable>
+              ))}
+              {b.text ? <Text style={{ fontSize: 14, color: b.links.length ? colors.muted : colors.ink }}>{b.text}</Text> : null}
+            </View>
+          ))}
+          {TEST_WARMUP.cues.map((c) => (
+            <Text key={c} style={{ fontSize: 13, color: colors.muted }}>{`• ${c}`}</Text>
+          ))}
+          <Button title="Done with warm-up" onPress={next} />
         </Card>
       ) : null}
 

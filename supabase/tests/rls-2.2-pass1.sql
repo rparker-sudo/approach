@@ -25,7 +25,7 @@ select set_my_self_level(:'A', 3::smallint); select set_my_self_level(:'B', 3::s
 select set_my_self_level(:'A', 1::smallint);
 update team_members set level = 1 where user_id = auth.uid();
 reset role; select team_id = :'A'::uuid as team_a, level, level_set_by is null as self from team_members where user_id = :'J' order by 1 desc; set role authenticated;
-\echo == L2 coach A confirms intermediate; coach B sets beginner; coach A sees resolve 1 but no team/coach names
+\echo == L2 coach A confirms intermediate; coach B sets beginner; coach A sees swap_level 1 (numbers only, no team/coach names)
 select pg_temp.u(:'CA'); select set_member_level(:'A', :'J', 2::smallint);
 select pg_temp.u(:'CB'); select set_member_level(:'B', :'J', 1::smallint);
 select pg_temp.u(:'CA'); select team_level, confirmed, swap_level from member_levels(:'A') where user_id = :'J';

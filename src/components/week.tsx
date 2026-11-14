@@ -5,6 +5,8 @@ import { dayAdvice, liftCapMessage, pickLiftDays } from '../lib/generator';
 import type { DayType, Program } from '../lib/types';
 import { DAY_TYPES, WEEKDAYS } from '../lib/types';
 import { Body, Button, colors, Icon, Note, Row, Text } from './ui';
+import { capExperience } from '../lib/athlete';
+import { useStore } from '../lib/store';
 
 const ORDER: DayType[] = ['off', 'practice', 'game', 'tournament'];
 
@@ -146,7 +148,8 @@ export function ProgramWeek({
   onPressSession?: (sessionId: string) => void;
   monday?: Date;
 }) {
-  const plan = weekPlan(program, monday);
+  const { data } = useStore();
+  const plan = weekPlan(program, monday, capExperience(data));
   const types = plan.map((p) => p.dayType);
   const todayKey = dateKey(today());
   return (

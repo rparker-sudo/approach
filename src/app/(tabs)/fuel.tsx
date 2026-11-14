@@ -6,6 +6,7 @@ import { cardsFor, FOOD_IDEAS, FUEL_CARD_NOTE, FuelCard, fuelDay, NUTRITION_DISC
 import { addDays, dayTypeOn, planForDate, today } from '../../lib/calendar';
 import { useStore } from '../../lib/store';
 import type { DayType } from '../../lib/types';
+import { capExperience } from '../../lib/athlete';
 
 const OPTIONS: { id: string; day: DayType; lift: boolean; label: string }[] = [
   { id: 'rest', day: 'off', lift: false, label: 'Rest' },
@@ -20,7 +21,7 @@ export default function Fuel() {
   const { data, activeProgram } = useStore();
   const coach = data.profile?.role === 'coach';
   const day = today();
-  const todayPlan = activeProgram ? planForDate(activeProgram, day) : null;
+  const todayPlan = activeProgram ? planForDate(activeProgram, day, capExperience(data)) : null;
   const todayDay = todayPlan?.dayType ?? 'practice';
   const todayLift = !!todayPlan?.sessionId;
   const todayId =

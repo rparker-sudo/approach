@@ -7,7 +7,7 @@ import Constants from 'expo-constants';
 import { PERM_LABELS } from '../components/Consent';
 import YourChoices, { DEFAULT_CHOICES } from '../components/YourChoices';
 import DeleteAccountDialog from '../components/DeleteAccountDialog';
-import { Body, Button, Card, Chip, ChipRow, colors, Field, H2, Label, Lockup, Row, Screen, Text } from '../components/ui';
+import { Body, Button, Card, Chip, ChipRow, colors, Field, H2, Label, Lockup, Row, Screen, StatusChip, Text } from '../components/ui';
 import { BoardNameMode, boardName, isDemoMode, PERM_KEYS, syncConfigProblem } from '../lib/backend';
 import { LEGAL_TITLES, LegalPage, openLegal } from '../lib/legal';
 import { useStore } from '../lib/store';
@@ -17,7 +17,6 @@ import { NUTRITION_DISCLAIMER } from '../lib/nutrition';
 import { followsLowerLevel, ownLevel } from '../lib/athlete';
 import { possessive } from '../lib/util';
 import { levelLine } from '../components/VersionLine';
-import { StatusChip } from '../components/ui';
 
 /** G4 (Legal copy review §3). */
 const HEAD_INJURY_LINE =

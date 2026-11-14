@@ -1,4 +1,4 @@
-import type { CalendarEvent, DayType, Program, Session, TestBattery } from './types';
+import type { CalendarEvent, DayType, Experience, Program, Session, TestBattery } from './types';
 import { WEEKDAYS } from './types';
 
 /**
@@ -111,8 +111,20 @@ export type DayPlan = {
 
 const MATCH_WORD: Record<DayType, string> = { game: 'match', tournament: 'tournament', practice: 'practice', off: 'day off' };
 
-/** The real plan for the 7 days starting at `monday`. */
-export function weekPlan(program: Program, monday: Date): DayPlan[] {
+/* G2 caps (duplicated from generator.ts to avoid an import cycle): beginner 3, intermediate 4, advanced 5; in-season 3. */
+const EXP_RANK: Record<Experience, number> = { beginner: 1, intermediate: 2, advanced: 3 };
+function capFor(experience: Experience, phase: Program['phase']) {
+  const byLevel = experience === 'beginner' ? 3 : experience === 'intermediate' ? 4 : 5;
+  return phase === 'in' ? Math.min(3, byLevel) : byLevel;
+}
+
+/**
+ * The real plan for the 7 days starting at `monday`.
+ * `athleteExperience`: the athlete's level (the lower of it and the program's sets the lift-day cap).
+ * C14: every writer of lift days (onboarding, personal week, schedule, team calendar, coach lift days, automatic moves)
+ * ends up here, so the cap (R6) and the full rest day (R5) are enforced on the final week, whatever the inputs.
+ */
+export function weekPlan(program: Program, monday: Date, athleteExperience?: Experience): DayPlan[] {
   const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
   const types = days.map((d) => dayTypeOn(program, d));
   const nextType = (i: number) => (i < 6 ? types[i + 1] : dayTypeOn(program, addDays(days[6], 1)));
@@ -194,6 +206,26 @@ export function weekPlan(program: Program, monday: Date): DayPlan[] {
       p.note = 'Testing day';
     }
   }
+
+  // 6. C14 / G2: lift-day cap and at least one day with nothing scheduled. Mobility-only sessions don't count toward the cap.
+  const exp =
+    athleteExperience && EXP_RANK[athleteExperience] < EXP_RANK[program.experience] ? athleteExperience : program.experience;
+  const cap = capFor(exp, program.phase);
+  const isLift = (p: DayPlan) => !!p.test || (!!p.sessionId && !session(p.sessionId)?.mobility);
+  const drop = (p: DayPlan, note: string) => Object.assign(p, { sessionId: null, source: 'auto' as const, note });
+  // Drop the latest lifts first, keeping dates the coach or athlete chose (overrides) and testing days when possible.
+  const order = [...plan].reverse().sort((a, b) => Number(a.source === 'override') - Number(b.source === 'override'));
+  let count = plan.filter(isLift).length;
+  for (const p of order) {
+    if (count <= cap) break;
+    if (!isLift(p) || p.test) continue;
+    drop(p, `Lift skipped: max ${cap} lift days a week`);
+    count--;
+  }
+  if (!plan.some((p) => !p.sessionId && !p.test)) {
+    const p = order.find((x) => x.sessionId && !x.test);
+    if (p) drop(p, 'Rest day: at least one day a week with no training');
+  }
   return plan;
 }
 
@@ -220,8 +252,8 @@ export function withTest(program: Program, key: string, battery: TestBattery | n
   return { ...program, events: keep ? [...rest, ev] : rest };
 }
 
-export function planForDate(program: Program, d: Date): DayPlan {
-  return weekPlan(program, mondayOf(d))[weekdayOf(d)];
+export function planForDate(program: Program, d: Date, athleteExperience?: Experience): DayPlan {
+  return weekPlan(program, mondayOf(d), athleteExperience)[weekdayOf(d)];
 }
 
 /** Events from `from` onward, soonest first. */

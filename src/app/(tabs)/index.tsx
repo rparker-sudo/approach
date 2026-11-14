@@ -25,7 +25,7 @@ import {
   Screen,
   Text,
 } from '../../components/ui';
-import { resolveFor } from '../../lib/athlete';
+import { capExperience, resolveFor } from '../../lib/athlete';
 import { addDays, breakOn, dateKey, dayTypeOn, eventsOn, formatKey, isHeavyLegs, mondayOf, today, weekPlan } from '../../lib/calendar';
 import { getExercise } from '../../lib/exercises';
 import { captainLine, dayAdvice } from '../../lib/generator';
@@ -118,7 +118,7 @@ function Today() {
 
   // Real dates: the season calendar and automatic lift moves apply.
   const day = today();
-  const week = weekPlan(activeProgram, mondayOf(day));
+  const week = weekPlan(activeProgram, mondayOf(day), capExperience(data));
   const todayPlan = week[i];
   const vb = todayPlan.dayType;
   const session = activeProgram.sessions.find((s) => s.id === todayPlan.sessionId);

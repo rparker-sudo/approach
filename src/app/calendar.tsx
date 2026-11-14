@@ -30,7 +30,9 @@ import { useStore } from '../lib/store';
 import { useTeams } from '../lib/team';
 import type { CalendarEvent, DayType, Program, TestBattery } from '../lib/types';
 import { BATTERY_LABEL } from '../lib/testing';
+import { BREAK_MESSAGE, NO_DATE_MESSAGE, spacingNote, suggestTestDates } from '../lib/testingDates';
 import { DAY_TYPES, WEEKDAYS } from '../lib/types';
+import { capExperience } from '../lib/athlete';
 
 const TYPE_CHOICES: { id: DayType; label: string }[] = [
   { id: 'practice', label: 'Practice' },
@@ -57,11 +59,11 @@ export default function CalendarScreen() {
     const rows: DayPlan[][] = [];
     let monday = mondayOf(month);
     while (monday.getMonth() === month.getMonth() || addDays(monday, 6).getMonth() === month.getMonth()) {
-      rows.push(weekPlan(program, monday));
+      rows.push(weekPlan(program, monday, capExperience(data)));
       monday = addDays(monday, 7);
     }
     return rows;
-  }, [program, month]);
+  }, [program, month, data]);
 
   if (!program) return <Screen><Body muted>Program not found.</Body></Screen>;
   const coach = data.profile?.role === 'coach';
@@ -188,7 +190,7 @@ export default function CalendarScreen() {
           <Legend swatch={<Text style={{ fontSize: 12, fontWeight: '600' }}>T</Text>} text="Tournament" />
           <Legend swatch={<Text style={{ fontSize: 12, fontWeight: '600' }}>Test</Text>} text="Testing day" />
           <Legend swatch={<View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.ink }} />} text="Lift moved or chosen" />
-          <Legend swatch={<Text style={{ fontSize: 12, fontWeight: '600' }}>//</Text>} text="Break" />
+          <Legend swatch={<Text style={{ fontSize: 12, fontWeight: '600' }}>{'//'}</Text>} text="Break" />
         </Row>
       </Card>
 
@@ -259,6 +261,11 @@ export default function CalendarScreen() {
           dateKeyStr={selected}
           readOnly={readOnly}
           canTest={coach && !!program.teamId}
+          onPickDate={(k) => {
+            const d = fromKey(k);
+            setMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+            setSelected(k);
+          }}
           onClose={() => setSelected(null)}
           onSave={(next) => {
             save(next);
@@ -352,6 +359,7 @@ function DaySheet({
   dateKeyStr,
   readOnly,
   canTest,
+  onPickDate,
   onClose,
   onSave,
 }: {
@@ -360,6 +368,8 @@ function DaySheet({
   readOnly: boolean;
   /** Coach on a team calendar: can add a testing day (P6.1). */
   canTest?: boolean;
+  /** F25b: tapping a suggested date opens that date. */
+  onPickDate?: (key: string) => void;
   onClose: () => void;
   onSave: (p: Program) => void;
 }) {
@@ -380,7 +390,9 @@ function DaySheet({
   if (nextDayToo && type === 'tournament') draft = withEvent(draft, nextKey, 'tournament', label);
   draft = withTest(draft, dateKeyStr, canTest ? test : existing?.test ?? null);
   // P6.1: no testing within 48 hours before a match or tournament.
-  const testError = canTest && test ? testBlocked(draft, dateKeyStr) : null;
+  const testError = canTest && test ? (breakOn(draft, date) ? BREAK_MESSAGE : testBlocked(draft, dateKeyStr)) : null;
+  const suggestions = canTest ? suggestTestDates(program) : null;
+  const spacing = canTest && !testError ? spacingNote(program, dateKeyStr, test) : null;
   const auto = planForDate(withOverride(draft, dateKeyStr, undefined), date);
   const autoName = program.sessions.find((s) => s.id === auto.sessionId)?.name ?? 'Rest';
   const current = planForDate(program, date);
@@ -448,6 +460,25 @@ function DaySheet({
               {canTest ? (
                 <>
                   <Label>Testing day</Label>
+                  {suggestions ? (
+                    <View style={{ gap: 6 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600' }}>Suggested dates</Text>
+                      {suggestions.dates.length ? (
+                        <ChipRow>
+                          {suggestions.dates.map((x) => (
+                            <Chip
+                              key={x.date}
+                              label={x.reason}
+                              selected={x.date === dateKeyStr}
+                              onPress={() => (x.date === dateKeyStr ? setTest(suggestions.battery) : onPickDate?.(x.date))}
+                            />
+                          ))}
+                        </ChipRow>
+                      ) : (
+                        <Text style={{ fontSize: 13, color: colors.muted }}>{NO_DATE_MESSAGE}</Text>
+                      )}
+                    </View>
+                  ) : null}
                   <ChipRow>
                     <Chip label="None" selected={test === null} onPress={() => setTest(null)} />
                     {(['full', 'jump', 'mid'] as TestBattery[]).map((b) => (
@@ -455,6 +486,7 @@ function DaySheet({
                     ))}
                   </ChipRow>
                   {testError ? <Text style={{ fontSize: 13, color: colors.error }}>{testError}</Text> : null}
+                  {spacing ? <Text style={{ fontSize: 13, color: colors.warning }}>{spacing}</Text> : null}
                   {test && !testError ? (
                     <Text style={{ fontSize: 13, color: colors.muted }}>That day&apos;s lift becomes a Testing session. You confirm supervision on the day.</Text>
                   ) : null}

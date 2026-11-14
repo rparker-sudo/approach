@@ -200,3 +200,27 @@ export function sessionForDate(program: Program, session: Session, date: Date = 
   const exercises = light ? lighten(session.exercises, 'light') : block.deload ? lighten(session.exercises, 'deload') : session.exercises;
   return { session, exercises, block, light };
 }
+
+/**
+ * Home bodyweight progression (home-workouts.md §5): after the top of the rep range on every set for 2 sessions in a row,
+ * suggest the exercise's harder version, only at or below the athlete's level. Suggestion only.
+ */
+export function harderSuggestion(logs: WorkoutLog[], exerciseId: string, reps: string, level: number, allowed: (e: Exercise) => boolean = () => true): Exercise | null {
+  const ex = getExercise(exerciseId);
+  if (ex.weighted || !ex.harder) return null;
+  const harder = getExercise(ex.harder);
+  if (!harder || harder.id === ex.id || harder.level > level || !allowed(harder)) return null;
+  const range = repRange(reps);
+  if (!range) return null;
+  const top = range[1];
+  const recent = logs
+    .filter((l) => l.kind !== 'extra_recovery' && l.entries.some((e) => e.exerciseId === exerciseId && e.sets.some((x) => x.done)))
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 2);
+  if (recent.length < 2) return null;
+  const allTop = (l: WorkoutLog) => {
+    const sets = l.entries.find((e) => e.exerciseId === exerciseId)!.sets.filter((x) => x.done);
+    return sets.length > 0 && sets.every((x) => (parseFloat(x.reps) || 0) >= top);
+  };
+  return recent.every(allTop) ? harder : null;
+}

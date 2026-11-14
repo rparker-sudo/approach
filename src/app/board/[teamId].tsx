@@ -9,6 +9,7 @@ import { addDays, breakOn, dateKey, formatKey, mondayOf, planForDate, today } fr
 import { defaultTeamGoal, EffortMetric, formatMetric, liftDaysOf, METRICS, POINTS_LINE, rank, seasonStart, weeksRemaining } from '../../lib/effort';
 import { getExercise } from '../../lib/exercises';
 import { Level, resolveExercise } from '../../lib/resolve';
+import { runState, stationFor, StationRun } from '../../lib/stations';
 import { BATTERY_LABEL } from '../../lib/testing';
 import { ALL, useTeams } from '../../lib/team';
 import type { Program, TestBattery } from '../../lib/types';
@@ -71,6 +72,7 @@ function Board({ teamId }: { teamId: string }) {
   const [prs, setPrs] = useState<Record<string, number>>({});
   const [tests, setTests] = useState<BoardTest[]>([]);
   const [racks, setRacks] = useState<Rack[]>([]);
+  const [run, setRun] = useState<StationRun | null>(null);
   const [connected, setConnected] = useState(true);
   const [lastOk, setLastOk] = useState(() => Date.now());
   const [view, setView] = useState<'live' | 'season'>('live');
@@ -88,13 +90,15 @@ function Board({ teamId }: { teamId: string }) {
   const load = useCallback(async () => {
     try {
       const startOfDay = today().toISOString();
-      const [m, l, b, ts, rk] = await Promise.all([
+      const [m, l, b, ts, rk, sr] = await Promise.all([
         backend.boardMembers(teamId),
         backend.listLiveProgress(teamId, day),
         backend.bestsSince(teamId, startOfDay),
         backend.boardTests(teamId, day),
         backend.listRacks(teamId),
+        backend.getStationRun(teamId, day),
       ]);
+      setRun(sr);
       setMembers(m);
       setLive(l);
       setPrs(b);
@@ -211,7 +215,12 @@ function Board({ teamId }: { teamId: string }) {
     return 'not_started';
   };
   const ORDER: Record<TileState, number> = { resting: 0, lifting: 0, not_started: 1, done: 2 };
-  const all: Tile[] = (members ?? []).map((m) => {
+  // 3.1: athletes on a home day aren't on the live view (they aren't in the room).
+  const atHome = (m: BoardMember) => {
+    const k = m.groupId && today_.per.some((x) => x.key === m.groupId) ? m.groupId : ALL;
+    return (today_.per.find((x) => x.key === k) ?? today_.per[0])?.session?.location === 'home';
+  };
+  const all: Tile[] = (members ?? []).filter((m) => !atHome(m)).map((m) => {
     const l = live.find((x) => x.userId === m.userId);
     return { member: m, live: l, prs: Math.max(prs[m.userId] ?? 0, l?.prToday ?? 0), test: tests.find((x) => x.userId === m.userId), state: tileState(l), upFirst: undefined };
   });
@@ -269,12 +278,47 @@ function Board({ teamId }: { teamId: string }) {
   const filterKeys: (string | null)[] = [null, ...groups.map((g) => g.id), ...racks.map((r) => `rack:${r.id}`)];
   const filterLabel = (k: string | null) => (!k ? 'All' : k.startsWith('rack:') ? racks.find((r) => `rack:${r.id}` === k)?.name ?? 'Rack' : groupName(k));
   const big = (n: number) => Math.max(14, Math.min(n, (n * width) / 1920));
-  const sessionLine = today_.test
+  // F30: station grid during Part 2 of a Stations session.
+  const stSession = today_.per.find((x) => x.session?.format === 'stations')?.session;
+  const stList = stSession?.stations ?? [];
+  const rs = run && stSession && stList.length ? runState(run, now) : null;
+  const gridOn = !!rs && rs.phase !== 'done' && view === 'live';
+  const sortedRacks = [...racks].sort((a, b) => a.sortOrder - b.sortOrder).filter((r) => r.userIds.length);
+
+  const sessionLine = gridOn
+    ? `Stations · Round ${rs!.round + 1} of ${run!.rounds}`
+    : today_.test
     ? `Testing day: ${BATTERY_LABEL[today_.test]}`
     : today_.lifting.map((s) => (today_.lifting.length > 1 ? `${s.label}: ${s.session!.name}` : s.session!.name)).join(' · ');
 
   let body: React.ReactNode;
   if (view === 'season') body = <Season teamId={teamId} accent={accent} />;
+  else if (gridOn)
+    body = (
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+        {stList.map((st, i) => {
+          const rk = sortedRacks.find((_, k) => stationFor(k, rs!.round, stList.length) === i);
+          const next = rk ? stList[stationFor(sortedRacks.indexOf(rk), rs!.round + 1, stList.length)] : null;
+          const tiles = rk ? all.filter((x) => rk.userIds.includes(x.member.userId)) : [];
+          const tw = Math.max(200, Math.floor((grid.w - 16 * (Math.min(stList.length, 3) - 1)) / Math.min(stList.length, 3)) - 24);
+          return (
+            <View key={st.id} style={{ width: tw + 24, gap: 6, padding: 12, borderRadius: 16, borderWidth: 1, borderColor: P.line }}>
+              <Text style={{ color: P.ink, fontSize: big(32), fontWeight: '700' }}>{st.name}</Text>
+              {rk ? (
+                <Text style={{ color: P.muted, fontSize: big(24) }}>{`${rk.name} · ${st.name}${next && rs!.round + 1 < run!.rounds ? ` → ${next.name}` : ''}`}</Text>
+              ) : (
+                <Text style={{ color: P.muted, fontSize: big(24) }}>Open this round.</Text>
+              )}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {tiles.map((tile) => (
+                  <BoardTile key={tile.member.userId} tile={tile} w={Math.floor((tw - 8) / 2)} h={120} accent={accent} now={now} groupName={groupName} test={today_.test} />
+                ))}
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    );
   else if (members === null)
     body = (
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GAP }}>
@@ -328,6 +372,11 @@ function Board({ teamId }: { teamId: string }) {
             {new Date(now).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
           </Text>
           {sessionLine ? <Text style={{ color: P.muted, fontSize: big(24) }}>{sessionLine}</Text> : null}
+          {gridOn ? (
+            <Text style={{ color: P.ink, fontSize: big(48), fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+              {rs!.phase === 'transition' ? `Move to your next station · ${clock(rs!.secondsLeft)}` : `Rotate in ${clock(rs!.secondsLeft)}`}
+            </Text>
+          ) : null}
         </View>
         {view === 'live' ? (
           <View style={{ flexDirection: 'row', gap: 28, flexWrap: 'wrap' }}>
@@ -485,7 +534,12 @@ function BoardTile({
     line2 = !t || t.jumpsDone < 3 ? `Jump tests ${t?.jumpsDone ?? 0} / 3` : test !== 'jump' && t.strengthDone ? 'Strength check ✓' : 'Jump tests ✓';
   } else if (tile.state === 'not_started') line2 = tile.upFirst ? `Up first: ${tile.upFirst}` : null;
   else if (done) line2 = l?.finishedAt ? `Finished ${new Date(l.finishedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Finished';
-  else {
+  else if (l?.groupLabel) {
+    // F23: "A1 DB Bench · A2 One-Arm Row" then "Round 2 of 3".
+    const cut = l.groupLabel.lastIndexOf(' · Round ');
+    line2 = cut > 0 ? l.groupLabel.slice(0, cut) : l.groupLabel;
+    line3 = cut > 0 ? l.groupLabel.slice(cut + 3) : null;
+  } else {
     line2 = l?.exerciseName ?? null;
     line3 = l?.setIndex && l.setCount ? `Set ${l.setIndex} of ${l.setCount}${l.lastReps ? ` · last set ${l.lastReps} reps` : ''}` : null;
   }

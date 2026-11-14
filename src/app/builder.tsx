@@ -1,18 +1,16 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Body, Button, Card, Chip, ChipRow, Field, H2, Label, Screen } from '../components/ui';
+import { Body, Button, Card, Chip, ChipRow, Field, H2, Label, Screen , Row, Stepper, Text, colors } from '../components/ui';
 import { LiftDayPicker, WeekEditor } from '../components/week';
 import EquipmentPicker from '../components/EquipmentPicker';
 import { ALL_EQUIPMENT } from '../lib/exercises';
 import { generateProgram, liftDayCap, pickLiftDays, recommendedTotal, weekSummary } from '../lib/generator';
-import { Row, Stepper, Text, colors } from '../components/ui';
 import { Switch } from 'react-native';
 import { LEVEL_NAME } from '../lib/athlete';
-import { WEEKDAYS } from '../lib/types';
+import { WEEKDAYS , EXPERIENCE, PHASES, POSITIONS } from '../lib/types';
 import { useStore } from '../lib/store';
 import { ALL, teamProgramId, useTeams } from '../lib/team';
 import type { DayType, Equipment, Experience, Phase, ProgramPosition } from '../lib/types';
-import { EXPERIENCE, PHASES, POSITIONS } from '../lib/types';
 
 export default function Builder() {
   const { data } = useStore();

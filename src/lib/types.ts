@@ -234,7 +234,8 @@ export type WorkoutLog = {
   programId: string;
   sessionId: string;
   sessionName: string;
-  entries: { exerciseId: string; sets: LoggedSet[] }[];
+  /** stationId: the station the exercise was done at (stations format; progression ignores order). */
+  entries: { exerciseId: string; sets: LoggedSet[]; stationId?: string }[];
   note?: string;
   /** Team this workout counts for (sent to the coach). */
   teamId?: string;
@@ -244,6 +245,8 @@ export type WorkoutLog = {
   prCount?: number;
   /** Start to finish, capped at 120 minutes. */
   durationMin?: number;
+  /** v2.2 pass 3: where it was done (home sessions record 'home'). */
+  location?: 'school' | 'home';
   /** v2.2: 'extra_recovery' sessions (T4) never count as prescribed sessions or feed weight suggestions. */
   kind?: 'lift' | 'extra_recovery';
 };

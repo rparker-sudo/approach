@@ -6,10 +6,9 @@ import { ALL_EQUIPMENT, CATEGORY_LABEL, EXERCISES, fits, getExercise } from '../
 import { formatRest, restSecFor } from '../lib/generator';
 import { useStore } from '../lib/store';
 import { resolveFor } from '../lib/athlete';
-import { estimateMinutes, FLOOR_MESSAGE, formatMinutes, REST_FLOOR, tierOf } from '../lib/rest';
+import { estimateMinutes, FLOOR_MESSAGE, formatMinutes, REST_FLOOR, tierOf , lengthTarget } from '../lib/rest';
 import { effortProblem } from '../lib/resolve';
 import { blockRests, blocksOf, clockProblem, CLOCK_REASON, groupRows, labelOf, straightRests, ungroup } from '../lib/groups';
-import { lengthTarget } from '../lib/rest';
 import StationsEditor from '../components/StationsEditor';
 import { useTeams } from '../lib/team';
 import VersionLine, { DroppedLine } from '../components/VersionLine';

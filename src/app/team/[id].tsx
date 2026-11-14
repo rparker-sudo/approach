@@ -7,6 +7,7 @@ import ConsentSheet from '../../components/ConsentSheet';
 import EffortBoard, { useTeamProgramFor } from '../../components/EffortBoard';
 import TeamSettingsCard from '../../components/TeamSettingsCard';
 import TestingBanner from '../../components/TestingBanner';
+import StationControls from '../../components/StationControls';
 import TestsSection from '../../components/TestsSection';
 import { LevelChip, LevelSwaps, levelSetLine, SetLevelSheet } from '../../components/LevelRoster';
 import { defaultTeamGoal, liftDaysOf, weeksRemaining } from '../../lib/effort';
@@ -158,6 +159,7 @@ export default function TeamScreen() {
       {tab === 'team' ? (
       <>
       <TestingBanner team={team} onReviewLevels={() => setReviewLevels(true)} />
+      <StationControls team={team} />
       <Button
         kind="secondary"
         title="Open coach board"

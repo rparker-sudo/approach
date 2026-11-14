@@ -9,15 +9,17 @@ import { Body, BRAND, Button, Card, Chip, ChipRow, colors, display, Icon, Label,
 import { dateKey, today } from '../lib/calendar';
 import { showAlert } from '../lib/dialog';
 import { CATEGORY_LABEL, getExercise } from '../lib/exercises';
-import { formatRest } from '../lib/generator';
-import { repRange, suggestWeight, Suggestion } from '../lib/progression';
-import { resolveFor } from '../lib/athlete';
+import { formatRest , homeAllowed } from '../lib/generator';
+import { repRange, suggestWeight, Suggestion , harderSuggestion } from '../lib/progression';
+import { resolveFor , athleteLevel } from '../lib/athlete';
 import type { ResolvedExercise } from '../lib/resolve';
 import VersionLine, { DroppedLine } from '../components/VersionLine';
 import { EXTRA_RECOVERY_SESSIONS, RECOVERY_NOTE, recoveryProgram } from '../lib/recovery';
+import { blocksOf, labelOf } from '../lib/groups';
+import { backend , canLog } from '../lib/backend';
+import { runState, stationFor, StationRun } from '../lib/stations';
 import { adjustRest, clock, Rest, secondsLeft, startRest } from '../lib/restTimer';
 import { ConsentBanner } from '../components/Consent';
-import { canLog } from '../lib/backend';
 import { useStore } from '../lib/store';
 import { useTeams } from '../lib/team';
 import type { LoggedSet, WorkoutLog } from '../lib/types';
@@ -44,7 +46,7 @@ function buzz() {
 export default function Workout() {
   useKeepAwake();
   const { programId, sessionId, recovery } = useLocalSearchParams<{ programId: string; sessionId: string; recovery?: string }>();
-  const { data, addLog, activeProgram } = useStore();
+  const { data, addLog, activeProgram, mutate } = useStore();
   const { consentFor, shareLiveProgress } = useTeams();
   const insets = useSafeAreaInsets();
   // v2.2 extra recovery (T4): a Training Content session wrapped as a one-session program (still resolved, G-1).
@@ -64,10 +66,40 @@ export default function Workout() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const day = useMemo(() => (program && session ? resolveFor(data, program, session, today()) : null), [program, session]);
   const plan: ResolvedExercise[] = useMemo(() => day?.exercises ?? [], [day]);
+  const blocks = useMemo(() => blocksOf(plan), [plan]);
+  const isHome = session?.location === 'home';
+  const noSuggestions = isRecovery || !!day?.lightHome; // light home day: no weight suggestions (H2)
+  // Stations (F29b): the shared rotation timer and this athlete's rack.
+  const [run, setRun] = useState<StationRun | null>(null);
+  const [rackIndex, setRackIndex] = useState<number | null>(null);
+  const stationsOn = session?.format === 'stations' && !!program?.teamId && !isRecovery && (session?.stations?.length ?? 0) > 0;
+  useEffect(() => {
+    if (!stationsOn || !program?.teamId) return;
+    let alive = true;
+    const poll = () =>
+      backend
+        .getStationRun(program.teamId!, dateKey(today()))
+        .then((x) => alive && setRun(x))
+        .catch(() => {});
+    backend
+      .listRacks(program.teamId)
+      .then((rk) => {
+        if (!alive) return;
+        const i = [...rk].sort((a, b) => a.sortOrder - b.sortOrder).findIndex((x) => x.userIds.length > 0);
+        setRackIndex(i >= 0 ? i : null);
+      })
+      .catch(() => {});
+    poll();
+    const t = setInterval(poll, 5000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [stationsOn, program?.teamId]);
   const suggestions = useMemo(
     () =>
       plan.map((pe) => {
-        if (isRecovery) return null; // extra recovery never creates weight suggestions
+        if (noSuggestions) return null; // extra recovery and the light home day never create weight suggestions
         const est = data.strengthEstimates?.[pe.exerciseId];
         return suggestWeight(data.logs, pe, program?.equipment, est && program ? { e1rm: est.e1rm, phase: program.phase } : undefined, day?.easing.active);
       }),
@@ -137,12 +169,16 @@ export default function Workout() {
           setIndex: Math.min(curEntry.sets.filter((x) => x.done).length + 1, curEntry.sets.length),
           setCount: curEntry.sets.length,
           restEndsAt: rest ? new Date(rest.endAt).toISOString() : null,
+          groupLabel: groupLine(plan, curIndex, draft.entries),
+          stationId: plan[curIndex].stationId ?? null,
+          rotateAt: run && !run.endedAt ? new Date(runState(run, now).rotateAt).toISOString() : null,
         }
       : null;
   const liveKey = livePayload ? JSON.stringify([doneCount, livePayload]) : '';
   const lastShared = useRef('');
   useEffect(() => {
-    if (isRecovery || !program?.teamId || !session || !livePayload || summary || liveKey === lastShared.current) return;
+    // Home sessions aren't on the live board (they aren't in the room).
+    if (isRecovery || isHome || !program?.teamId || !session || !livePayload || summary || liveKey === lastShared.current) return;
     if (doneCount === 0 && curIndex === 0) return; // nothing to show until the first set or a move
     const timer = setTimeout(() => {
       lastShared.current = liveKey;
@@ -160,6 +196,21 @@ export default function Workout() {
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveKey, summary]);
+
+  // Stations: tick every second while a rotation runs; buzz when it's time to rotate.
+  const lastPhase = useRef<string>('');
+  useEffect(() => {
+    if (!run || run.endedAt) return;
+    const t = setInterval(() => {
+      const at = Date.now();
+      setNow(at);
+      const st = runState(run, at);
+      const key = `${st.round}-${st.phase}`;
+      if (lastPhase.current && lastPhase.current !== key && st.phase === 'transition') buzz();
+      lastPhase.current = key;
+    }, 1000);
+    return () => clearInterval(t);
+  }, [run]);
 
   // Tick while resting.
   useEffect(() => {
@@ -231,10 +282,28 @@ export default function Workout() {
     }
     setRestDone(false);
     // No rest timer for 0 s (extra recovery: move straight on).
-    if (plan[ei].restSecResolved > 0) setRest(startRest(plan[ei].restSecResolved, getExercise(plan[ei].exerciseId).name));
+    // Blocks: A1 → 15 s transition → A2 → rest after the round → A1 again. Label the timer with what's next.
+    const block = plan[ei].group ? blocks.get(plan[ei].group!) ?? [] : [];
+    let nextIndex: number | null = null;
+    let restLabel = getExercise(plan[ei].exerciseId).name;
+    if (block.length >= 2) {
+      const k = block.indexOf(ei);
+      const roundsLeft = block.some((b) => entries[b].sets.filter((x, j) => !(b === ei && j === si) && !x.done).length > 0);
+      if (k < block.length - 1) {
+        nextIndex = block[k + 1];
+        restLabel = `Next: ${labelOf(plan, nextIndex)} ${getExercise(plan[nextIndex].exerciseId).name}`;
+      } else if (roundsLeft) {
+        nextIndex = block[0];
+        restLabel = `Rest, then ${labelOf(plan, block[0])} ${getExercise(plan[block[0]].exerciseId).name}`;
+      } else nextIndex = block[block.length - 1] + 1 < plan.length ? block[block.length - 1] + 1 : null;
+    }
+    if (plan[ei].restSecResolved > 0) setRest(startRest(plan[ei].restSecResolved, restLabel));
     else setRest(null);
-    // Last set of this exercise: move on while you rest.
-    if (remainingHere === 0 && mode === 'focus' && ei < plan.length - 1) update({ index: ei + 1 });
+    if (mode === 'focus') {
+      if (block.length >= 2 && nextIndex != null) update({ index: nextIndex });
+      // Last set of this exercise: move on while you rest.
+      else if (remainingHere === 0 && ei < plan.length - 1) update({ index: ei + 1 });
+    }
   }
 
   async function clearDraft() {
@@ -258,7 +327,11 @@ export default function Workout() {
       teamId: program!.teamId && canLog(consentFor(program!.teamId)) ? program!.teamId : undefined,
       synced: false,
       ...(isRecovery ? { kind: 'extra_recovery' as const, programId: 'extra-recovery' } : {}),
+      ...(isHome ? { location: 'home' as const } : {}),
     };
+    // Stations: each exercise records the station it was done at (unfinished sets stay "not done").
+    log.entries = entries.map((e, i) => (plan[i]?.stationId ? { ...e, stationId: plan[i].stationId } : e));
+    if (isHome && !data.homeHintSeen) mutate((d) => ({ ...d, homeHintSeen: true }));
     // New best estimated strength vs. earlier logs.
     const prs: string[] = [];
     for (const e of isRecovery ? [] : entries) {
@@ -334,6 +407,30 @@ export default function Workout() {
     );
   }
 
+  const level = athleteLevel(data);
+  const cardProps = (i: number) => {
+    const pe = plan[i];
+    const block = pe.group ? blocks.get(pe.group) ?? [] : [];
+    const rounds = block.length >= 2 ? Math.min(...block.map((b) => entries[b].sets.length)) : 0;
+    const round = block.length >= 2 ? Math.min(rounds, Math.min(...block.map((b) => entries[b].sets.filter((x) => x.done).length)) + 1) : 0;
+    const harder =
+      isHome && !day.lightHome && !(pe.exerciseId in (data.harderPicks ?? {}))
+        ? harderSuggestion(data.logs, pe.exerciseId, pe.reps, level, (e) => homeAllowed(e, false))
+        : null;
+    return {
+      label: labelOf(plan, i),
+      blockLine: block.length >= 2 ? `${block.length === 2 ? 'Superset' : 'Circuit'} · Round ${round} of ${rounds}` : null,
+      harder,
+      onHarder: (yes: boolean) => mutate((d) => ({ ...d, harderPicks: { ...(d.harderPicks ?? {}), [pe.exerciseId]: yes && harder ? harder.id : null } })),
+    };
+  };
+  // Stations (F29b): where this athlete is now.
+  const stations = session.stations ?? [];
+  const rs = stationsOn && run ? runState(run, now) : null;
+  const myStation = rs && rs.phase !== 'done' && rackIndex != null ? stations[stationFor(rackIndex, rs.round, stations.length)] : null;
+  const nextStation = rs && rs.phase !== 'done' && rackIndex != null ? stations[stationFor(rackIndex, rs.round + 1, stations.length)] : null;
+  const notDoneAt = (st: typeof myStation) =>
+    st ? plan.reduce((n, pe, i) => n + (pe.stationId === st.id ? entries[i].sets.filter((x) => !x.done).length : 0), 0) : 0;
   const header = (
     <View style={{ gap: 6 }}>
       <Row style={{ justifyContent: 'space-between' }}>
@@ -355,6 +452,32 @@ export default function Workout() {
         {day.easing.active ? <Pill text="Easing back in this week" /> : null}
       </Row>
       <DroppedLine count={day.dropped} />
+      {stationsOn && rs && rs.phase !== 'done' ? (
+        rackIndex == null ? (
+          <Note>You&apos;re not on a rack today. Follow the standard order.</Note>
+        ) : rs.phase === 'transition' ? (
+          <View accessibilityRole="alert" style={{ backgroundColor: colors.primaryBg, padding: 12, borderRadius: 12 }}>
+            <Text style={{ color: colors.primaryText, fontWeight: '700', fontSize: 16 }}>{`Time to rotate → Station ${stations.indexOf(myStation!) + 1} (${myStation!.name}) · ${clock(rs.secondsLeft)}`}</Text>
+          </View>
+        ) : (
+          <View style={{ gap: 2 }}>
+            <Text style={{ fontSize: 18, fontWeight: '700' }}>{`Station ${stations.indexOf(myStation!) + 1} · ${myStation!.name}`}</Text>
+            <Text style={{ fontSize: 14, fontVariant: ['tabular-nums'] }}>
+              {`Rotate in ${clock(rs.secondsLeft)}${nextStation && rs.round + 1 < run!.rounds ? ` → Station ${stations.indexOf(nextStation) + 1} (${nextStation.name})` : ''}`}
+            </Text>
+            {mode === 'focus' && plan[idx]?.stationId !== myStation!.id && plan.some((pe) => pe.stationId === myStation!.id) ? (
+              <Button small kind="secondary" title={`Go to Station ${stations.indexOf(myStation!) + 1}`} onPress={() => update({ index: plan.findIndex((pe) => pe.stationId === myStation!.id) })} />
+            ) : null}
+          </View>
+        )
+      ) : null}
+      {stationsOn && rs && rackIndex != null && rs.round > 0 && rs.phase !== 'done'
+        ? (() => {
+            const prev = stations[stationFor(rackIndex, rs.round - 1, stations.length)];
+            const n = notDoneAt(prev);
+            return n ? <Text style={{ fontSize: 13, color: colors.muted }}>{`${n} set${n === 1 ? '' : 's'} not done at ${prev.name}`}</Text> : null;
+          })()
+        : null}
       {isRecovery ? <Note>{RECOVERY_NOTE}</Note> : null}
     </View>
   );
@@ -381,7 +504,7 @@ export default function Workout() {
 
         {mode === 'focus' ? (
           <>
-            <ExerciseCard pe={plan[idx]} teamId={program.teamId} entry={entries[idx]} suggestion={suggestions[idx]} ei={idx} big setSet={setSet} toggleDone={toggleDone} />
+            <ExerciseCard {...cardProps(idx)} pe={plan[idx]} teamId={program.teamId} entry={entries[idx]} suggestion={suggestions[idx]} ei={idx} big setSet={setSet} toggleDone={toggleDone} />
             <Row>
               <View style={{ flex: 1 }}>
                 <Button kind="ghost" title="Previous" disabled={idx === 0} onPress={() => update({ index: idx - 1 })} />
@@ -398,7 +521,7 @@ export default function Workout() {
           </>
         ) : (
           plan.map((pe, i) => (
-            <ExerciseCard key={i} pe={pe} teamId={program.teamId} entry={entries[i]} suggestion={suggestions[i]} ei={i} setSet={setSet} toggleDone={toggleDone} />
+            <ExerciseCard key={i} {...cardProps(i)} pe={pe} teamId={program.teamId} entry={entries[i]} suggestion={suggestions[i]} ei={i} setSet={setSet} toggleDone={toggleDone} />
           ))
         )}
 
@@ -466,6 +589,10 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 function ExerciseCard({
+  label,
+  blockLine,
+  harder,
+  onHarder,
   pe,
   teamId,
   entry,
@@ -475,6 +602,10 @@ function ExerciseCard({
   setSet,
   toggleDone,
 }: {
+  label?: string | null;
+  blockLine?: string | null;
+  harder?: { id: string; name: string } | null;
+  onHarder?: (yes: boolean) => void;
   pe: ResolvedExercise;
   teamId?: string;
   entry: Entry;
@@ -487,8 +618,11 @@ function ExerciseCard({
   const info = getExercise(pe.exerciseId);
   const timed = !repRange(pe.reps);
   return (
-    <Card>
+    <Card style={label ? { borderLeftWidth: 4, borderLeftColor: colors.ink } : undefined}>
+      {blockLine ? <Text style={{ fontSize: 13, fontWeight: '700' }}>{blockLine}</Text> : null}
+      {label ? <Text style={{ fontSize: 28, fontWeight: '800' }}>{label}</Text> : null}
       <Text style={[display(12), { color: colors.muted }]}>{CATEGORY_LABEL[info.category]}</Text>
+      {pe.afterCircuit ? <Text style={{ fontSize: 13, color: colors.muted }}>Done on its own after the circuit.</Text> : null}
       <Pressable accessibilityRole="link" onPress={() => router.push(`/exercise/${info.id}`)}>
         <Row style={{ gap: 6 }}>
           <Text style={{ fontSize: big ? 24 : 20, fontWeight: '600', flexShrink: 1 }}>{info.name}</Text>
@@ -512,11 +646,20 @@ function ExerciseCard({
         )
       ) : null}
       {pe.notes ? <Text style={{ fontSize: 13 }}>Coach: {pe.notes}</Text> : null}
+      {harder && onHarder ? (
+        <View style={{ borderWidth: 1, borderColor: colors.line, borderRadius: 12, padding: 10, gap: 6 }}>
+          <Text style={{ fontSize: 14, fontWeight: '600' }}>{`Ready for a harder version? ${harder.name}`}</Text>
+          <Row style={{ gap: 8 }}>
+            <Button small title="Try it" onPress={() => onHarder(true)} />
+            <Button small kind="ghost" title="Not yet" onPress={() => onHarder(false)} />
+          </Row>
+        </View>
+      ) : null}
       {big ? <Body muted style={{ fontSize: 13 }}>{info.cue}</Body> : null}
 
       <Row style={{ gap: 8 }}>
         <Text style={{ width: 30, fontSize: 12, color: colors.muted }}>Set</Text>
-        {info.weighted ? <Text style={{ flex: 1, fontSize: 12, color: colors.muted }}>Weight (lb)</Text> : null}
+        {info.weighted ? <Text style={{ flex: 1, fontSize: 12, color: colors.muted }}>{info.id === 'backpack-carry' ? 'Bag weight (lb)' : 'Weight (lb)'}</Text> : null}
         <Text style={{ flex: 1, fontSize: 12, color: colors.muted }}>{timed ? 'Time / reps' : 'Reps'}</Text>
         <Text style={{ width: big ? 72 : 44, fontSize: 12, color: colors.muted, textAlign: 'center' }}>Done</Text>
       </Row>
@@ -561,4 +704,16 @@ function ExerciseCard({
       ))}
     </Card>
   );
+}
+
+/** Board line for a block (F23): "A1 DB Bench · A2 One-Arm Row · Round 2 of 3"; null for straight sets. */
+function groupLine(plan: ResolvedExercise[], i: number, entries: Entry[]): string | null {
+  const g = plan[i]?.group;
+  if (!g) return null;
+  const idx = plan.map((pe, k) => (pe.group === g ? k : -1)).filter((k) => k >= 0);
+  if (idx.length < 2) return null;
+  const names = idx.map((k) => `${labelOf(plan, k)} ${getExercise(plan[k].exerciseId).name}`).join(' · ');
+  const rounds = Math.min(...idx.map((k) => entries[k]?.sets.length ?? 0));
+  const round = Math.min(rounds, Math.min(...idx.map((k) => entries[k]?.sets.filter((x) => x.done).length ?? 0)) + 1);
+  return `${names} · Round ${round} of ${rounds}`;
 }

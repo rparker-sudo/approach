@@ -5,6 +5,8 @@ import AttendanceCheck from '../../components/AttendanceCheck';
 import CapNotice from '../../components/CapNotice';
 import { ConsentBanner } from '../../components/Consent';
 import RackCard from '../../components/RackCard';
+import StationsCard from '../../components/StationsCard';
+import HomeEquipmentSheet from '../../components/HomeEquipmentSheet';
 import ReadinessCard from '../../components/ReadinessCard';
 import ScreenHeader from '../../components/ScreenHeader';
 import Sheet from '../../components/Sheet';
@@ -78,6 +80,7 @@ function LeaveNotice() {
 function Today() {
   const { data, activeProgram } = useStore();
   const [easingOpen, setEasingOpen] = useState(false);
+  const [homeSheet, setHomeSheet] = useState(false);
   const painToday = !!(data.readinessLog ?? []).find((r) => r.day === dateKey(today()))?.pain;
   const { account, teams, consentFor } = useTeams();
   const profile = data.profile!;
@@ -168,7 +171,12 @@ function Today() {
       {showCheckIn ? <ReadinessCard /> : null}
       {activeProgram.teamId ? null : <CapNotice program={activeProgram} />}
       {activeProgram.teamId ? <AttendanceCheck program={activeProgram} /> : null}
-      {activeProgram.teamId ? <RackCard teamId={activeProgram.teamId} /> : null}
+      {/* F21: no rack card on a home day. */}
+      {activeProgram.teamId && session?.location !== 'home' ? <RackCard teamId={activeProgram.teamId} /> : null}
+      {/* F20: opens once the first time an upcoming home day appears (closing counts as bodyweight only). */}
+      {homeSheet || (!data.homeEquipmentAsked && week.slice(i).some((p) => activeProgram.sessions.find((x) => x.id === p.sessionId)?.location === 'home')) ? (
+        <HomeEquipmentSheet onClose={() => setHomeSheet(false)} />
+      ) : null}
 
       <Card>
         <Row style={{ justifyContent: 'space-between' }}>
@@ -201,11 +209,27 @@ function Today() {
           </>
         ) : session ? (
           <>
-            <H2>{session.name}</H2>
-            <Body muted>{session.focus}</Body>
+            {session.location === 'home' ? (
+              <>
+                <Text style={{ fontSize: 13, fontWeight: '600' }}>{session.light ? '🏠 Light home' : '🏠 Home'}</Text>
+                <H2>{session.light ? `Light home day · ${formatMinutes(todaySession!.estMinutes)}` : `Home workout · ${formatMinutes(todaySession!.estMinutes)}`}</H2>
+                <Body muted>{session.light ? 'Easy movement. No weights today.' : session.name}</Body>
+                {!data.homeEquipmentAsked ? (
+                  <Text accessibilityRole="link" onPress={() => setHomeSheet(true)} style={{ fontSize: 14, textDecorationLine: 'underline' }}>
+                    Set up home equipment
+                  </Text>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <H2>{session.name}</H2>
+                <Body muted>{session.focus}</Body>
+              </>
+            )}
+            {activeProgram.teamId && session.format === 'stations' ? <StationsCard teamId={activeProgram.teamId} session={session} exercises={todaySession!.exercises} /> : null}
             <Row style={{ gap: 6, flexWrap: 'wrap' }}>
               <Pill text={todaySession!.block.label} />
-              <Pill text={formatMinutes(todaySession!.estMinutes)} />
+              {session.location === 'home' ? null : <Pill text={formatMinutes(todaySession!.estMinutes)} />}
               {todaySession!.light ? <Pill text="Lightened by coach" bg={colors.day.game} /> : null}
             </Row>
             {todaySession!.light ? <Note>Coach lightened today&apos;s lift. Same exercises, fewer sets, easy effort.</Note> : null}
@@ -224,6 +248,9 @@ function Today() {
               ) : null}
               <DroppedLine count={todaySession!.dropped} />
             </View>
+            {session.location === 'home' && !data.homeHintSeen ? (
+              <Text style={{ fontSize: 13, color: colors.muted }}>Clear some space, wear sneakers, and stop if anything hurts.</Text>
+            ) : null}
             {doneToday ? <Pill text="Done today" achievement /> : null}
             {loggingLocked ? (
               <Button title="Logging unlocks after consent." disabled onPress={() => {}} />

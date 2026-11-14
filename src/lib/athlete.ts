@@ -36,7 +36,7 @@ export function followsLowerLevel(data: AppData): boolean {
 
 /** The one way screens get an athlete's session. */
 export function resolveFor(data: AppData, program: Program, session: Session, date: Date = today()): ResolvedSession {
-  return resolveSession(program, session, { level: athleteLevel(data), logs: data.logs }, date);
+  return resolveSession(program, session, { level: athleteLevel(data), logs: data.logs, homeEquipment: data.homeEquipment ?? [], harderPicks: data.harderPicks }, date);
 }
 
 /** Load-test level rule on the athlete's device (mirrors can_load_test; the server decides). */

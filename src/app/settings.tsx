@@ -17,6 +17,8 @@ import { NUTRITION_DISCLAIMER } from '../lib/nutrition';
 import { followsLowerLevel, ownLevel } from '../lib/athlete';
 import { possessive } from '../lib/util';
 import { levelLine } from '../components/VersionLine';
+import HomeEquipmentSheet from '../components/HomeEquipmentSheet';
+import { HOME_EQUIPMENT } from '../lib/generator';
 
 /** G4 (Legal copy review §3). */
 const HEAD_INJURY_LINE =
@@ -27,6 +29,7 @@ export default function Settings() {
   const { account, teams, signOut, leaveTeam, deleteAccount, consentFor, setMyChoices, setBoardNameMode, setLiftProgram } = useTeams();
   const [savedChoices, setSavedChoices] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [homeSheet, setHomeSheet] = useState(false);
   const [name, setName] = useState(data.profile?.name ?? '');
   if (!data.profile) return null;
   const profile = data.profile;
@@ -265,6 +268,20 @@ export default function Settings() {
           }
         />
       </Card>
+
+      {!coach ? (
+        <Card>
+          <H2>Home equipment</H2>
+          <Text style={{ fontSize: 14 }}>
+            {(data.homeEquipment ?? []).length
+              ? HOME_EQUIPMENT.filter((e) => data.homeEquipment!.includes(e.id)).map((e) => e.label).join(', ')
+              : 'Bodyweight only'}
+          </Text>
+          <Text style={{ fontSize: 13, color: colors.muted }}>This stays on your phone. Your coach doesn&apos;t see it.</Text>
+          <Button small kind="secondary" title="Change home equipment" onPress={() => setHomeSheet(true)} />
+          {homeSheet ? <HomeEquipmentSheet onClose={() => setHomeSheet(false)} /> : null}
+        </Card>
+      ) : null}
 
       <Card>
         <H2>Safety</H2>

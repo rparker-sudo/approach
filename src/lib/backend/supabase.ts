@@ -559,7 +559,9 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
         pr_today: p.prToday ?? 0,
         finished_at: p.finishedAt ?? null,
       };
-      let { error } = await sb.from('live_progress').upsert({ ...base, ...live }, { onConflict: 'team_id,user_id,day' });
+      const p3 = { group_label: p.groupLabel?.slice(0, 120) ?? null, station_id: p.stationId ?? null, rotate_at: p.rotateAt ?? null };
+      let { error } = await sb.from('live_progress').upsert({ ...base, ...live, ...p3 }, { onConflict: 'team_id,user_id,day' });
+      if (isMissing(error)) ({ error } = await sb.from('live_progress').upsert({ ...base, ...live }, { onConflict: 'team_id,user_id,day' }));
       if (isMissing(error)) ({ error } = await sb.from('live_progress').upsert(base, { onConflict: 'team_id,user_id,day' }));
       if (isMissing(error)) return;
       if (error) fail(error);
@@ -571,9 +573,15 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
       const BASE = 'team_id,user_id,day,session_id,sets_done,sets_total,status,updated_at';
       let { data, error }: Res = await sb
         .from('live_progress')
-        .select(`${BASE},state,exercise_name,set_index,set_count,last_reps,rest_ends_at,pr_today,finished_at`)
+        .select(`${BASE},state,exercise_name,set_index,set_count,last_reps,rest_ends_at,pr_today,finished_at,group_label,station_id,rotate_at`)
         .eq('team_id', teamId)
         .eq('day', day);
+      if (isMissing(error))
+        ({ data, error } = (await sb
+          .from('live_progress')
+          .select(`${BASE},state,exercise_name,set_index,set_count,last_reps,rest_ends_at,pr_today,finished_at`)
+          .eq('team_id', teamId)
+          .eq('day', day)) as Res);
       if (isMissing(error)) ({ data, error } = (await sb.from('live_progress').select(BASE).eq('team_id', teamId).eq('day', day)) as Res);
       if (isMissing(error)) return [];
       if (error) fail(error);
@@ -595,8 +603,14 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
           rest_ends_at?: string | null;
           pr_today?: number;
           finished_at?: string | null;
+          group_label?: string | null;
+          station_id?: string | null;
+          rotate_at?: string | null;
         }[]
       ).map((r) => ({
+        groupLabel: r.group_label ?? null,
+        stationId: r.station_id ?? null,
+        rotateAt: r.rotate_at ?? null,
         state: r.state,
         exerciseName: r.exercise_name ?? null,
         setIndex: r.set_index ?? null,
@@ -688,6 +702,35 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
       if (error) fail(error);
     },
 
+    async getStationRun(teamId, day) {
+      const { data, error } = await sb.from('station_runs').select('*').eq('team_id', teamId).eq('day', day).maybeSingle();
+      if (isMissing(error)) return null;
+      if (error) fail(error);
+      const r = data as { team_id: string; day: string; session_id: string; round: number; rounds: number; station_sec: number; transition_sec: number; rotate_at: string; ended_at: string | null } | null;
+      return r
+        ? { teamId: r.team_id, day: r.day, sessionId: r.session_id, round: r.round, rounds: r.rounds, stationSec: r.station_sec, transitionSec: r.transition_sec, rotateAt: r.rotate_at, endedAt: r.ended_at }
+        : null;
+    },
+
+    async saveStationRun(run) {
+      const { error } = await sb.from('station_runs').upsert(
+        {
+          team_id: run.teamId,
+          day: run.day,
+          session_id: run.sessionId,
+          round: run.round,
+          rounds: run.rounds,
+          station_sec: run.stationSec,
+          transition_sec: run.transitionSec,
+          rotate_at: run.rotateAt,
+          ended_at: run.endedAt ?? null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'team_id,day' },
+      );
+      if (error) fail(error);
+    },
+
     async myRack(teamId) {
       const { data, error } = await sb.rpc('my_rack', { t: teamId });
       if (isMissing(error)) return null;
@@ -702,6 +745,7 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'live_progress', filter: `team_id=eq.${teamId}` }, onChange)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'test_results', filter: `team_id=eq.${teamId}` }, onChange)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'rack_group_members', filter: `team_id=eq.${teamId}` }, onChange)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'station_runs', filter: `team_id=eq.${teamId}` }, onChange)
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') onStatus?.(true);
           else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') onStatus?.(false);
@@ -1016,6 +1060,8 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members', filter }, onChange)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'team_calendars', filter }, onChange)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'team_groups', filter }, onChange)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'station_runs', filter }, onChange)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rack_group_members', filter }, onChange)
         .subscribe();
       return () => {
         sb.removeChannel(channel);

@@ -35,6 +35,7 @@ import {
   TestResult,
   TestSession,
   Rack,
+  StationRun,
 } from './types';
 
 /**
@@ -66,6 +67,8 @@ type DB = {
   }[];
   /** v2.2 pass 2: rack groups (D-026). */
   racks?: (Rack & { teamId: string })[];
+  /** v2.2 pass 3: shared station timers. */
+  stationRuns?: StationRun[];
   /** v2.2: userId → the team whose lift program they follow (same as profiles.lift_program_team_id). */
   liftProgram?: Record<string, string | null>;
   programs: TeamProgram[];
@@ -669,6 +672,20 @@ export const localBackend: Backend = {
       userIds: r.userIds.filter((u) => current.has(u) && !placed.has(u) && (placed.add(u), true)),
     }));
     db.racks = [...(db.racks ?? []).filter((r) => r.teamId !== teamId), ...next];
+    await save(db);
+  },
+
+  async getStationRun(teamId, day) {
+    const db = await load();
+    const viewer = db.sessionUserId;
+    if (!isCoach(db, teamId, viewer) && !db.members.some((m) => m.teamId === teamId && m.userId === viewer)) return null;
+    return (db.stationRuns ?? []).find((r) => r.teamId === teamId && r.day === day) ?? null;
+  },
+
+  async saveStationRun(run) {
+    const { db, user } = await me();
+    coachOf(db, run.teamId, user.id);
+    db.stationRuns = [...(db.stationRuns ?? []).filter((r) => !(r.teamId === run.teamId && r.day === run.day)), run];
     await save(db);
   },
 

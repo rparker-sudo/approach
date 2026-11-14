@@ -1,3 +1,4 @@
+import type { StationRun } from '../stations';
 import type { CalendarEvent, Position, Program, Role, TestBattery, WorkoutLog } from '../types';
 
 /**
@@ -176,6 +177,7 @@ export type TeamLog = {
 };
 
 export type LogKind = 'lift' | 'extra_recovery';
+export type { StationRun };
 
 /** A teammate on the boards (only members with boards permission who aren't hidden). */
 export type BoardMember = { userId: string; boardName: string; groupId: string | null };
@@ -200,6 +202,10 @@ export type LiveProgress = {
   restEndsAt?: string | null;
   prToday?: number;
   finishedAt?: string | null;
+  /** Pass 3: "A1 DB Bench · A2 One-Arm Row · Round 2 of 3"; station and shared rotation time. */
+  groupLabel?: string | null;
+  stationId?: string | null;
+  rotateAt?: string | null;
 };
 export type LiveState = 'idle' | 'lifting' | 'resting' | 'done';
 
@@ -319,6 +325,9 @@ export interface Backend {
   listRacks(teamId: string): Promise<Rack[]>;
   saveRacks(teamId: string, racks: { name: string; userIds: string[] }[]): Promise<void>;
   myRack(teamId: string): Promise<MyRack | null>;
+  /** v2.2 pass 3 station rotation: the shared timer for a team session (coach writes, members read). */
+  getStationRun(teamId: string, day: string): Promise<StationRun | null>;
+  saveStationRun(run: StationRun): Promise<void>;
   /** Live updates for the coach board. onStatus reports connection drops. */
   subscribeBoard(teamId: string, onChange: () => void, onStatus?: (connected: boolean) => void): () => void;
 

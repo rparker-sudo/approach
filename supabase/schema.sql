@@ -1599,3 +1599,46 @@ grant execute on function public.save_racks(uuid, jsonb) to authenticated;
 grant execute on function public.rack_partner_names() to authenticated;
 revoke all on public.rack_groups, public.rack_group_members from anon;
 grant select, insert, update, delete on public.rack_groups, public.rack_group_members to authenticated;
+
+-- ============================================================
+-- Approach 2.2 pass 3 additions (same as supabase/migrations/007_approach_2_2_p3.sql)
+-- ============================================================
+-- ---------- 3.2 / 3.4 live board: superset label, station, shared rotation time. Never loads or RPE. ----------
+alter table public.live_progress add column if not exists group_label text;
+alter table public.live_progress drop constraint if exists live_progress_group_label_check;
+alter table public.live_progress add constraint live_progress_group_label_check check (group_label is null or char_length(group_label) <= 120);
+alter table public.live_progress add column if not exists station_id text;
+alter table public.live_progress drop constraint if exists live_progress_station_id_check;
+alter table public.live_progress add constraint live_progress_station_id_check check (station_id is null or char_length(station_id) <= 40);
+alter table public.live_progress add column if not exists rotate_at timestamptz;
+
+-- ---------- 3.4 Station rotation: one shared timer per team session (no athlete data) ----------
+-- round is 0-based; rotate_at is when the current round's station time ends. Clients work out the rest from the clock.
+create table if not exists public.station_runs (
+  team_id uuid not null references public.teams (id) on delete cascade,
+  day date not null,
+  session_id text not null,
+  round smallint not null default 0 check (round between 0 and 12),
+  rounds smallint not null check (rounds between 1 and 12),
+  station_sec integer not null check (station_sec between 60 and 3600),
+  transition_sec integer not null default 60 check (transition_sec between 0 and 600),
+  rotate_at timestamptz not null,
+  ended_at timestamptz,
+  started_by uuid default auth.uid() references public.profiles (id) on delete set null,
+  updated_at timestamptz not null default now(),
+  primary key (team_id, day)
+);
+alter table public.station_runs enable row level security;
+drop policy if exists "coach runs stations" on public.station_runs;
+create policy "coach runs stations" on public.station_runs
+  for all to authenticated using (public.is_team_coach(team_id)) with check (public.is_team_coach(team_id));
+drop policy if exists "members follow stations" on public.station_runs;
+create policy "members follow stations" on public.station_runs
+  for select to authenticated using (public.is_team_member(team_id));
+revoke all on public.station_runs from anon;
+grant select, insert, update, delete on public.station_runs to authenticated;
+
+do $$
+begin
+  begin alter publication supabase_realtime add table public.station_runs; exception when duplicate_object then null; when undefined_object then null; end;
+end $$;

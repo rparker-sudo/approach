@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { Body, Button, Card, Chip, ChipRow, colors, H2, Label, Note, Screen, Text } from '../components/ui';
@@ -8,6 +8,7 @@ import { dayAdvice, liftCapMessage, liftDayCap, mobilitySession } from '../lib/g
 import { useStore } from '../lib/store';
 import type { DayType } from '../lib/types';
 import { DAY_TYPES, WEEKDAYS } from '../lib/types';
+import { goBack } from '../lib/nav';
 
 /** Edit the default week: which session (or rest) goes on each weekday, and the usual volleyball week. */
 export default function ScheduleScreen() {
@@ -69,7 +70,7 @@ export default function ScheduleScreen() {
       liftSchedule: schedule,
       ...(program!.teamId ? { unposted: true } : null),
     });
-    router.back();
+    goBack();
   }
 
   return (

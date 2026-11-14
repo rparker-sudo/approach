@@ -10,6 +10,8 @@ import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
 import { NotEligible } from '../components/AgeGate';
 import DialogHost from '../components/DialogHost';
+import HeaderBack from '../components/HeaderBack';
+import HomeLogo from '../components/HomeLogo';
 import { colors, DisplayTitle } from '../components/ui';
 import { StoreProvider, useStore } from '../lib/store';
 import { TeamProvider } from '../lib/team';
@@ -66,6 +68,10 @@ function ThemeStack() {
           headerTitle: ({ children }) => <DisplayTitle>{children}</DisplayTitle>,
           contentStyle: { backgroundColor: colors.bg },
           headerBackButtonDisplayMode: 'minimal',
+          // Always a back button, even after a browser refresh (no history): see HeaderBack.
+          headerLeft: () => <HeaderBack />,
+          // The Approach mark on every page goes home.
+          headerRight: () => <HomeLogo />,
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -83,6 +89,11 @@ function ThemeStack() {
         <Stack.Screen name="invite" options={{ title: 'Invite athletes' }} />
         <Stack.Screen name="exercise/[id]" options={{ title: 'How to' }} />
         <Stack.Screen name="schedule" options={{ title: 'Lift days', presentation: 'modal' }} />
+        <Stack.Screen name="testing" options={{ title: 'Testing day' }} />
+        <Stack.Screen name="effort" options={{ title: 'Team effort' }} />
+        <Stack.Screen name="recovery" options={{ title: 'Extra recovery' }} />
+        <Stack.Screen name="racks" options={{ title: 'Racks' }} />
+        <Stack.Screen name="board/[teamId]" options={{ headerShown: false }} />
       </Stack>
       <DialogHost />
     </>

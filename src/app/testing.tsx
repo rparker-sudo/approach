@@ -26,6 +26,7 @@ import {
 } from '../lib/testing';
 import type { TestBattery } from '../lib/types';
 import { parseNum } from '../lib/util';
+import { goBack } from '../lib/nav';
 
 /**
  * Testing session (P6, F11). Order: warm-up → approach touch → broad jump → med-ball throw → strength checks.
@@ -65,7 +66,7 @@ export default function TestingScreen() {
       <Screen>
         <Stack.Screen options={{ title: 'Testing day' }} />
         <Note>{elig.note ?? "Testing isn't turned on for you on this team."}</Note>
-        <Button kind="ghost" title="Back" onPress={() => router.back()} />
+        <Button kind="ghost" title="Back" onPress={() => goBack()} />
       </Screen>
     );
   }
@@ -442,7 +443,7 @@ function Results({
         </>
       ) : null}
       {!Object.keys(jumps).length && !checks.length ? <Body muted>No results saved today.</Body> : null}
-      <Button title="Done" onPress={() => router.back()} />
+      <Button title="Done" onPress={() => goBack()} />
     </Card>
   );
 }

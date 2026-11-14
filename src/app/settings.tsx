@@ -19,6 +19,7 @@ import { possessive } from '../lib/util';
 import { levelLine } from '../components/VersionLine';
 import HomeEquipmentSheet from '../components/HomeEquipmentSheet';
 import { HOME_EQUIPMENT } from '../lib/generator';
+import { goBack } from '../lib/nav';
 
 /** G4 (Legal copy review §3). */
 const HEAD_INJURY_LINE =
@@ -70,7 +71,7 @@ export default function Settings() {
 
   function save() {
     setProfile({ ...profile, name: name.trim() || profile.name });
-    router.back();
+    goBack();
   }
 
   return (
@@ -137,7 +138,7 @@ export default function Settings() {
                 </View>
               ))
             ) : null}
-            <Button kind="ghost" title="Sign out" onPress={() => signOut().then(() => router.back())} />
+            <Button kind="ghost" title="Sign out" onPress={() => signOut().then(() => goBack())} />
             <Button kind="danger" title="Delete my account" onPress={() => setDeleting(true)} />
             <DeleteAccountDialog
               visible={deleting}
@@ -183,7 +184,7 @@ export default function Settings() {
           disabled={!coach && profile.isMinor !== false}
           onPress={() => {
             setProfile({ ...profile, role: coach ? 'athlete' : 'coach' });
-            router.back();
+            goBack();
           }}
         />
       </Card>

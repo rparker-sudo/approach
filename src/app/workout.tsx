@@ -14,6 +14,7 @@ import { repRange, suggestWeight, Suggestion , harderSuggestion } from '../lib/p
 import { resolveFor , athleteLevel } from '../lib/athlete';
 import type { ResolvedExercise } from '../lib/resolve';
 import VersionLine, { DroppedLine } from '../components/VersionLine';
+import HomeLogo from '../components/HomeLogo';
 import { EXTRA_RECOVERY_SESSIONS, RECOVERY_NOTE, recoveryProgram } from '../lib/recovery';
 import { blocksOf, labelOf } from '../lib/groups';
 import { backend , canLog } from '../lib/backend';
@@ -24,6 +25,7 @@ import { useStore } from '../lib/store';
 import { useTeams } from '../lib/team';
 import type { LoggedSet, WorkoutLog } from '../lib/types';
 import { estimateStrength, uid } from '../lib/util';
+import { goBack } from '../lib/nav';
 
 type Entry = { exerciseId: string; sets: LoggedSet[] };
 type Draft = { entries: Entry[]; index: number; note: string; startedAt: number };
@@ -241,7 +243,7 @@ export default function Workout() {
       <View style={{ flex: 1, backgroundColor: colors.bg, padding: 16, gap: 16, paddingTop: insets.top + 16 }}>
         <Stack.Screen options={{ title: session.name }} />
         <ConsentBanner />
-        <Button kind="ghost" title="Back" onPress={() => router.back()} />
+        <Button kind="ghost" title="Back" onPress={() => goBack()} />
       </View>
     );
   }
@@ -369,10 +371,12 @@ export default function Workout() {
     setSummary({ sets: done, total, minutes, prs, team: !!program!.teamId });
   }
 
-  function leave() {
+  // Close goes back; the logo goes home. Both ask first once a set is checked (the draft is kept).
+  function leave(home = false) {
+    const exit = () => (home || !router.canGoBack() ? router.dismissTo('/') : router.back());
     if (done === 0) {
       clearDraft();
-      return router.back();
+      return exit();
     }
     showAlert('Leave workout?', 'Your checked sets are saved. Come back today to pick up where you left off.', [
       { text: 'Keep going', style: 'cancel' },
@@ -381,10 +385,10 @@ export default function Workout() {
         style: 'destructive',
         onPress: () => {
           clearDraft();
-          router.back();
+          exit();
         },
       },
-      { text: 'Leave', onPress: () => router.back() },
+      { text: 'Leave', onPress: exit },
     ]);
   }
 
@@ -407,7 +411,7 @@ export default function Workout() {
           </View>
         ) : null}
         <Note>{`${summary.team ? 'Your coach can see this workout. ' : ''}Refuel within an hour: protein and carbs.`}</Note>
-        <Button title="Done" onPress={() => router.back()} />
+        <Button title="Done" onPress={() => goBack()} />
       </ScrollView>
     );
   }
@@ -495,10 +499,11 @@ export default function Workout() {
         options={{
           title: session.name,
           headerLeft: () => (
-            <Pressable onPress={leave} hitSlop={10} style={{ paddingHorizontal: Platform.OS === 'web' ? 16 : 0 }}>
+            <Pressable onPress={() => leave()} hitSlop={10} style={{ paddingHorizontal: Platform.OS === 'web' ? 16 : 0 }}>
               <Text style={{ fontSize: 16, fontWeight: '600' }}>Close</Text>
             </Pressable>
           ),
+          headerRight: () => <HomeLogo onPress={() => leave(true)} />,
         }}
       />
       <ScrollView

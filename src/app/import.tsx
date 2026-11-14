@@ -1,9 +1,10 @@
-import { router } from 'expo-router';
+
 import { showAlert } from '../lib/dialog';
 import { useState } from 'react';
 
 import { Body, Button, colors, H2, Screen, TextInput } from '../components/ui';
 import { decodeProgram, useStore } from '../lib/store';
+import { goBack } from '../lib/nav';
 
 export default function ImportScreen() {
   const { data, saveProgram } = useStore();
@@ -18,7 +19,7 @@ export default function ImportScreen() {
     }
     saveProgram(program, !coach);
     showAlert('Program added', coach ? `"${program.name}" is in Plan.` : `"${program.name}" is now your active program.`);
-    router.back();
+    goBack();
   }
 
   return (

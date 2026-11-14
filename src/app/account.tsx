@@ -1,7 +1,8 @@
-import { router } from 'expo-router';
+
 import AccountForm from '../components/AccountForm';
 import { Body, H2, Screen } from '../components/ui';
 import { useStore } from '../lib/store';
+import { goBack } from '../lib/nav';
 
 /** Sign in from Settings or the Team/Plan tabs (for people who started without an account). */
 export default function AccountScreen() {
@@ -19,7 +20,7 @@ export default function AccountScreen() {
         role={role}
         onDone={(a) => {
           if (data.profile) setProfile({ ...data.profile, name: a.name || data.profile.name, role: a.role });
-          router.back();
+          goBack();
         }}
       />
     </Screen>

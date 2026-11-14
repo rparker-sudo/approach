@@ -122,6 +122,7 @@ const WEB_ICON: Partial<Record<string, AndroidSymbol>> = {
   calendar: 'calendar_month',
   volleyball: 'sports_volleyball',
   gearshape: 'settings',
+  'chevron.left': 'chevron_left',
   'chevron.right': 'chevron_right',
   'chevron.up': 'expand_less',
   'chevron.down': 'expand_more',

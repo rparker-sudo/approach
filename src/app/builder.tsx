@@ -11,6 +11,7 @@ import { WEEKDAYS , EXPERIENCE, PHASES, POSITIONS } from '../lib/types';
 import { useStore } from '../lib/store';
 import { ALL, teamProgramId, useTeams } from '../lib/team';
 import type { DayType, Equipment, Experience, Phase, ProgramPosition } from '../lib/types';
+import { goBack } from '../lib/nav';
 
 export default function Builder() {
   const { data } = useStore();
@@ -114,7 +115,7 @@ function BuilderForm() {
     if (!coach) {
       setProfile({ ...profile, position: position === 'All positions' ? profile.position : position, phase, experience, volleyballWeek: week, liftDaysPerWeek: liftDays.length, liftDays, equipment });
     }
-    router.back();
+    goBack();
     if (coach && !existing && !team) router.push(`/program/${program.id}`);
   }
 

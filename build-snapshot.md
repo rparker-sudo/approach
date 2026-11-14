@@ -11,7 +11,7 @@
 **Current version:** 2.2.0 (`app.json`, `package.json`).
 - Built on branch `v2.2` from the hand-off commit (`d9fa6ec`, docs of Fri Nov 13, 2026), following `docs/specs/v2.2.md` v1.3 (pass 1 → 2 → 3).
 - **Not deployed yet.**
-  - C13 (legal pages with the new Approach-domain contact email) waits for the owner to choose the address.
+  - C13 is done: `public/privacy.html`, `terms.html` and `consent.html` were regenerated from the v2.2 legal docs with the new contact email **ryan@approachstrength.com** (owner, TM-10), dated November 14, 2026.
   - Migrations 005–007 aren't applied to the live project yet.
   - Merge to `main` (which deploys the site) and the local `v2.2` tag come after the owner approves.
 
@@ -225,7 +225,7 @@ $0 now. Future: Apple Developer Program $99/year; Supabase Pro about $25/month i
 **Left out (conflict with spec 3.1):** F23 "At home 4" count and home-day ticker lines.
 
 **Not built / partial (honest list):**
-- **C13:** the legal pages aren't regenerated yet. Waiting for the new Approach-domain contact email (owner decision TM-10); the pages also need the level field listed. Never deployed with the club address or a placeholder.
+- **Contact email in the source docs:** `docs/compliance.md`, `docs/legal/soft-launch-notice.md` and `docs/legal/parent-consent-form.md` still name the old club address. `scripts/build-legal-pages.py` swaps it for ryan@approachstrength.com in the published pages. **The planning team should update their source docs.**
 - **F19b week grid:** no drag-to-move and no "Switch to home / weight room" per day. The coach builds school + home weeks from Week setup and edits sessions.
 - **F28e:** "Run jump tests as stations" isn't built (load tests correctly can't be stations).
 - **F27c/F27d:** no "Timed" work toggle or work timer for tier C/D rows. Reps and holds are typed as text.

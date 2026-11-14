@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import type { Team } from '../lib/backend';
 import { backend, Rack } from '../lib/backend';
@@ -31,23 +31,23 @@ export default function StationControls({ team }: { team: Team }) {
   const on = session?.format === 'stations' && (session.stations?.length ?? 0) > 0 && session.location !== 'home';
 
   const teamId = team.id;
-  const load = useCallback(async () => {
-    const [r, rk] = await Promise.all([backend.getStationRun(teamId, day), backend.listRacks(teamId)]);
-    setRun(r);
-    setRacks(rk);
-  }, [teamId, day]);
+  const [reload, setReload] = useState(0);
   useEffect(() => {
     if (!on) return;
     let alive = true;
-    Promise.resolve().then(() => {
-      if (alive) load().catch(() => {});
-    });
+    Promise.all([backend.getStationRun(teamId, day), backend.listRacks(teamId)])
+      .then(([r, rk]) => {
+        if (!alive) return;
+        setRun(r);
+        setRacks(rk);
+      })
+      .catch(() => {});
     const tick = setInterval(() => setNow(Date.now()), 1000);
     return () => {
       alive = false;
       clearInterval(tick);
     };
-  }, [on, load]);
+  }, [on, teamId, day, reload, t.syncing]);
 
   if (!on || !session || !program) return null;
   const stations = session.stations!;
@@ -84,7 +84,7 @@ export default function StationControls({ team }: { team: Team }) {
     setBusy(true);
     try {
       await backend.saveRacks(team.id, base);
-      await load();
+      setReload((n) => n + 1);
       showAlert('Racks updated', `${missing.length} athlete${missing.length === 1 ? '' : 's'} added to racks.`);
     } catch (e) {
       showAlert("Couldn't update racks", e instanceof Error ? e.message : 'Try again.');

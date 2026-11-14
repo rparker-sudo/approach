@@ -410,7 +410,7 @@ export const EXERCISES: Exercise[] = [
       ['Band too light.', 'Knees drifting forward.', 'Holding the breath.']),
   ),
   x('wall-sit', 'Wall Sit', 'prehab', 'knee-care', false, 1, NONE, 'Thighs parallel, back flat on the wall.',
-    h('Tendon-friendly knee strength when you have no bands.',
+    h('Knee and quad strength when you have no bands.',
       ['Lean your back on a wall and slide down until thighs are parallel to the floor.', 'Hold.'],
       ['Knees over ankles.', 'Back flat.', 'Breathe.'],
       ['Knees past toes.', 'Hands pushing on the thighs.', 'Too shallow.']),

@@ -350,7 +350,7 @@ export default function Workout() {
         <View style={{ width: `${total ? (done / total) * 100 : 0}%`, height: 6, backgroundColor: colors.achievement, borderRadius: 3 }} />
       </View>
       <Row style={{ gap: 6, flexWrap: 'wrap' }}>
-        <Pill text={day.block.label} />
+        {isRecovery ? null : <Pill text={day.block.label} />}
         {day.light ? <Pill text="Lightened by coach" bg={colors.day.game} /> : null}
         {day.easing.active ? <Pill text="Easing back in this week" /> : null}
       </Row>

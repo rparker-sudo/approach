@@ -71,6 +71,8 @@ insert into live_progress (team_id, day, sets_done, sets_total, status) values (
 \echo == T9 athlete cannot confirm supervision (expect 1 error); coach confirms; load test ok
 insert into test_sessions (team_id, day, battery) values (:'T', current_date, 'full');
 select pg_temp.u(:'C'); insert into test_sessions (team_id, day, battery) values (:'T', current_date, 'full');
+-- 2.2 (migration 005): minors also need a coach-confirmed intermediate/advanced level for load tests.
+select set_member_level(:'T', :'J', 2::smallint);
 select pg_temp.u(:'J');
 insert into test_results (team_id, user_id, day, test_id, value, unit, reps) values (:'T', :'J', current_date, 'trap-bar-deadlift', 200, 'lb', 5);
 select test_id, value, reps, e1rm from test_results where test_id = 'trap-bar-deadlift';

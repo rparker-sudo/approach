@@ -126,7 +126,17 @@ export type ProgramExercise = {
   restSec?: number;
   /** v2.2: the coach set restSec in the builder (distinguishes it from a stored pre-v2.2 default). */
   restSetByCoach?: boolean;
+  /** v2.2 pass 3: block letter. Same letter = superset (2) or circuit (3–4), in list order (A1, A2…). One = straight sets
+   *  (used to place a single exercise in a station). Absent = straight sets. */
+  group?: string;
+  /** Tier D drill done during the previous exercise's rest (no extra rest). */
+  filler?: boolean;
+  /** Built by auto-pairing ("Auto" tag); any manual change clears it. */
+  autoGroup?: boolean;
 };
+
+/** v2.2 pass 3 station rotation (circuits-and-stations.md Part 2). */
+export type Station = { id: string; name: string; groups: string[]; minutes: number; autoMinutes?: boolean };
 
 export type Session = {
   id: string;
@@ -135,6 +145,14 @@ export type Session = {
   exercises: ProgramExercise[];
   /** Mobility/recovery only (doesn't count toward the lift-day cap). */
   mobility?: boolean;
+  /** v2.2 pass 3 (home-workouts.md): where the session happens. Missing = weight room. */
+  location?: 'school' | 'home';
+  /** Light home day (H2): bodyweight only, RPE ≤ 6, no jumps, no weight suggestions. Only given beyond the cap. */
+  light?: boolean;
+  /** Stations format (D-030 part 2). Missing = standard. */
+  format?: 'standard' | 'stations';
+  stations?: Station[];
+  stationTransitionSec?: number;
 };
 
 export type Program = {
@@ -168,6 +186,12 @@ export type Program = {
   overrides?: Record<string, string | null>;
   /** What the gym has. Missing = full weight room (programs from 1.0). */
   equipment?: Equipment[];
+  /** v2.2 pass 3: weekdays (Monday = 0) the school weight room is available. Set = school + home week. */
+  weightRoomDays?: number[];
+  /** H7: level 1 jumps at home (off/pre-season only). */
+  homeJumps?: boolean;
+  /** "Save time with supersets" (§4d). Missing = default for the phase. */
+  supersets?: boolean;
   /** Start of the current training block (YYYY-MM-DD). Missing = createdAt. */
   blockStart?: string;
   /** Weeks per block; the last week is a deload. Default 4. */
@@ -265,6 +289,14 @@ export type AppData = {
   liftTeamId?: string | null;
   /** v2.2 athletes: one-time notice after leaving the program team (F15c). */
   leaveNotice?: string | null;
+  /** v2.2 pass 3 athletes: home equipment, on this device only (G-3). Missing = bodyweight. */
+  homeEquipment?: Equipment[];
+  /** The athlete answered the home-equipment sheet (or skipped it). */
+  homeEquipmentAsked?: boolean;
+  /** Harder-version answers (home bodyweight progression): exercise id → harder id accepted, or null for "Not yet". */
+  harderPicks?: Record<string, string | null>;
+  /** The first-home-day line was shown. */
+  homeHintSeen?: boolean;
   /** v2.2 athletes: last rack name seen per team, for the one-time "Moved to Rack 3" note. */
   lastRack?: Record<string, string>;
   /** v2.2 coaches: teams whose testing-day checklist was read on this device (F25a). */

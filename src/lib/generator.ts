@@ -1,5 +1,6 @@
 import { ALL_EQUIPMENT, EXERCISES, fits, getExercise } from './exercises';
-import { restFor, RestContext, withFloor } from './rest';
+import { lengthTarget, restFor, RestContext, withFloor } from './rest';
+import { autoGroup } from './groups';
 import type {
   DayType,
   Equipment,
@@ -30,6 +31,12 @@ export type GeneratorInput = {
   liftDays?: number[];
   /** What the gym has. Missing = full weight room. */
   equipment?: Equipment[];
+  /** v2.2 pass 3 (home-workouts.md §1): weight-room weekdays. Set = school + home week; liftDaysPerWeek is the total. */
+  weightRoomDays?: number[];
+  /** H7: level 1 jumps at home (off/pre-season only). */
+  homeJumps?: boolean;
+  /** "Save time with supersets" (§4d). Missing = on for in-season and home sessions. */
+  supersets?: boolean;
 };
 
 const isMatch = (d: DayType) => d === 'game' || d === 'tournament';
@@ -160,6 +167,34 @@ const A = {
     heavyLegs: false,
     slots: [S('care', 'shoulder-care'), S('care', 'knee-care'), S('care', 'ankle-care'), S('care', 'hand-care'), S('core', 'core-ext'), S('core', 'core-rot')],
   }),
+  // v2.2 pass 3 home archetypes (home-workouts.md §4). Exercises are bodyweight defaults; each athlete's app picks
+  // their version from their home equipment and level (resolveSession).
+  homeLower: (n: string): Archetype => ({
+    name: n,
+    focus: 'Single-leg strength, hamstrings, ankles',
+    heavyLegs: true,
+    slots: [S('main', 'single-leg'), S('secondary', 'hinge'), S('accessory', 'single-leg'), S('care', 'ankle-care'), S('core', 'core-rot'), CARE],
+  }),
+  homeUpper: (n: string): Archetype => ({
+    name: n,
+    focus: 'Push, pull, shoulders',
+    heavyLegs: false,
+    slots: [S('main', 'h-push'), S('secondary', 'h-pull'), S('secondary', 'v-push'), S('accessory', 'v-pull'), S('care', 'shoulder-care'), S('core', 'core-ext')],
+  }),
+  homeTotal: (n: string, lightLeaning = false): Archetype => ({
+    name: n,
+    focus: 'A bit of everything',
+    heavyLegs: !lightLeaning,
+    slots: lightLeaning
+      ? [S('main', 'h-push'), S('secondary', 'h-pull'), S('secondary', 'hinge'), S('accessory', 'v-pull'), S('core', 'core-ext'), CARE]
+      : [S('main', 'single-leg'), S('secondary', 'h-push'), S('secondary', 'h-pull'), S('accessory', 'hinge'), S('core', 'core-ext'), CARE],
+  }),
+  lightHome: (n: string): Archetype => ({
+    name: n,
+    focus: 'Easy movement. No weights today.',
+    heavyLegs: false,
+    slots: [S('mobility', 'mobility'), S('mobility', 'mobility'), CARE, S('care', 'ankle-care'), S('core', 'core-ext'), S('accessory', 'single-leg')],
+  }),
   recovery: (n: string): Archetype => ({
     name: n,
     focus: 'Light movement and mobility',
@@ -228,6 +263,49 @@ const RX: Record<Phase, Record<SlotRole, Rx>> = {
     mobility: { sets: 2, reps: '5', effort: 'Easy' },
   },
 };
+
+/** home-workouts.md §5: bodyweight strength needs more reps for the same effort. */
+const HOME_RX: Record<Phase, Record<SlotRole, Rx>> = (() => {
+  const bw = 'Leave 2–3 reps in the tank';
+  const base = (main: [number, string], sec: [number, string], acc: [number, string], core: [number, string]): Record<SlotRole, Rx> => ({
+    power: { sets: 3, reps: '3', effort: 'Fast, land soft' },
+    main: { sets: main[0], reps: main[1], effort: bw },
+    secondary: { sets: sec[0], reps: sec[1], effort: bw },
+    accessory: { sets: acc[0], reps: acc[1], effort: 'RPE 6' },
+    core: { sets: core[0], reps: core[1], effort: 'Controlled' },
+    care: { sets: 2, reps: '15', effort: 'Light' },
+    mobility: { sets: 2, reps: '5', effort: 'Easy' },
+  });
+  return {
+    off: base([3, '8–12'], [3, '10–12'], [2, '12–15'], [3, '8']),
+    pre: base([3, '8–12'], [3, '10–12'], [2, '12–15'], [3, '8']),
+    in: base([2, '8–10'], [2, '10'], [2, '12'], [2, '8']),
+    post: base([3, '10–12'], [3, '12'], [2, '15'], [3, '8']),
+  };
+})();
+
+/** H6: never at home (besides barbell, trap bar and cable, which aren't home equipment). */
+export const HOME_EXCLUDED = new Set(['nordic', 'box-jump', 'hang-clean', 'trap-bar-jump']);
+/** H7: the only jumps allowed at home, level 1, when the coach turns them on (off/pre-season). */
+export const HOME_JUMPS = new Set(['pogo', 'squat-jump', 'broad-jump']);
+export const HOME_JUMP_CUE = 'Clear space, no low ceilings, sneakers on.';
+/** Home equipment the athlete can tick (F20). */
+export const HOME_EQUIPMENT: { id: Equipment; label: string }[] = [
+  { id: 'dumbbells', label: 'Dumbbells' },
+  { id: 'kettlebells', label: 'Kettlebells' },
+  { id: 'bands', label: 'Bands' },
+  { id: 'pullup-bar', label: 'Pull-up bar' },
+  { id: 'bench', label: 'Bench' },
+  { id: 'box', label: 'Sturdy step or stairs' },
+  { id: 'med-ball', label: 'Med ball' },
+];
+
+export function homeAllowed(ex: Exercise, jumps: boolean): boolean {
+  if (HOME_EXCLUDED.has(ex.id) || ex.pattern === 'olympic') return false;
+  if (ex.pattern === 'jump') return jumps && HOME_JUMPS.has(ex.id);
+  if (ex.pattern === 'throw') return ex.equipment.some((s) => s.every((i) => i === 'med-ball'));
+  return ex.equipment.some((s) => s.every((i) => !['barbell', 'trap-bar', 'cable'].includes(i)));
+}
 
 /** Default rest between sets by role, seconds. */
 export const REST_BY_ROLE: Record<SlotRole, number> = {
@@ -308,11 +386,11 @@ const CARE_BY_POSITION: Record<ProgramPosition, Pattern[]> = {
   'Libero / DS': ['ankle-care', 'knee-care'],
 };
 
-type PickCtx = { equipment: Equipment[]; maxLevel: number; usedWeek: Set<string>; usedSession: Set<string> };
+type PickCtx = { equipment: Equipment[]; maxLevel: number; usedWeek: Set<string>; usedSession: Set<string>; allow?: (e: Exercise) => boolean };
 
 /** Best exercise for a slot, or undefined when nothing fits at all. */
 export function pickExercise(patterns: Pattern[], role: SlotRole, ctx: PickCtx): Exercise | undefined {
-  const pool = EXERCISES.filter((e) => patterns.includes(e.pattern) && !ctx.usedSession.has(e.id));
+  const pool = EXERCISES.filter((e) => patterns.includes(e.pattern) && !ctx.usedSession.has(e.id) && (!ctx.allow || ctx.allow(e)));
   // Olympic lifts only for experienced lifters with a barbell.
   const allowed = pool.filter((e) => e.pattern !== 'olympic' || ctx.maxLevel >= 3);
   const usable = allowed.filter((e) => fits(e, ctx.equipment));
@@ -339,13 +417,23 @@ export function pickExercise(patterns: Pattern[], role: SlotRole, ctx: PickCtx):
   return [...candidates].sort((a, b) => score(a) - score(b) || a.id.localeCompare(b.id))[0];
 }
 
-function buildSession(arch: Archetype, input: GeneratorInput, usedWeek: Set<string>, careIndex: { n: number }): Session {
-  const equipment = input.equipment ?? ALL_EQUIPMENT;
-  const ctx: PickCtx = { equipment, maxLevel: MAX_LEVEL[input.experience], usedWeek, usedSession: new Set() };
+type BuildOpts = { home?: boolean; light?: boolean; jumps?: boolean };
+
+function buildSession(arch: Archetype, input: GeneratorInput, usedWeek: Set<string>, careIndex: { n: number }, opts: BuildOpts = {}): Session {
+  // Home sessions store bodyweight defaults (each athlete's app picks their version).
+  const equipment = opts.home ? [] : input.equipment ?? ALL_EQUIPMENT;
+  const ctx: PickCtx = {
+    equipment,
+    maxLevel: opts.home && opts.jumps ? Math.min(MAX_LEVEL[input.experience], 3) : MAX_LEVEL[input.experience],
+    usedWeek,
+    usedSession: new Set(),
+    ...(opts.home ? { allow: (e: Exercise) => homeAllowed(e, !!opts.jumps) } : {}),
+  };
   // More lift days → shorter sessions, so total weekly work stays sensible.
   const days = input.liftDays?.length ?? input.liftDaysPerWeek;
-  let slots = arch.slots;
-  if (input.phase === 'in' || days >= 5) slots = slots.filter((sl, i) => !(sl.role === 'accessory' && i === slots.findIndex((x) => x.role === 'accessory')));
+  let slots = opts.home && opts.jumps && arch.heavyLegs && (input.phase === 'off' || input.phase === 'pre') ? [S('power', 'jump'), ...arch.slots] : arch.slots;
+  if (opts.light) slots = arch.slots;
+  else if (input.phase === 'in' || days >= 5) slots = slots.filter((sl, i) => !(sl.role === 'accessory' && i === slots.findIndex((x) => x.role === 'accessory')));
   if (days >= 6 && input.phase !== 'off') slots = slots.filter((sl) => sl.role !== 'core' || sl.patterns.includes('core-rot'));
 
   const exercises: ProgramExercise[] = [];
@@ -360,12 +448,17 @@ function buildSession(arch: Archetype, input: GeneratorInput, usedWeek: Set<stri
     if (!ex) continue;
     ctx.usedSession.add(ex.id);
     usedWeek.add(ex.id);
-    const rx = RX[input.phase][slot.role];
+    const rx = opts.home ? HOME_RX[input.phase][slot.role] : RX[input.phase][slot.role];
     const strengthSlot = slot.role === 'main' || slot.role === 'secondary' || slot.role === 'accessory';
-    let effort = strengthSlot && !ex.weighted ? 'Bodyweight' : rx.effort;
+    let effort = opts.home ? rx.effort : strengthSlot && !ex.weighted ? 'Bodyweight' : rx.effort;
     if (input.experience === 'beginner') effort = BEGINNER_EFFORT[effort] ?? effort;
     let sets = rx.sets;
-    if (input.experience === 'advanced' && input.phase === 'off' && slot.role === 'main') sets += 1;
+    if (!opts.home && input.experience === 'advanced' && input.phase === 'off' && slot.role === 'main') sets += 1;
+    // H2 light home day: 1–2 sets, RPE ≤ 6, easy.
+    if (opts.light) {
+      sets = slot.role === 'mobility' || slot.role === 'care' ? 1 : Math.min(2, sets);
+      effort = slot.role === 'accessory' ? 'RPE 6' : slot.role === 'mobility' ? 'Easy' : slot.role === 'care' ? 'Light' : 'Easy';
+    }
     exercises.push({
       exerciseId: ex.id,
       sets,
@@ -374,17 +467,176 @@ function buildSession(arch: Archetype, input: GeneratorInput, usedWeek: Set<stri
       role: slot.role,
       // v2.2: rest comes from restFor() (tier, reps, effort) unless the coach sets one.
       notes:
-        ex.id === 'hang-clean'
+        opts.home && ex.pattern === 'jump'
+          ? `${HOME_JUMP_CUE} Up to 20 contacts.`
+          : ex.id === 'hang-clean'
           ? 'Only with coaching. Swap for a jump otherwise.'
           : slot.role === 'main' && input.phase === 'in'
             ? 'Keep it crisp. Never grind a rep in-season.'
             : undefined,
     });
   }
-  return { id: uid(), name: arch.name, focus: arch.focus, exercises };
+  return {
+    id: uid(),
+    name: arch.name,
+    focus: arch.focus,
+    exercises,
+    ...(opts.home ? { location: 'home' as const } : {}),
+    ...(opts.light ? { light: true } : {}),
+  };
+}
+
+/** home-workouts.md §3: recommended total for the phase (intermediate/advanced), within the team's cap. */
+export function recommendedTotal(phase: Phase, weightRoomDays: number[]): number {
+  return phase === 'off' ? 4 : phase === 'pre' ? (weightRoomDays.length >= 2 ? 4 : 3) : 3;
+}
+
+/** §4: home archetypes for a number of school and home days. */
+function homeSplit(school: number, home: number): Archetype[] {
+  if (home <= 0) return [];
+  if (school >= 4) return [A.homeTotal('Home Total', true)];
+  if (school >= 2 && home === 1) return [A.homeUpper('Home Upper')];
+  if (school === 3 && home >= 2) return [A.homeLower('Home Lower'), A.homeUpper('Home Upper')];
+  const list = home === 1 ? [A.homeTotal('Home Total')] : home === 2 ? [A.homeLower('Home Lower'), A.homeUpper('Home Upper')] : [A.homeLower('Home Lower'), A.homeUpper('Home Upper'), A.homeTotal('Home Total')];
+  return list.slice(0, home);
+}
+
+/**
+ * School + home week (home-workouts.md §1–§4). School days = weight-room days (not match days), up to the total and cap.
+ * Home days fill the rest using pickLiftDays scoring plus H4 (day before a match: upper or light only) and H5 (no two
+ * leg-heavy days in a row, school or home; Home Upper is swapped in). A Light Home session is included for athletes
+ * whose cap is lower than the team week (it's given per athlete, never scheduled by default).
+ */
+function schoolHomeWeek(input: GeneratorInput): { sessions: Session[]; schedule: (string | null)[] } {
+  const week = input.volleyballWeek;
+  const cap = liftDayCap(input.experience, input.phase);
+  const total = Math.max(0, Math.min(input.liftDaysPerWeek, cap));
+  const schoolDays = [...new Set(input.weightRoomDays ?? [])].filter((d) => d >= 0 && d < 7 && !isMatch(week[d])).sort((a, b) => a - b).slice(0, total);
+  const homeCount = Math.max(0, total - schoolDays.length);
+  const usedWeek = new Set<string>();
+  const careIndex = { n: 0 };
+  const schoolArch = schoolDays.length ? splitFor(schoolDays.length) : [];
+  const school = schoolArch.map((a) => ({ s: buildSession(a, input, usedWeek, careIndex), heavy: a.heavyLegs }));
+  const jumps = !!input.homeJumps && (input.phase === 'off' || input.phase === 'pre');
+  const homeArch = homeSplit(schoolDays.length, homeCount);
+  const home = homeArch.map((a) => ({ s: buildSession(a, input, usedWeek, careIndex, { home: true, jumps }), heavy: a.heavyLegs, arch: a }));
+  const light = buildSession(A.lightHome('Light Home'), input, usedWeek, careIndex, { home: true, light: true });
+
+  const schedule: (string | null)[] = Array(7).fill(null);
+  const heavyOn: boolean[] = Array(7).fill(false);
+  // School sessions: heavy legs not the day before a match (existing logic).
+  const left = [...school];
+  for (const d of schoolDays) {
+    const beforeMatch = isMatch(week[(d + 1) % 7]);
+    let idx = beforeMatch ? left.findIndex((x) => !x.heavy) : 0;
+    if (idx < 0) idx = 0;
+    const [pick] = left.splice(idx, 1);
+    if (pick) {
+      schedule[d] = pick.s.id;
+      heavyOn[d] = pick.heavy;
+    }
+  }
+  // Home days (H3–H5): leg-heavy home sessions pick first, only on days that aren't next to another leg-heavy day or
+  // before a match; then the rest. Scoring follows pickLiftDays (prefer no volleyball, avoid the day after a match,
+  // spread sessions out). A leg-heavy session with no valid day becomes Home Upper.
+  const sessions: Session[] = [...school.map((x) => x.s)];
+  const pending = [...home].sort((a, b) => Number(b.heavy) - Number(a.heavy));
+  const score = (d: number) => {
+    let sc = week[d] === 'off' ? 10 : 6;
+    if (isMatch(week[(d + 6) % 7])) sc -= 4;
+    if (isMatch(week[(d + 1) % 7])) sc -= 25;
+    if (schedule[(d + 1) % 7] || schedule[(d + 6) % 7]) sc -= 8;
+    return sc;
+  };
+  const freeDays = () => [0, 1, 2, 3, 4, 5, 6].filter((d) => !schedule[d] && !isMatch(week[d]));
+  while (pending.length) {
+    let pick = pending.shift()!;
+    // Keep at least one day with no training (H3): total ≤ cap ≤ 5 already leaves two.
+    let days = freeDays();
+    if (pick.heavy) {
+      const ok = days.filter((d) => !heavyOn[(d + 1) % 7] && !heavyOn[(d + 6) % 7] && !isMatch(week[(d + 1) % 7]));
+      if (!ok.length) {
+        const sub = A.homeUpper(sessions.some((x) => x.name === 'Home Upper') || pending.some((x) => x.s.name === 'Home Upper') ? 'Home Upper B' : 'Home Upper');
+        pick = { s: buildSession(sub, input, usedWeek, careIndex, { home: true }), heavy: false, arch: sub };
+      } else days = ok;
+    }
+    if (!days.length) break;
+    const d = [...days].sort((a, b) => score(b) - score(a) || a - b)[0];
+    schedule[d] = pick.s.id;
+    heavyOn[d] = pick.heavy;
+    sessions.push(pick.s);
+  }
+  sessions.push(light);
+  return { sessions, schedule };
+}
+
+/** "2 weight-room days + 2 home days." plus the beginners' line when caps apply (F19a). */
+export function weekSummary(program: Program): { line: string; beginners: string | null } {
+  const sess = (sid: string | null) => program.sessions.find((x) => x.id === sid);
+  const days = program.liftSchedule.map(sess).filter((x): x is Session => !!x && !x.mobility && !x.light);
+  const school = days.filter((x) => x.location !== 'home').length;
+  const home = days.length - school;
+  const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const line = home ? `${plural(school, 'weight-room day')} + ${plural(home, 'home day')}.` : `${plural(school, 'lift day')}.`;
+  const bcap = liftDayCap('beginner', program.phase);
+  if (days.length <= bcap) return { line, beginners: null };
+  const hasLight = program.sessions.some((x) => x.light);
+  const bSchool = Math.min(school, bcap);
+  const bHome = Math.max(0, bcap - bSchool);
+  return {
+    line,
+    beginners: `Beginners: ${bSchool} weight-room${bHome ? ` + ${bHome} home` : ''}${hasLight ? ' + 1 light home day' : ''} (max ${bcap} full lift days for their level).`,
+  };
 }
 
 export function generateProgram(input: GeneratorInput): Program {
+  if (input.weightRoomDays) return withAutoGroups(finishProgram(input, schoolHomeWeek(input)), input);
+  return withAutoGroups(generateStandard(input), input);
+}
+
+/** §4d auto-pairing for each session (only when supersets are on or a session is over its target). */
+function withAutoGroups(program: Program, input: GeneratorInput): Program {
+  return {
+    ...program,
+    sessions: program.sessions.map((s) => {
+      if (s.mobility || s.light) return s;
+      const home = s.location === 'home';
+      const enabled = input.supersets ?? (input.phase === 'in' || home);
+      return autoGroup(s, {
+        target: lengthTarget(input.phase, home ? 'home' : 'school'),
+        enabled,
+        ctx: { phase: input.phase, equipment: home ? [] : program.equipment, home },
+        kind: home ? 'home' : 'school',
+      });
+    }),
+    ...(input.supersets != null ? { supersets: input.supersets } : {}),
+  };
+}
+
+function finishProgram(input: GeneratorInput, week: { sessions: Session[]; schedule: (string | null)[] }): Program {
+  const phaseLabel = PHASES.find((p) => p.id === input.phase)?.label ?? '';
+  const today = new Date();
+  return {
+    id: uid(),
+    name: input.name?.trim() || `${phaseLabel} – ${input.position}`,
+    forName: input.forName,
+    author: input.author,
+    position: input.position,
+    phase: input.phase,
+    experience: input.experience,
+    volleyballWeek: [...input.volleyballWeek],
+    liftSchedule: week.schedule,
+    sessions: week.sessions,
+    createdAt: today.toISOString(),
+    equipment: input.equipment ?? ALL_EQUIPMENT,
+    blockStart: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`,
+    blockWeeks: 4,
+    weightRoomDays: [...(input.weightRoomDays ?? [])],
+    ...(input.homeJumps ? { homeJumps: true } : {}),
+  };
+}
+
+function generateStandard(input: GeneratorInput): Program {
   const cap = liftDayCap(input.experience, input.phase);
   const chosen = input.liftDays?.length
     ? [...new Set(input.liftDays)].filter((d) => d >= 0 && d < 7).sort((a, b) => a - b)

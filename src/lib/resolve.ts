@@ -1,6 +1,7 @@
 import { addDays, dateKey, fromKey, today as todayDate } from './calendar';
 import { ALL_EQUIPMENT, EXERCISES, fits, getExercise } from './exercises';
-import { BEGINNER_EFFORT, restSecFor } from './generator';
+import { BEGINNER_EFFORT, homeAllowed, pickExercise, restSecFor } from './generator';
+import { blockRests, blocksOf } from './groups';
 import { BlockInfo, sessionForDate } from './progression';
 import { estimateMinutes } from './rest';
 import type { Equipment, Exercise, Phase, Program, ProgramExercise, Session, WorkoutLog } from './types';
@@ -23,13 +24,22 @@ export type AthleteContext = {
   level: Level;
   /** The athlete's whole workout history (G-2), for the return-from-break rule. */
   logs: WorkoutLog[];
+  /** v2.2 pass 3: home equipment from this device (G-3). Missing = bodyweight. */
+  homeEquipment?: Equipment[];
+  /** Harder versions the athlete accepted (home bodyweight progression): exercise id → harder id. */
+  harderPicks?: Record<string, string | null>;
 };
 
 export type ResolvedExercise = ProgramExercise & {
   /** The exercise in the coach's plan, when the athlete's version is different. */
   teamExerciseId?: string;
-  /** Rest after each set for this athlete (coach setting within floors, else auto). */
+  /** Rest after each set for this athlete (coach setting within floors, else auto; in blocks: 15 s transitions and
+   *  the rest after the round). */
   restSecResolved: number;
+  /** Beginners: a circuit's 4th exercise done as straight sets after the circuit (C1). */
+  afterCircuit?: boolean;
+  /** Station this exercise belongs to (stations format). */
+  stationId?: string;
 };
 
 export type ResolvedSession = {
@@ -43,6 +53,9 @@ export type ResolvedSession = {
   /** G9: returning from a break this week. */
   easing: Easing;
   estMinutes: number;
+  home: boolean;
+  /** H2 light home day. */
+  lightHome: boolean;
 };
 
 export type Easing = { active: boolean; until?: string };
@@ -99,6 +112,20 @@ export function resolveExercise(ex: Exercise, level: Level, equipment: Equipment
   return same[0] ?? null;
 }
 
+/* ---------- 3.1 Home sessions (home-workouts.md §4): each athlete's version for their home equipment and level ---------- */
+export function resolveHomeExercise(ex: Exercise, role: ProgramExercise['role'], level: Level, equipment: Equipment[], jumps: boolean, used: Set<string>): Exercise | null {
+  if (ex.pattern === 'jump' && !jumps) return null;
+  return (
+    pickExercise([ex.pattern], role ?? 'accessory', {
+      equipment,
+      maxLevel: level,
+      usedWeek: new Set(),
+      usedSession: used,
+      allow: (e) => homeAllowed(e, jumps) && e.level <= level,
+    }) ?? null
+  );
+}
+
 /* ---------- 1.6 Effort ceilings ---------- */
 export function effortCeiling(level: Level, phase: Phase, easing: boolean): number {
   if (easing) return 6;
@@ -121,16 +148,28 @@ export function capEffort(effort: string, ceiling: number): string {
 /* ---------- resolveSession ---------- */
 export function resolveSession(program: Program, session: Session, athlete: AthleteContext, date: Date = todayDate()): ResolvedSession {
   const day = sessionForDate(program, session, date);
-  const equipment = program.equipment?.length ? program.equipment : ALL_EQUIPMENT;
+  const home = session.location === 'home';
+  const lightHome = !!session.light;
+  const equipment = home ? (lightHome ? [] : athlete.homeEquipment ?? []) : program.equipment?.length ? program.equipment : ALL_EQUIPMENT;
+  const jumps = home && !lightHome && !!program.homeJumps && (program.phase === 'off' || program.phase === 'pre');
   const easing = easingFor(athlete.logs, date);
   const team = !!program.teamId;
   const swaps: { from: string; to: string }[] = [];
   let dropped = 0;
   const out: ResolvedExercise[] = [];
+  const usedHome = new Set<string>();
   for (const pe of day.exercises) {
     const original = getExercise(pe.exerciseId);
     // Every program resolves to the athlete's level (team programs per G8; personal and shared programs as a backstop to G1).
-    const resolved = resolveExercise(original, athlete.level, equipment);
+    // Home sessions: the best exercise for the slot from the athlete's home equipment and level (H6 pool).
+    let resolved = home ? resolveHomeExercise(original, pe.role, athlete.level, equipment, jumps, usedHome) : resolveExercise(original, athlete.level, equipment);
+    // Harder version the athlete accepted (only at or below their level, and allowed here).
+    const harderId = resolved ? athlete.harderPicks?.[resolved.id] : null;
+    if (resolved && harderId && !lightHome) {
+      const harder = EXERCISES.find((e) => e.id === harderId);
+      if (harder && harder.level <= athlete.level && (!home || (homeAllowed(harder, jumps) && fits(harder, equipment)))) resolved = harder;
+    }
+    if (resolved) usedHome.add(resolved.id);
     if (!resolved) {
       dropped++;
       continue;
@@ -139,17 +178,41 @@ export function resolveSession(program: Program, session: Session, athlete: Athl
     if (resolved.id !== original.id) swaps.push({ from: original.name, to: resolved.name });
     if (isStrength(pe, resolved)) {
       if (team && athlete.level === 1) effort = BEGINNER_EFFORT[effort] ?? effort;
-      effort = capEffort(effort, effortCeiling(athlete.level, program.phase, easing.active));
+      // H2: light home day tops out at RPE 6.
+      effort = capEffort(effort, lightHome ? 6 : effortCeiling(athlete.level, program.phase, easing.active));
     }
     const next: ProgramExercise = { ...pe, exerciseId: resolved.id, effort };
     out.push({
       ...next,
       ...(resolved.id !== original.id ? { teamExerciseId: original.id } : {}),
-      restSecResolved: restSecFor(next, { phase: program.phase, equipment: program.equipment }),
+      restSecResolved: 0,
     });
   }
-  const estMinutes = estimateMinutes(out.map((e) => ({ ex: getExercise(e.exerciseId), sets: e.sets, reps: e.reps, restSec: e.restSecResolved })));
-  return { session: day.session, exercises: out, dropped, swaps, block: day.block, light: day.light, easing, estMinutes };
+  // C1: beginners see at most 3 in a circuit; a 4th is done as straight sets after it.
+  if (athlete.level === 1) {
+    for (const [g, idx] of blocksOf(out)) {
+      if (idx.length < 4) continue;
+      for (const i of idx.slice(3)) out[i] = { ...out[i], group: undefined, afterCircuit: true };
+      const extra = idx.slice(3).map((i) => out[i]);
+      const rest = out.filter((_, i) => !idx.slice(3).includes(i));
+      const last = rest.map((pe, k) => (pe.group === g ? k : -1)).filter((k) => k >= 0).pop()!;
+      rest.splice(last + 1, 0, ...extra);
+      out.splice(0, out.length, ...rest);
+    }
+  }
+  // Rest: straight-set rest (coach within floors, else auto), then blocks (15 s transitions, rest after the round).
+  const ctx = { phase: program.phase, equipment: home ? equipment : program.equipment, home, light: lightHome };
+  const rests = blockRests(out, out.map((pe) => restSecFor(pe, ctx)), ctx);
+  out.forEach((pe, i) => (pe.restSecResolved = rests[i]));
+  // Stations: which station each block belongs to.
+  if (session.format === 'stations') {
+    for (const st of session.stations ?? []) for (const pe of out) if (pe.group && st.groups.includes(pe.group)) pe.stationId = st.id;
+  }
+  const estMinutes = estimateMinutes(
+    out.map((e) => ({ ex: getExercise(e.exerciseId), sets: e.filler ? 0 : e.sets, reps: e.reps, restSec: e.restSecResolved })),
+    home ? 'home' : 'school',
+  );
+  return { session: day.session, exercises: out, dropped, swaps, block: day.block, light: day.light, easing, estMinutes, home, lightHome };
 }
 
 /** Swaps an athlete at a given level would get on a session (coach athlete detail). */

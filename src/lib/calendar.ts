@@ -211,7 +211,10 @@ export function weekPlan(program: Program, monday: Date, athleteExperience?: Exp
   const exp =
     athleteExperience && EXP_RANK[athleteExperience] < EXP_RANK[program.experience] ? athleteExperience : program.experience;
   const cap = capFor(exp, program.phase);
-  const isLift = (p: DayPlan) => !!p.test || (!!p.sessionId && !session(p.sessionId)?.mobility);
+  // Mobility-only sessions and the light home day (H2) don't count toward the cap.
+  const isLift = (p: DayPlan) => !!p.test || (!!p.sessionId && !session(p.sessionId)?.mobility && !session(p.sessionId)?.light);
+  const lightSession = program.sessions.find((x) => x.light);
+  let lightUsed = plan.some((p) => p.sessionId && session(p.sessionId)?.light);
   const drop = (p: DayPlan, note: string) => Object.assign(p, { sessionId: null, source: 'auto' as const, note });
   // Drop the latest lifts first, keeping dates the coach or athlete chose (overrides) and testing days when possible.
   const order = [...plan].reverse().sort((a, b) => Number(a.source === 'override') - Number(b.source === 'override'));
@@ -219,7 +222,11 @@ export function weekPlan(program: Program, monday: Date, athleteExperience?: Exp
   for (const p of order) {
     if (count <= cap) break;
     if (!isLift(p) || p.test) continue;
-    drop(p, `Lift skipped: max ${cap} lift days a week`);
+    // H2: one light home day a week beyond the cap (bodyweight, RPE ≤ 6), not on a match day.
+    if (lightSession && !lightUsed && p.dayType !== 'game' && p.dayType !== 'tournament') {
+      Object.assign(p, { sessionId: lightSession.id, source: 'auto' as const, note: `Light home day: max ${cap} full lift days for your level` });
+      lightUsed = true;
+    } else drop(p, `Lift skipped: max ${cap} lift days a week`);
     count--;
   }
   if (!plan.some((p) => !p.sessionId && !p.test)) {

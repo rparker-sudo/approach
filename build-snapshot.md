@@ -10,9 +10,8 @@
 
 **Current version:** 2.2.0 (`app.json`, `package.json`).
 - Built on branch `v2.2` from the hand-off commit (`d9fa6ec`, docs of Fri Nov 13, 2026), following `docs/specs/v2.2.md` v1.3 (pass 1 → 2 → 3).
-- **Not deployed yet.**
+- **Deployed November 14, 2026:** the owner ran migrations 005–007 on the live project and approved the merge. `v2.2` was fast-forwarded into `main`, and the GitHub Pages deploy succeeded. The `v2.2` tag was made locally; the owner pushes it from the Mac.
   - C13 is done: `public/privacy.html`, `terms.html` and `consent.html` were regenerated from the v2.2 legal docs with the new contact email **ryan@approachstrength.com** (owner, TM-10), dated November 14, 2026.
-  - Migrations 005–007 aren't applied to the live project yet.
   - Merge to `main` (which deploys the site) and the local `v2.2` tag come after the owner approves.
 
 **History (from `CHANGELOG.md` and git):**
@@ -179,8 +178,8 @@ Supabase and GitHub (Pages, Actions) only. `pg_cron` is a built-in Supabase exte
 
 ## 6. Deployment and usage
 
-- **Website:** https://rparker-sudo.github.io/approach/ (deploys from `main`; still 2.1.1).
-- **Supabase:** live, Free plan, with 002–004 applied. **005–007 are not applied yet.** Steps are in README "Upgrading from 2.1 (to 2.2)" (enable pg_cron first).
+- **Website:** https://rparker-sudo.github.io/approach/ (deploys from `main`; 2.2.0 deployed November 14, 2026).
+- **Supabase:** live, Free plan. 002–007 applied (005–007 on November 14, 2026, with pg_cron enabled, per the owner).
 - **Users:** the owner plus fewer than 10 others, all 18+, per the owner **(unverified count)**.
 
 ---

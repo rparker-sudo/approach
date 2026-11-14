@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Member, Team, TestResult } from '../lib/backend';
 import { formatKey } from '../lib/calendar';
 import { useTeams } from '../lib/team';
-import { JUMP_TESTS, LOAD_NAMES } from '../lib/testing';
+import { changeSince, JUMP_TESTS, LOAD_NAMES } from '../lib/testing';
 import { Button, colors, Field, Row, Text } from './ui';
 
 const nameOf = (r: TestResult) => JUMP_TESTS.find((j) => j.id === r.testId)?.name ?? LOAD_NAMES[r.testId as keyof typeof LOAD_NAMES] ?? r.testId;
@@ -24,7 +24,7 @@ export default function TestsSection({ team, member }: { team: Team; member: Mem
           <Text style={{ fontSize: 13 }}>
             {`${formatKey(r.day)} · ${nameOf(r)}: ${r.value} ${r.unit}${r.reps ? ` × ${r.reps}` : ''}`}
             {r.e1rm ? ` · estimated strength ~${Math.round(r.e1rm)} lb (estimate)` : ''}
-            {r.voided ? ' · voided' : ''}
+            {r.voided ? ' · voided' : ` · ${changeSince(rows, r)}`}
           </Text>
           {editing === r.id ? (
             <Row style={{ gap: 6 }}>

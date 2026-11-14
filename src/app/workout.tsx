@@ -117,18 +117,49 @@ export default function Workout() {
     AsyncStorage.setItem(draftKey(program.id, session.id), JSON.stringify(draft)).catch(() => {});
   }, [draft, program, session, summary]);
 
-  // P3: share sets done with the coach board (debounced 2 s; only with boards permission, checked in shareLiveProgress).
+  // P3 / D-025: share live progress with the coach board (debounced 2 s; boards permission is checked in
+  // shareLiveProgress): sets done, the current (resolved) exercise, set x of y, last set's reps, and when the rest
+  // ends. Never weights or RPE.
   const doneCount = draft ? draft.entries.reduce((n, e) => n + e.sets.filter((x) => x.done).length, 0) : 0;
   const totalCount = draft ? draft.entries.reduce((n, e) => n + e.sets.length, 0) : 0;
-  const lastShared = useRef(-1);
+  const lastDone = useRef<{ reps: number | null }>({ reps: null });
+  const curIndex = draft
+    ? mode === 'focus'
+      ? Math.min(draft.index, Math.max(0, plan.length - 1))
+      : Math.max(0, draft.entries.findIndex((e) => e.sets.some((x) => !x.done)))
+    : 0;
+  const curEntry = draft?.entries[curIndex];
+  const livePayload =
+    draft && plan[curIndex] && curEntry
+      ? {
+          state: (rest ? 'resting' : 'lifting') as 'resting' | 'lifting',
+          exerciseName: getExercise(plan[curIndex].exerciseId).name,
+          setIndex: Math.min(curEntry.sets.filter((x) => x.done).length + 1, curEntry.sets.length),
+          setCount: curEntry.sets.length,
+          restEndsAt: rest ? new Date(rest.endAt).toISOString() : null,
+        }
+      : null;
+  const liveKey = livePayload ? JSON.stringify([doneCount, livePayload]) : '';
+  const lastShared = useRef('');
   useEffect(() => {
-    if (isRecovery || !program?.teamId || !session || !draft || summary || doneCount === lastShared.current || doneCount === 0) return;
+    if (isRecovery || !program?.teamId || !session || !livePayload || summary || liveKey === lastShared.current) return;
+    if (doneCount === 0 && curIndex === 0) return; // nothing to show until the first set or a move
     const timer = setTimeout(() => {
-      lastShared.current = doneCount;
-      shareLiveProgress({ teamId: program.teamId!, day: dateKey(today()), sessionId: session.id, setsDone: doneCount, setsTotal: totalCount, status: 'in_progress' });
+      lastShared.current = liveKey;
+      shareLiveProgress({
+        teamId: program.teamId!,
+        day: dateKey(today()),
+        sessionId: session.id,
+        setsDone: doneCount,
+        setsTotal: totalCount,
+        status: 'in_progress',
+        ...livePayload,
+        lastReps: lastDone.current.reps,
+      });
     }, 2000);
     return () => clearTimeout(timer);
-  }, [doneCount, totalCount, program?.teamId, session, draft, summary, shareLiveProgress]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveKey, summary]);
 
   // Tick while resting.
   useEffect(() => {
@@ -187,6 +218,7 @@ export default function Workout() {
     const s = entry.sets[si];
     const nowDone = !s.done;
     setSet(ei, si, { done: nowDone });
+    if (nowDone) lastDone.current = { reps: parseFloat(s.reps) || null };
     // Carry the weight forward to the next empty set.
     const next = entry.sets[si + 1];
     if (nowDone && next && !next.weight && s.weight) setSet(ei, si + 1, { weight: s.weight });
@@ -240,7 +272,19 @@ export default function Workout() {
     // Lift minutes count toward effort hours (capped at 120 per workout); bests show as a "PR" badge on the board.
     addLog({ ...log, durationMin: Math.min(120, minutes), prCount: prs.length });
     if (program!.teamId && !isRecovery) {
-      shareLiveProgress({ teamId: program!.teamId, day: dateKey(today()), sessionId: session!.id, setsDone: done, setsTotal: total, status: 'done' });
+      shareLiveProgress({
+        teamId: program!.teamId,
+        day: dateKey(today()),
+        sessionId: session!.id,
+        setsDone: done,
+        setsTotal: total,
+        status: 'done',
+        state: 'done',
+        exerciseName: null,
+        restEndsAt: null,
+        prToday: prs.length,
+        finishedAt: new Date().toISOString(),
+      });
     }
     clearDraft();
     setRest(null);

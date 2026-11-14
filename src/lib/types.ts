@@ -265,6 +265,8 @@ export type AppData = {
   liftTeamId?: string | null;
   /** v2.2 athletes: one-time notice after leaving the program team (F15c). */
   leaveNotice?: string | null;
+  /** v2.2 athletes: last rack name seen per team, for the one-time "Moved to Rack 3" note. */
+  lastRack?: Record<string, string>;
   /** v2.2 coaches: teams whose testing-day checklist was read on this device (F25a). */
   checklistRead?: string[];
 };

@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 import AttendanceCheck from '../../components/AttendanceCheck';
 import CapNotice from '../../components/CapNotice';
 import { ConsentBanner } from '../../components/Consent';
+import RackCard from '../../components/RackCard';
 import ReadinessCard from '../../components/ReadinessCard';
 import ScreenHeader from '../../components/ScreenHeader';
 import Sheet from '../../components/Sheet';
@@ -167,6 +168,7 @@ function Today() {
       {showCheckIn ? <ReadinessCard /> : null}
       {activeProgram.teamId ? null : <CapNotice program={activeProgram} />}
       {activeProgram.teamId ? <AttendanceCheck program={activeProgram} /> : null}
+      {activeProgram.teamId ? <RackCard teamId={activeProgram.teamId} /> : null}
 
       <Card>
         <Row style={{ justifyContent: 'space-between' }}>

@@ -167,6 +167,9 @@ export default function TeamScreen() {
           else router.push(`/board/${team.id}`);
         }}
       />
+      <Text style={{ fontSize: 13, color: colors.muted }}>Use a personal device and network, not school-owned screens or Wi-Fi.</Text>
+      {Platform.OS === 'web' ? <Text style={{ fontSize: 13, color: colors.muted }}>Opens in a new tab. Press F11 for full screen.</Text> : null}
+      <Button kind="secondary" title="Racks" onPress={() => router.push({ pathname: '/racks', params: { teamId: team.id } })} />
 
       {anyUnposted ? (
         <Card>

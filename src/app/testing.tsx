@@ -21,6 +21,8 @@ import {
   repOptions,
   TEST_REST_SEC,
   WARMUP_LADDER,
+  changeSince,
+  UPS_AND_DOWNS,
 } from '../lib/testing';
 import type { TestBattery } from '../lib/types';
 import { parseNum } from '../lib/util';
@@ -401,6 +403,8 @@ function Results({
   programId: string | null;
 }) {
   const { data } = useStore();
+  const { testResults } = useTeams();
+  const mine = Object.values(testResults).flat();
   const program = data.programs.find((p) => p.id === programId);
   // Before → after for each tested lift in the athlete's program (P6.7).
   const changes = useMemo(() => {
@@ -419,12 +423,16 @@ function Results({
   return (
     <Card>
       <H2>Results</H2>
-      {JUMP_TESTS.filter((j) => jumps[j.id] != null).map((j) => (
-        <Text key={j.id} style={{ fontSize: 15 }}>{`${j.name}: ${jumps[j.id]} ${j.unit}`}</Text>
-      ))}
+      {JUMP_TESTS.filter((j) => jumps[j.id] != null).map((j) => {
+        const saved = mine.filter((x) => x.testId === j.id && x.day === dateKey(today())).pop();
+        return <Text key={j.id} style={{ fontSize: 15 }}>{`${j.name}: ${jumps[j.id]} ${j.unit}${saved ? `, ${changeSince(mine, saved)}` : ''}`}</Text>;
+      })}
       {checks.map((c) => (
-        <Text key={c.id} style={{ fontSize: 15 }}>{`${LOAD_NAMES[c.testId as LoadTestId]}: Estimated strength: ~${Math.round(c.e1rm ?? 0)} lb (estimate)`}</Text>
+        <Text key={c.id} style={{ fontSize: 15 }}>
+          {`${LOAD_NAMES[c.testId as LoadTestId]}: ${c.value} × ${c.reps}, Estimated strength: ~${Math.round(c.e1rm ?? 0)} lb (estimate), ${changeSince([...mine, ...checks.filter((x) => !mine.some((m) => m.id === x.id))], c)}`}
+        </Text>
       ))}
+      {checks.some((c) => changeSince([...mine, ...checks.filter((x) => !mine.some((m) => m.id === x.id))], c).startsWith('−')) ? <Text style={{ fontSize: 13, color: colors.muted }}>{UPS_AND_DOWNS}</Text> : null}
       {changes.length ? (
         <>
           <Label>Updated your starting weights</Label>

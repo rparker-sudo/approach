@@ -1,4 +1,4 @@
-import type { JumpTestId, LoadTestId, Perms } from './backend/types';
+import type { JumpTestId, LoadTestId, Perms, TestResult } from './backend/types';
 import { canTest } from './backend/types';
 import { isLow } from './readiness';
 import type { Equipment, Experience, Phase, ReadinessEntry, TestBattery } from './types';
@@ -111,3 +111,24 @@ export function bestOf(attempts: (number | null)[]): number | null {
 export const WARMUP_LADDER = ['Empty bar or a light weight × 8', 'About half your working weight × 5', 'About 70% × 3', 'About 85% × 1–2'];
 
 export const TEST_REST_SEC = 180;
+
+/**
+ * P6.10 change since last test (private: athlete and coach only). Compared with the athlete's most recent earlier
+ * non-voided result for the same test: jump tests in their unit (inches / feet), lifts by estimated strength (lb).
+ * First result ever → "Baseline set". A lower result shows plainly as a change ("−5 lb").
+ */
+export function changeSince(all: Pick<TestResult, 'id' | 'userId' | 'testId' | 'day' | 'value' | 'unit' | 'e1rm' | 'voided'>[], r: Pick<TestResult, 'id' | 'userId' | 'testId' | 'day' | 'value' | 'unit' | 'e1rm'>): string {
+  const list = all.filter((x) => x.userId === r.userId && x.testId === r.testId && !x.voided);
+  const idx = list.findIndex((x) => x.id === r.id);
+  const earlier = list.filter((x, i) => x.day < r.day || (x.day === r.day && idx >= 0 && i < idx)).sort((a, b) => a.day.localeCompare(b.day));
+  const prev = earlier[earlier.length - 1];
+  if (!prev) return 'Baseline set';
+  const lift = r.e1rm != null && prev.e1rm != null;
+  const d = Math.round(((lift ? r.e1rm! - prev.e1rm! : r.value - prev.value) as number) * 10) / 10;
+  const unit = lift ? 'lb' : r.unit;
+  const sign = d > 0 ? '+' : d < 0 ? '−' : '±';
+  const when = new Date(`${prev.day}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return `${sign}${Math.abs(d)} ${unit} since ${when}`;
+}
+
+export const UPS_AND_DOWNS = 'Strength checks go up and down. Your program adjusts.';

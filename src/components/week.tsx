@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { dateKey, fromKey, isHeavyLegs, mondayOf, today, weekPlan } from '../lib/calendar';
+import { breakOn, dateKey, eventsOn, fromKey, isHeavyLegs, mondayOf, today, weekPlan } from '../lib/calendar';
 import { dayAdvice, liftCapMessage, pickLiftDays } from '../lib/generator';
 import type { DayType, Program } from '../lib/types';
 import { DAY_TYPES, WEEKDAYS } from '../lib/types';
@@ -180,7 +180,30 @@ export function ProgramWeek({
               </View>
             </View>
             <View style={{ flex: 1, gap: 2 }}>
-              {p.event?.label ? <Text style={{ fontSize: 12, color: colors.muted }}>{p.event.label}</Text> : null}
+              {(() => {
+                // F15d / F16b: every team's events (team name in the text) and break bands.
+                const d = fromKey(p.date);
+                const evs = eventsOn(program, d);
+                const brk = breakOn(program, d, true);
+                const multi = evs.some((e) => e.teamName);
+                return (
+                  <>
+                    {brk ? <BreakBand label={brk.teamName ? `${brk.teamName} break` : brk.label || 'Break'} /> : null}
+                    {multi
+                      ? evs.map((e, k) => (
+                          <Text key={k} style={{ fontSize: 12, color: colors.muted }}>
+                            {`${DAY_TYPES.find((x) => x.id === e.type)?.label ?? e.type} · ${e.teamName ?? program.teamName ?? ''}${e.label ? ` · ${e.label}` : ''}`}
+                          </Text>
+                        ))
+                      : p.event?.label
+                        ? <Text style={{ fontSize: 12, color: colors.muted }}>{p.event.label}</Text>
+                        : null}
+                    {brk?.teamName ? (
+                      <Text style={{ fontSize: 12, color: colors.muted }}>{`Your lifting continues on ${program.teamName ?? 'your'} program.`}</Text>
+                    ) : null}
+                  </>
+                );
+              })()}
               {session ? (
                 <>
                   <Text style={{ fontWeight: '600', fontSize: 16 }}>{session.name}</Text>
@@ -190,7 +213,7 @@ export function ProgramWeek({
                 </>
               ) : (
                 <Text style={{ color: colors.muted, fontSize: 16, fontWeight: '500' }}>
-                  {vb === 'off' ? 'Rest' : `${vbLabel}, no lift`}
+                  {p.break ? 'Break week, no lift' : vb === 'off' ? 'Rest' : `${vbLabel}, no lift`}
                 </Text>
               )}
               {advice ? <Text style={{ color: colors.ink, fontSize: 12, marginTop: 4 }}>{advice}</Text> : null}
@@ -203,6 +226,30 @@ export function ProgramWeek({
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+/** Break band: text plus a striped pattern, so it isn't color only (F16a). */
+export function BreakBand({ label }: { label: string }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        borderWidth: 1,
+        borderColor: colors.line,
+        borderStyle: 'dashed',
+        borderRadius: 6,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        alignSelf: 'flex-start',
+        backgroundColor: colors.raised,
+      }}
+    >
+      <Text style={{ fontSize: 12, color: colors.muted, letterSpacing: 1 }}>{'////'}</Text>
+      <Text style={{ fontSize: 12, fontWeight: '600' }}>{label}</Text>
     </View>
   );
 }

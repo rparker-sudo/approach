@@ -9,14 +9,17 @@ import { Body, BRAND, Button, Card, Chip, ChipRow, colors, display, Icon, Label,
 import { dateKey, today } from '../lib/calendar';
 import { showAlert } from '../lib/dialog';
 import { CATEGORY_LABEL, getExercise } from '../lib/exercises';
-import { formatRest, restSecFor } from '../lib/generator';
-import { repRange, sessionForDate, suggestWeight, Suggestion } from '../lib/progression';
+import { formatRest } from '../lib/generator';
+import { repRange, suggestWeight, Suggestion } from '../lib/progression';
+import { resolveFor } from '../lib/athlete';
+import type { ResolvedExercise } from '../lib/resolve';
+import VersionLine, { DroppedLine } from '../components/VersionLine';
 import { adjustRest, clock, Rest, secondsLeft, startRest } from '../lib/restTimer';
 import { ConsentBanner } from '../components/Consent';
 import { canLog } from '../lib/backend';
 import { useStore } from '../lib/store';
 import { useTeams } from '../lib/team';
-import type { LoggedSet, ProgramExercise, WorkoutLog } from '../lib/types';
+import type { LoggedSet, WorkoutLog } from '../lib/types';
 import { estimateStrength, uid } from '../lib/util';
 
 type Entry = { exerciseId: string; sets: LoggedSet[] };
@@ -45,16 +48,19 @@ export default function Workout() {
   const insets = useSafeAreaInsets();
   const program = data.programs.find((p) => p.id === programId);
   const session = program?.sessions.find((s) => s.id === sessionId);
-  // Today's version of the session (deload week / coach-lightened day applied).
-  const day = useMemo(() => (program && session ? sessionForDate(program, session, today()) : null), [program, session]);
-  const plan: ProgramExercise[] = useMemo(() => day?.exercises ?? [], [day]);
+  // G-1: the athlete's version of today's session (day version, level, effort ceilings, easing, rest).
+  // Resolved once when the workout opens, so finishing a set doesn't change the plan mid-workout.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const day = useMemo(() => (program && session ? resolveFor(data, program, session, today()) : null), [program, session]);
+  const plan: ResolvedExercise[] = useMemo(() => day?.exercises ?? [], [day]);
   const suggestions = useMemo(
     () =>
       plan.map((pe) => {
         const est = data.strengthEstimates?.[pe.exerciseId];
-        return suggestWeight(data.logs, pe, program?.equipment, est && program ? { e1rm: est.e1rm, phase: program.phase } : undefined);
+        return suggestWeight(data.logs, pe, program?.equipment, est && program ? { e1rm: est.e1rm, phase: program.phase } : undefined, day?.easing.active);
       }),
-    [plan, data.logs, data.strengthEstimates, program],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [plan, data.strengthEstimates, program],
   );
 
   const fresh = (): Draft => ({
@@ -179,7 +185,7 @@ export default function Workout() {
       return;
     }
     setRestDone(false);
-    setRest(startRest(restSecFor(plan[ei]), getExercise(plan[ei].exerciseId).name));
+    setRest(startRest(plan[ei].restSecResolved, getExercise(plan[ei].exerciseId).name));
     // Last set of this exercise: move on while you rest.
     if (remainingHere === 0 && mode === 'focus' && ei < plan.length - 1) update({ index: ei + 1 });
   }
@@ -286,7 +292,9 @@ export default function Workout() {
       <Row style={{ gap: 6, flexWrap: 'wrap' }}>
         <Pill text={day.block.label} />
         {day.light ? <Pill text="Lightened by coach" bg={colors.day.game} /> : null}
+        {day.easing.active ? <Pill text="Easing back in this week" /> : null}
       </Row>
+      <DroppedLine count={day.dropped} />
     </View>
   );
 
@@ -312,7 +320,7 @@ export default function Workout() {
 
         {mode === 'focus' ? (
           <>
-            <ExerciseCard pe={plan[idx]} entry={entries[idx]} suggestion={suggestions[idx]} ei={idx} big setSet={setSet} toggleDone={toggleDone} />
+            <ExerciseCard pe={plan[idx]} teamId={program.teamId} entry={entries[idx]} suggestion={suggestions[idx]} ei={idx} big setSet={setSet} toggleDone={toggleDone} />
             <Row>
               <View style={{ flex: 1 }}>
                 <Button kind="ghost" title="Previous" disabled={idx === 0} onPress={() => update({ index: idx - 1 })} />
@@ -329,7 +337,7 @@ export default function Workout() {
           </>
         ) : (
           plan.map((pe, i) => (
-            <ExerciseCard key={i} pe={pe} entry={entries[i]} suggestion={suggestions[i]} ei={i} setSet={setSet} toggleDone={toggleDone} />
+            <ExerciseCard key={i} pe={pe} teamId={program.teamId} entry={entries[i]} suggestion={suggestions[i]} ei={i} setSet={setSet} toggleDone={toggleDone} />
           ))
         )}
 
@@ -398,6 +406,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function ExerciseCard({
   pe,
+  teamId,
   entry,
   suggestion,
   ei,
@@ -405,7 +414,8 @@ function ExerciseCard({
   setSet,
   toggleDone,
 }: {
-  pe: ProgramExercise;
+  pe: ResolvedExercise;
+  teamId?: string;
   entry: Entry;
   suggestion: Suggestion | null;
   ei: number;
@@ -424,15 +434,16 @@ function ExerciseCard({
           <Icon name="chevron.right" size={14} color={colors.faint} />
         </Row>
       </Pressable>
+      <VersionLine exerciseId={pe.exerciseId} teamExerciseId={pe.teamExerciseId} teamId={teamId} />
       <Text style={{ fontSize: 16, fontWeight: '600' }}>
-        {pe.sets} × {pe.reps} <Text style={{ fontSize: 13, color: colors.muted }}>· {pe.effort} · Rest {formatRest(restSecFor(pe))}</Text>
+        {pe.sets} × {pe.reps} <Text style={{ fontSize: 13, color: colors.muted }}>· {pe.effort} · Rest {formatRest(pe.restSecResolved)}</Text>
       </Text>
       {info.weighted && !timed ? (
         suggestion ? (
           <Text style={{ fontSize: 13 }}>
             Last: {suggestion.last} →{' '}
             <Text style={{ fontWeight: '600' }}>
-              {suggestion.reason === 'test' ? `Start at ${suggestion.weight} (from your strength check)` : suggestion.reason === 'up' ? `Try ${suggestion.weight} (+${suggestion.delta})` : suggestion.reason === 'down' ? `Try ${suggestion.weight} (${suggestion.delta})` : `Stay at ${suggestion.weight}`}
+              {suggestion.reason === 'easing' ? `Start at ${suggestion.weight} (lighter week)` : suggestion.reason === 'test' ? `Start at ${suggestion.weight} (from your strength check)` : suggestion.reason === 'up' ? `Try ${suggestion.weight} (+${suggestion.delta})` : suggestion.reason === 'down' ? `Try ${suggestion.weight} (${suggestion.delta})` : `Stay at ${suggestion.weight}`}
             </Text>
           </Text>
         ) : (

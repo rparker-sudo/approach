@@ -295,8 +295,8 @@ function repsFor(ex: Exercise, rx: Rx, phase: Phase): string {
   return oneSide ? `${rx.reps} each` : rx.reps;
 }
 
-const MAX_LEVEL: Record<Experience, number> = { beginner: 1, intermediate: 2, advanced: 3 };
-const BEGINNER_EFFORT: Record<string, string> = { 'RPE 7–8': 'RPE 6–7', 'RPE 7': 'RPE 6', 'RPE 6–7': 'RPE 6' };
+export const MAX_LEVEL: Record<Experience, number> = { beginner: 1, intermediate: 2, advanced: 3 };
+export const BEGINNER_EFFORT: Record<string, string> = { 'RPE 7–8': 'RPE 6–7', 'RPE 7': 'RPE 6', 'RPE 6–7': 'RPE 6' };
 
 /** Care patterns by position, used round-robin across sessions. */
 const CARE_BY_POSITION: Record<ProgramPosition, Pattern[]> = {

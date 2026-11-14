@@ -14,6 +14,7 @@ import {
   NO_PERMS,
   LiveProgress,
   Member,
+  MemberLevel,
   Perms,
   Readiness,
   SignUpInput,
@@ -26,6 +27,7 @@ import {
   TestSession,
 } from './backend';
 import { dateKey, today } from './calendar';
+import { LEVEL_OF } from './athlete';
 import { isLow } from './readiness';
 import { useStore } from './store';
 import type { AppData, CalendarEvent, LocalTeamCalendar, Position, Program, ReadinessEntry, TestBattery } from './types';
@@ -137,6 +139,19 @@ type TeamState = {
   updateTestResult: (teamId: string, id: string, patch: Partial<Pick<TestResult, 'value' | 'reps' | 'voided'>>) => Promise<void>;
   /** Deletes the account on the server; the caller then erases local data. */
   deleteAccount: () => Promise<void>;
+  /** v2.2 coach: per-team level info (numbers only, never another team's name), who follows another team's program,
+   *  who is returning from a break, and today's testing eligibility (no reason). */
+  coachExtras: Record<string, CoachExtras>;
+  setMemberLevel: (teamId: string, userId: string, level: number) => Promise<void>;
+  /** v2.2 athlete: choose which team's lifting program to follow. */
+  setLiftProgram: (teamId: string) => Promise<void>;
+};
+
+export type CoachExtras = {
+  levels: Record<string, MemberLevel>;
+  followingOther: string[];
+  returning: string[];
+  eligibleToday: Record<string, boolean>;
 };
 
 const Ctx = createContext<TeamState | null>(null);
@@ -205,7 +220,18 @@ function applyPosted(d: AppData, role: 'coach' | 'athlete', snap: Snapshot): App
       return { ...p, events: cal?.events ?? p.events, lightDates: lightFor(cal, p.groupKey ?? ALL), groupName: group?.name ?? p.groupName };
     });
   } else {
+    // v2.2 (TM-2): one lifting program. Only the program team's workout is mirrored; the other teams add their
+    // practices and matches to the schedule, labeled with the team name (breaks only as a label: they don't stop lifting).
+    const liftTeam = snap.teams.find((t) => t.isLiftProgram) ?? snap.teams[0];
+    const otherEvents: CalendarEvent[] = snap.teams
+      .filter((t) => t.id !== liftTeam?.id)
+      .flatMap((t) => (snap.calendars.find((c) => c.teamId === t.id)?.events ?? []).map((e) => ({ ...e, teamName: t.name, test: undefined })))
+      .map(({ test: _t, ...e }) => e);
     for (const t of snap.teams) {
+      if (t.id !== liftTeam?.id) {
+        programs = programs.filter((p) => p.id !== teamProgramId(t.id));
+        continue;
+      }
       const mine = t.myGroupId ? snap.posted.find((tp) => tp.teamId === t.id && tp.groupKey === t.myGroupId) : undefined;
       const tp = mine ?? snap.posted.find((x) => x.teamId === t.id && x.groupKey === ALL);
       const id = teamProgramId(t.id);
@@ -226,7 +252,7 @@ function applyPosted(d: AppData, role: 'coach' | 'athlete', snap: Snapshot): App
         author: t.coachName ?? tp.program.author,
         postedAt: tp.updatedAt,
         unposted: false,
-        events: cal?.events ?? tp.program.events ?? [],
+        events: [...(cal?.events ?? tp.program.events ?? []).map(({ teamName: _n, ...e }) => e), ...otherEvents],
         lightDates: lightFor(cal, tp.groupKey),
       };
       const same = local && JSON.stringify(local) === JSON.stringify(mirrored);
@@ -236,13 +262,16 @@ function applyPosted(d: AppData, role: 'coach' | 'athlete', snap: Snapshot): App
 
   let activeProgramId = d.activeProgramId;
   if (!programs.some((p) => p.id === activeProgramId)) activeProgramId = null;
+  let liftTeamId = d.liftTeamId;
+  let teamLevels = d.teamLevels;
   if (role === 'athlete') {
-    const firstTeamProgram = programs.find((p) => p.teamId);
-    // A team workout takes over as the plan unless the athlete already follows another team's plan.
-    const active = programs.find((p) => p.id === activeProgramId);
-    if (firstTeamProgram && !active?.teamId) activeProgramId = firstTeamProgram.id;
+    // The program team's workout is the plan.
+    const teamProgram = programs.find((p) => p.teamId);
+    if (teamProgram) activeProgramId = teamProgram.id;
+    liftTeamId = (snap.teams.find((t) => t.isLiftProgram) ?? snap.teams[0])?.id ?? null;
+    teamLevels = Object.fromEntries(snap.teams.map((t) => [t.id, { level: t.myLevel ?? null, confirmed: !!t.myLevelConfirmed, teamName: t.name }]));
   }
-  return { ...d, programs, activeProgramId, teamCalendars };
+  return { ...d, programs, activeProgramId, teamCalendars, liftTeamId, teamLevels };
 }
 
 export function TeamProvider({ children }: { children: ReactNode }) {
@@ -259,6 +288,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const [attendance, setAttendance] = useState<Record<string, Attendance[]>>({});
   const [testSessions, setTestSessions] = useState<Record<string, TestSession | undefined>>({});
   const [testResults, setTestResults] = useState<Record<string, TestResult[]>>({});
+  const [coachExtras, setCoachExtras] = useState<Record<string, CoachExtras>>({});
   const [syncing, setSyncing] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   const accountRef = useRef<Account | null>(account);
@@ -317,7 +347,16 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     if (!acct) return;
     setSyncing(true);
     try {
-      const t = await backend.listMyTeams();
+      let t = await backend.listMyTeams();
+      // v2.2 1.1: the server doesn't know the athlete's experience, so the app fills in the self-reported level once.
+      const exp = dataRef.current.profile?.experience;
+      if (acct.role === 'athlete' && exp) {
+        const missing = t.filter((x) => x.myLevel == null && !x.myLevelConfirmed);
+        if (missing.length) {
+          await Promise.all(missing.map((x) => backend.setMySelfLevel(x.id, LEVEL_OF[exp]).catch(() => {})));
+          t = await backend.listMyTeams();
+        }
+      }
       const ids = t.map((x) => x.id);
       const [tps, cals, grp] = await Promise.all([
         backend.getPrograms(ids),
@@ -350,6 +389,18 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         setLogs(Object.fromEntries(ids.map((id, i) => [id, l[i]])));
         setReadiness(Object.fromEntries(ids.map((id, i) => [id, r[i]])));
         setTestResults(Object.fromEntries(ids.map((id, i) => [id, tr[i]])));
+        const extras = await Promise.all(
+          ids.map(async (id): Promise<CoachExtras> => {
+            const [lv, fo, ret, el] = await Promise.all([
+              backend.memberLevels(id),
+              backend.membersFollowingOther(id),
+              backend.membersReturning(id),
+              backend.testingEligibility(id, day),
+            ]);
+            return { levels: Object.fromEntries(lv.map((x) => [x.userId, x])), followingOther: fo, returning: ret, eligibleToday: el };
+          }),
+        );
+        setCoachExtras(Object.fromEntries(ids.map((id, i) => [id, extras[i]])));
       } else {
         const tr = await Promise.all(t.map((x) => (canTest(x.myPerms) ? backend.listTestResults(x.id, acct.id) : Promise.resolve([] as TestResult[]))));
         setTestResults(Object.fromEntries(ids.map((id, i) => [id, tr[i]])));
@@ -482,6 +533,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     setAttendance({});
     setTestSessions({});
     setTestResults({});
+    setCoachExtras({});
     mutate((d) => {
       const programs = d.programs.filter((p) => !p.teamId);
       return {
@@ -489,6 +541,8 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         programs,
         teamCalendars: {},
         teamConsent: {},
+        teamLevels: {},
+        liftTeamId: null,
         activeProgramId: programs.some((p) => p.id === d.activeProgramId) ? d.activeProgramId : null,
       };
     });
@@ -575,6 +629,15 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         await backend.updateTestResult(id, patch);
         const list = await backend.listTestResults(teamId);
         setTestResults((s) => ({ ...s, [teamId]: list }));
+      },
+      coachExtras,
+      async setMemberLevel(teamId, userId, level) {
+        await backend.setMemberLevel(teamId, userId, level);
+        await refresh();
+      },
+      async setLiftProgram(teamId) {
+        await backend.setLiftProgram(teamId);
+        await refresh();
       },
       async createTeam(name) {
         const t = await backend.createTeam(name);
@@ -665,7 +728,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         }));
       },
     }),
-    [account, checked, teams, members, groups, logs, readiness, posted, attendance, testSessions, testResults, syncing, lastError, refresh, mutate, data, postCalendarIfNeeded, postProgram, writeCalendar, clearTeamState],
+    [account, checked, teams, members, groups, logs, readiness, posted, attendance, testSessions, testResults, coachExtras, syncing, lastError, refresh, mutate, data, postCalendarIfNeeded, postProgram, writeCalendar, clearTeamState],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

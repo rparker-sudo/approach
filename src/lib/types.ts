@@ -180,7 +180,8 @@ export type Program = {
 /** Testing-day battery (P6): full = jumps + strength checks; jump = jumps only; mid = jumps + trap bar. */
 export type TestBattery = 'full' | 'jump' | 'mid';
 /** A dated calendar entry. A testing day keeps its underlying day type and adds `test`. */
-export type CalendarEvent = { date: string; type: DayType; label?: string; test?: TestBattery };
+/** v2.2: `break` (coach-set break, TM-3) runs from `date` to `endDate` (inclusive). `teamName` labels another team's events on the athlete's combined schedule (never stored). */
+export type CalendarEvent = { date: string; type: DayType | 'break'; label?: string; test?: TestBattery; endDate?: string; teamName?: string };
 
 export type Profile = {
   name: string;
@@ -256,6 +257,14 @@ export type AppData = {
   jumpTests?: { day: string; testId: 'touch' | 'broad' | 'throw'; value: number }[];
   /** The athlete has seen "Your coach sees your check-ins" once. */
   checkinNoticeSeen?: boolean;
+  /** v2.2 athletes: last known level per team (offline copy of team_members.level). */
+  teamLevels?: Record<string, { level: number | null; confirmed: boolean; teamName: string }>;
+  /** v2.2 athletes: the team whose lifting program they follow (null = personal program). */
+  liftTeamId?: string | null;
+  /** v2.2 athletes: one-time notice after leaving the program team (F15c). */
+  leaveNotice?: string | null;
+  /** v2.2 coaches: teams whose testing-day checklist was read on this device (F25a). */
+  checklistRead?: string[];
 };
 
 export type LocalTeamCalendar = {

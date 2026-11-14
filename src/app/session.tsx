@@ -5,6 +5,9 @@ import { Body, Button, Card, colors, Field, H2, Label, Row, Screen, Stepper, Tex
 import { ALL_EQUIPMENT, CATEGORY_LABEL, EXERCISES, fits, getExercise } from '../lib/exercises';
 import { formatRest, restSecFor } from '../lib/generator';
 import { useStore } from '../lib/store';
+import { resolveFor } from '../lib/athlete';
+import { formatMinutes } from '../lib/rest';
+import VersionLine, { DroppedLine } from '../components/VersionLine';
 import type { ExerciseCategory, ProgramExercise, Session } from '../lib/types';
 
 const CATS: ExerciseCategory[] = ['power', 'lower', 'upper', 'core', 'prehab'];
@@ -20,8 +23,9 @@ export default function SessionScreen() {
   const coach = data.profile?.role === 'coach';
   const canStart = !coach && data.activeProgramId === program.id;
 
-  // Athletes see their team's workout exactly as the coach posted it.
+  // Athletes see their version of the team's workout (G-1: resolveSession).
   if (program.teamId && !coach) {
+    const resolved = resolveFor(data, program, session);
     return (
       <Screen>
         <Stack.Screen options={{ title: session.name }} />
@@ -32,8 +36,8 @@ export default function SessionScreen() {
             onPress={() => router.push({ pathname: '/workout', params: { programId: program.id, sessionId: session.id } })}
           />
         ) : null}
-        <Body muted style={{ fontSize: 13 }}>{session.focus}</Body>
-        {session.exercises.map((e, i) => {
+        <Body muted style={{ fontSize: 13 }}>{`${session.focus} · ${formatMinutes(resolved.estMinutes)}`}</Body>
+        {resolved.exercises.map((e, i) => {
           const info = getExercise(e.exerciseId);
           return (
             <Card key={`${e.exerciseId}-${i}`} style={{ gap: 6 }}>
@@ -41,14 +45,16 @@ export default function SessionScreen() {
               <Pressable accessibilityRole="link" onPress={() => router.push(`/exercise/${info.id}`)}>
                 <H2>{info.name}</H2>
               </Pressable>
+              <VersionLine exerciseId={e.exerciseId} teamExerciseId={e.teamExerciseId} teamId={program.teamId} />
               <Text style={{ fontSize: 16, fontWeight: '600' }}>
-                {e.sets} × {e.reps} <Text style={{ fontSize: 13, color: colors.muted }}>· {e.effort} · Rest {formatRest(restSecFor(e))}</Text>
+                {e.sets} × {e.reps} <Text style={{ fontSize: 13, color: colors.muted }}>· {e.effort} · Rest {formatRest(e.restSecResolved)}</Text>
               </Text>
               {e.notes ? <Text style={{ fontSize: 13 }}>Coach: {e.notes}</Text> : null}
               <Body muted style={{ fontSize: 13 }}>{info.cue}</Body>
             </Card>
           );
         })}
+        <DroppedLine count={resolved.dropped} />
       </Screen>
     );
   }

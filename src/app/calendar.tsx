@@ -3,8 +3,10 @@ import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Body, BRAND, Button, Card, Chip, ChipRow, colors, Field, H2, Icon, Label, Note, Row, Screen, Text } from '../components/ui';
+import { BreakBand } from '../components/week';
 import {
   addDays,
+  breakOn,
   dateKey,
   DayPlan,
   eventOn,
@@ -20,11 +22,13 @@ import {
   withEvent,
   withTest,
   withOverride,
+  withBreak,
+  withoutBreak,
 } from '../lib/calendar';
 import { showAlert } from '../lib/dialog';
 import { useStore } from '../lib/store';
 import { useTeams } from '../lib/team';
-import type { DayType, Program, TestBattery } from '../lib/types';
+import type { CalendarEvent, DayType, Program, TestBattery } from '../lib/types';
 import { BATTERY_LABEL } from '../lib/testing';
 import { DAY_TYPES, WEEKDAYS } from '../lib/types';
 
@@ -45,6 +49,7 @@ export default function CalendarScreen() {
     return new Date(t.getFullYear(), t.getMonth(), 1);
   });
   const [selected, setSelected] = useState<string | null>(null);
+  const [breakEdit, setBreakEdit] = useState<{ start: string; original?: CalendarEvent } | null>(null);
   const [posting, setPosting] = useState(false);
 
   const weeks = useMemo(() => {
@@ -63,6 +68,8 @@ export default function CalendarScreen() {
   const readOnly = !!program.teamId && !coach;
   const todayKey = dateKey(today());
   const upcoming = upcomingEvents(program, today(), 6);
+  const canBreak = coach && !!program.teamId;
+  const breaks = (program.events ?? []).filter((e) => e.type === 'break' && !e.teamName).sort((a, b) => a.date.localeCompare(b.date));
 
   function save(next: Program) {
     if (next.teamId) {
@@ -135,11 +142,12 @@ export default function CalendarScreen() {
               const inMonth = d.getMonth() === month.getMonth();
               const isToday = p.date === todayKey;
               const changed = p.source !== 'plan';
+              const brk = breakOn(program, d, true);
               return (
                 <Pressable
                   key={p.date}
                   accessibilityRole="button"
-                  accessibilityLabel={`${formatKey(p.date)}: ${DAY_TYPES.find((x) => x.id === p.dayType)!.label}${p.sessionId ? ', lift' : ''}${p.note ? `. ${p.note}` : ''}`}
+                  accessibilityLabel={`${formatKey(p.date)}: ${DAY_TYPES.find((x) => x.id === p.dayType)!.label}${brk ? `, ${brk.teamName ? `${brk.teamName} break` : 'break'}` : ''}${p.sessionId ? ', lift' : ''}${p.note ? `. ${p.note}` : ''}`}
                   onPress={() => setSelected(p.date)}
                   style={{
                     flex: 1,
@@ -149,6 +157,7 @@ export default function CalendarScreen() {
                     backgroundColor: p.dayType === 'off' ? 'transparent' : colors.day[p.dayType],
                     borderWidth: isToday ? 2 : 1,
                     borderColor: isToday ? colors.ink : colors.line,
+                    borderStyle: brk && !isToday ? 'dashed' : 'solid',
                     opacity: inMonth ? 1 : 0.35,
                     justifyContent: 'space-between',
                   }}
@@ -158,7 +167,7 @@ export default function CalendarScreen() {
                     {changed ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.ink }} /> : null}
                   </Row>
                   <Text style={{ fontSize: 12, fontWeight: '600', textAlign: 'center' }}>
-                    {p.test ? 'Test' : p.dayType === 'tournament' ? 'T' : p.dayType === 'game' ? 'M' : ''}
+                    {p.test ? 'Test' : p.dayType === 'tournament' ? 'T' : p.dayType === 'game' ? 'M' : brk ? '//' : ''}
                   </Text>
                   <View
                     style={{
@@ -179,8 +188,30 @@ export default function CalendarScreen() {
           <Legend swatch={<Text style={{ fontSize: 12, fontWeight: '600' }}>T</Text>} text="Tournament" />
           <Legend swatch={<Text style={{ fontSize: 12, fontWeight: '600' }}>Test</Text>} text="Testing day" />
           <Legend swatch={<View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.ink }} />} text="Lift moved or chosen" />
+          <Legend swatch={<Text style={{ fontSize: 12, fontWeight: '600' }}>//</Text>} text="Break" />
         </Row>
       </Card>
+
+      {canBreak || breaks.length ? (
+        <View style={{ gap: 8 }}>
+          <Label>Breaks</Label>
+          {breaks.map((b) => (
+            <Pressable
+              key={b.date}
+              accessibilityRole="button"
+              disabled={!canBreak}
+              onPress={() => setBreakEdit({ start: b.date, original: b })}
+              style={{ minHeight: 44, justifyContent: 'center' }}
+            >
+              <Row style={{ justifyContent: 'space-between' }}>
+                <BreakBand label={b.label || 'Break'} />
+                <Text style={{ fontSize: 13, color: colors.muted }}>{rangeText(b.date, b.endDate ?? b.date)}</Text>
+              </Row>
+            </Pressable>
+          ))}
+          {canBreak ? <Button kind="secondary" title="Add break" icon="plus" onPress={() => setBreakEdit({ start: todayKey })} /> : null}
+        </View>
+      ) : null}
 
       <View style={{ gap: 8 }}>
         <Label>Upcoming</Label>
@@ -190,7 +221,7 @@ export default function CalendarScreen() {
           <Card style={{ gap: 0, paddingVertical: 4 }}>
             {upcoming.map((e, i) => (
               <Pressable
-                key={e.date}
+                key={`${e.date}-${i}`}
                 onPress={() => {
                   const d = fromKey(e.date);
                   setMonth(new Date(d.getFullYear(), d.getMonth(), 1));
@@ -199,7 +230,7 @@ export default function CalendarScreen() {
                 style={{ paddingVertical: 10, borderTopWidth: i ? 1 : 0, borderTopColor: colors.line }}
               >
                 <Row style={{ justifyContent: 'space-between' }}>
-                  <Text style={{ fontWeight: '600' }}>{e.type === 'tournament' ? 'Tournament' : 'Match'}{e.label ? ` · ${e.label}` : ''}</Text>
+                  <Text style={{ fontWeight: '600' }}>{e.type === 'tournament' ? 'Tournament' : 'Match'}{e.teamName ? ` · ${e.teamName}` : ''}{e.label ? ` · ${e.label}` : ''}</Text>
                   <Text style={{ fontSize: 13, color: colors.muted }}>{formatKey(e.date)}</Text>
                 </Row>
               </Pressable>
@@ -207,6 +238,20 @@ export default function CalendarScreen() {
           </Card>
         )}
       </View>
+
+      {breakEdit ? (
+        <BreakSheet
+          program={program}
+          start={breakEdit.start}
+          original={breakEdit.original}
+          onClose={() => setBreakEdit(null)}
+          onSave={(next, added) => {
+            save(next);
+            setBreakEdit(null);
+            showAlert(added ? 'Break added' : 'Break saved', 'Post to send it to your athletes.');
+          }}
+        />
+      ) : null}
 
       {selected ? (
         <DaySheet
@@ -222,6 +267,73 @@ export default function CalendarScreen() {
         />
       ) : null}
     </Screen>
+  );
+}
+
+function rangeText(a: string, b: string) {
+  const o: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+  return a === b ? formatKey(a, o) : `${formatKey(a, o)}–${formatKey(b, o)}`;
+}
+
+const isKey = (k: string) => /^\d{4}-\d{2}-\d{2}$/.test(k) && !Number.isNaN(fromKey(k).getTime());
+
+/** F16a: coach adds or edits a break (start, end, optional label). */
+function BreakSheet({
+  program,
+  start: initialStart,
+  original,
+  onClose,
+  onSave,
+}: {
+  program: Program;
+  start: string;
+  original?: CalendarEvent;
+  onClose: () => void;
+  onSave: (p: Program, added: boolean) => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const [start, setStart] = useState(original?.date ?? initialStart);
+  const [end, setEnd] = useState(original?.endDate ?? original?.date ?? dateKey(addDays(fromKey(initialStart), 6)));
+  const [label, setLabel] = useState(original?.label ?? '');
+  const valid = isKey(start) && isKey(end);
+  const orderError = valid && end < start ? 'End date must be on or after the start date.' : null;
+  // [UX proposal] F16a: a break can't cover a testing day.
+  const testInside = valid && !orderError ? (program.events ?? []).find((e) => e.test && !e.teamName && e.date >= start && e.date <= end) : undefined;
+  const testError = testInside
+    ? `This break covers your testing day on ${formatKey(testInside.date, { month: 'short', day: 'numeric' })}. Move or delete the testing day first.`
+    : null;
+  const error = !valid ? 'Use dates like 2026-11-23.' : orderError ?? testError;
+
+  return (
+    <Modal transparent animationType="slide" visible onRequestClose={onClose}>
+      <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={onClose} accessibilityLabel="Close" />
+      <View style={{ backgroundColor: colors.card, borderTopLeftRadius: BRAND.radius.lg, borderTopRightRadius: BRAND.radius.lg, borderWidth: 1, borderColor: colors.line, maxHeight: '85%' }}>
+        <ScrollView contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 20 + insets.bottom }} keyboardShouldPersistTaps="handled">
+          <H2>{original ? 'Edit break' : 'Add break'}</H2>
+          <Field label="Start date" value={start} onChangeText={setStart} placeholder="YYYY-MM-DD" autoCapitalize="none" />
+          <Field label="End date" value={end} onChangeText={setEnd} placeholder="YYYY-MM-DD" autoCapitalize="none" />
+          <Field label="Label (optional)" value={label} onChangeText={(t) => setLabel(t.slice(0, 30))} placeholder="Thanksgiving break" maxLength={30} />
+          {valid && !orderError ? (
+            <Note>{`No lift sessions ${rangeText(start, end)} for athletes on ${program.teamName ?? 'this team'}'s program. Streaks and Consistency pause.`}</Note>
+          ) : null}
+          {error ? <Text style={{ color: colors.warning, fontSize: 14 }}>{error}</Text> : null}
+          <Button title="Save" disabled={!!error} onPress={() => onSave(withBreak(program, start, end, original?.date, label), !original)} />
+          {original ? (
+            <Button
+              kind="danger"
+              title="Delete break"
+              onPress={() =>
+                showAlert('Delete this break?', undefined, [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Delete', style: 'destructive', onPress: () => onSave(withoutBreak(program, original.date), false) },
+                ])
+              }
+            />
+          ) : null}
+          <Button kind="ghost" title="Cancel" onPress={onClose} />
+        </ScrollView>
+      </View>
+    </Modal>
   );
 }
 
@@ -255,7 +367,7 @@ function DaySheet({
   const date = fromKey(dateKeyStr);
   const existing = eventOn(program, date);
   const usual = program.volleyballWeek[weekdayOf(date)];
-  const [type, setType] = useState<DayType | null>(existing?.type ?? null); // null = usual week
+  const [type, setType] = useState<DayType | null>((existing?.type as DayType | undefined) ?? null); // null = usual week
   const [label, setLabel] = useState(existing?.label ?? '');
   const [nextDayToo, setNextDayToo] = useState(false);
   const hasOverride = !!program.overrides && dateKeyStr in program.overrides;

@@ -66,8 +66,8 @@ export type Suggestion = {
   delta: number;
   /** e.g. "135 × 8, 8, 8" */
   last: string;
-  /** 'test': set from a strength check (P6.7). */
-  reason: 'up' | 'same' | 'down' | 'test';
+  /** 'test': set from a strength check (P6.7). 'easing': returning from a break (G9). */
+  reason: 'up' | 'same' | 'down' | 'test' | 'easing';
 };
 
 const round5 = (n: number) => Math.max(5, Math.round(n / 5) * 5);
@@ -113,6 +113,31 @@ export function suggestWeight(
   pe: ProgramExercise,
   equipment: Equipment[] = ALL_EQUIPMENT,
   /** Latest strength-check estimate for this lift, and the program's phase (P6.7). */
+  test?: { e1rm: number; phase: Phase },
+  /** G9: returning from a break (14+ days without a log): start about 10% below the last logged weight. */
+  easing?: boolean,
+): Suggestion | null {
+  const s = suggestWeightCore(logs, pe, equipment, test);
+  if (!s || !easing) return s;
+  const top = lastTopWeight(logs, pe.exerciseId);
+  if (top == null) return s;
+  // About 10% below the last logged weight, rounded down to 2.5 lb (G5 rounding), never above the normal suggestion.
+  const eased = Math.max(2.5, Math.floor((top * 0.9) / 2.5) * 2.5);
+  if (eased >= s.weight) return s;
+  return { weight: eased, delta: eased - top, last: s.last, reason: 'easing' };
+}
+
+/** Heaviest completed set in the most recent log of an exercise. */
+function lastTopWeight(logs: WorkoutLog[], exerciseId: string): number | null {
+  const history = logs.filter((l) => doneSets(l, exerciseId).length).sort((a, b) => b.date.localeCompare(a.date));
+  if (!history.length) return null;
+  return Math.max(...doneSets(history[0], exerciseId).map((x) => x.weight));
+}
+
+function suggestWeightCore(
+  logs: WorkoutLog[],
+  pe: ProgramExercise,
+  equipment: Equipment[],
   test?: { e1rm: number; phase: Phase },
 ): Suggestion | null {
   const ex = getExercise(pe.exerciseId);

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Program, TestBattery, WorkoutLog } from '../types';
 import { uid } from '../util';
+import { easingFor } from '../resolve';
 import {
   Account,
   Attendance,
@@ -57,7 +58,13 @@ type DB = {
     consentRecordedBy?: string | null;
     /** Pass 1 data (migrated to perms on load). */
     consentStatus?: string;
+    /** v2.2: level on this team (1–3); levelSetBy null = self-reported. */
+    level?: number | null;
+    levelSetBy?: string | null;
+    levelSetAt?: string | null;
   }[];
+  /** v2.2: userId → the team whose lift program they follow (same as profiles.lift_program_team_id). */
+  liftProgram?: Record<string, string | null>;
   programs: TeamProgram[];
   logs: TeamLog[];
   groups: Group[];
@@ -162,6 +169,66 @@ function visibleTo(db: DB, viewerId: string | null, teamId: string, rowUserId: s
   if (rowUserId === viewerId) return true;
   const t = db.teams.find((x) => x.id === teamId);
   return !!t && t.coachId === viewerId && db.members.some((m) => m.teamId === teamId && m.userId === rowUserId);
+}
+
+/** Same as the server's lift_team_of(): the athlete's choice if still a member, else the first-joined team. */
+function liftTeamOf(db: DB, userId: string): string | null {
+  const mine = db.members.filter((m) => m.userId === userId).sort((a, b) => a.joinedAt.localeCompare(b.joinedAt));
+  const pick = db.liftProgram?.[userId];
+  if (pick && mine.some((m) => m.teamId === pick)) return pick;
+  return mine[0]?.teamId ?? null;
+}
+
+/** Lower level across the athlete's teams (Q-7). */
+function resolveLevelOf(db: DB, userId: string): number | null {
+  const lv = db.members.filter((m) => m.userId === userId && m.level != null).map((m) => m.level!);
+  return lv.length ? Math.min(...lv) : null;
+}
+
+const plusDays = (day: string, n: number) => {
+  const d = new Date(`${day}T12:00:00`);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+const isoDow = (day: string) => (new Date(`${day}T12:00:00`).getDay() + 6) % 7;
+
+function onBreak(db: DB, teamId: string, day: string) {
+  const cal = db.calendars.find((c) => c.teamId === teamId);
+  return !!cal?.events.some((e) => e.type === 'break' && day >= e.date && day <= (e.endDate ?? e.date));
+}
+
+/** Same as has_match_within_48h(): any team's game or tournament on day..day+2 (calendar, or the usual week of the whole-team program). */
+function matchWithin48h(db: DB, userId: string, day: string) {
+  for (const m of db.members.filter((x) => x.userId === userId)) {
+    const events = db.calendars.find((c) => c.teamId === m.teamId)?.events ?? [];
+    const week = db.programs.find((p) => p.teamId === m.teamId && p.groupKey === 'all')?.program.volleyballWeek;
+    for (let k = 0; k <= 2; k++) {
+      const d = plusDays(day, k);
+      const onDay = events.filter((e) => e.date === d && e.type !== 'break');
+      if (onDay.some((e) => e.type === 'game' || e.type === 'tournament')) return true;
+      if (!onDay.length && week && (week[isoDow(d)] === 'game' || week[isoDow(d)] === 'tournament')) return true;
+    }
+  }
+  return false;
+}
+
+/** Same as the server's can_load_test(): returns no reason. */
+function canLoadTest(db: DB, userId: string, day: string, teamId?: string | null): boolean {
+  const team = teamId ?? liftTeamOf(db, userId);
+  if (!team) return false;
+  const tm = db.members.find((m) => m.teamId === team && m.userId === userId);
+  if (!tm || !canTest(tm.perms)) return false;
+  if (matchWithin48h(db, userId, day) || onBreak(db, team, day)) return false;
+  if (db.readiness.some((r) => r.userId === userId && r.day === day && (r.pain || (r.sleep + r.energy + (6 - r.soreness)) / 3 <= 2 || r.soreness >= 4))) {
+    return false;
+  }
+  const minor = db.users.find((u) => u.id === userId)?.isMinor ?? true;
+  if (minor) {
+    const coachId = db.teams.find((t) => t.id === team)?.coachId;
+    if (tm.level == null || tm.level < 2 || !tm.levelSetBy || tm.levelSetBy !== coachId) return false;
+    if (db.members.some((o) => o.userId === userId && o.teamId !== team && o.level === 1 && o.levelSetBy)) return false;
+  } else if ((resolveLevelOf(db, userId) ?? 2) < 2) return false;
+  return true;
 }
 
 function coachOf(db: DB, teamId: string, userId: string) {
@@ -296,6 +363,12 @@ export const localBackend: Backend = {
         myGroupId: user.role === 'coach' ? undefined : db.members.find((m) => m.teamId === t.id && m.userId === user.id)?.groupId ?? null,
         myPerms: user.role === 'coach' ? undefined : permsOf(db, t.id, user.id),
         myConsentVersion: user.role === 'coach' ? undefined : db.members.find((m) => m.teamId === t.id && m.userId === user.id)?.consentVersion ?? null,
+        ...(user.role === 'coach'
+          ? {}
+          : (() => {
+              const m = db.members.find((x) => x.teamId === t.id && x.userId === user.id);
+              return { myLevel: m?.level ?? null, myLevelConfirmed: !!m?.levelSetBy, isLiftProgram: liftTeamOf(db, user.id) === t.id };
+            })()),
       }));
   },
 
@@ -356,6 +429,9 @@ export const localBackend: Backend = {
           isMinor: u?.isMinor ?? null,
           perms: m.perms ?? { ...NO_PERMS },
           consentVersion: m.consentVersion ?? null,
+          level: m.level ?? null,
+          levelConfirmed: !!m.levelSetBy,
+          levelSetAt: m.levelSetAt ?? null,
         };
       });
   },
@@ -365,6 +441,71 @@ export const localBackend: Backend = {
     coachOf(db, teamId, user.id);
     db.members = db.members.filter((m) => !(m.teamId === teamId && m.userId === userId));
     await save(db);
+  },
+
+  async setMySelfLevel(teamId, level) {
+    const { db, user } = await me();
+    const m = db.members.find((x) => x.teamId === teamId && x.userId === user.id);
+    if (!m || m.level != null || m.levelSetBy) return;
+    m.level = level;
+    await save(db);
+  },
+
+  async setMemberLevel(teamId, userId, level) {
+    const { db, user } = await me();
+    if (!isCoach(db, teamId, user.id)) throw new BackendError('Only the team coach can set levels.');
+    const m = db.members.find((x) => x.teamId === teamId && x.userId === userId);
+    if (!m) throw new BackendError("That athlete isn't on the team.");
+    m.level = level;
+    m.levelSetBy = user.id;
+    m.levelSetAt = new Date().toISOString();
+    await save(db);
+  },
+
+  async memberLevels(teamId) {
+    const { db, user } = await me();
+    if (!isCoach(db, teamId, user.id)) return [];
+    return db.members
+      .filter((m) => m.teamId === teamId)
+      .map((m) => ({
+        userId: m.userId,
+        teamLevel: m.level ?? null,
+        confirmed: !!m.levelSetBy,
+        setAt: m.levelSetAt ?? null,
+        resolveLevel: resolveLevelOf(db, m.userId),
+      }));
+  },
+
+  async setLiftProgram(teamId) {
+    const { db, user } = await me();
+    if (teamId && !db.members.some((m) => m.teamId === teamId && m.userId === user.id)) throw new BackendError("You're not on that team.");
+    db.liftProgram = { ...(db.liftProgram ?? {}), [user.id]: teamId };
+    await save(db);
+  },
+
+  async membersFollowingOther(teamId) {
+    const { db, user } = await me();
+    if (!isCoach(db, teamId, user.id)) return [];
+    return db.members.filter((m) => m.teamId === teamId && liftTeamOf(db, m.userId) !== teamId).map((m) => m.userId);
+  },
+
+  async membersReturning(teamId) {
+    const { db, user } = await me();
+    if (!isCoach(db, teamId, user.id)) return [];
+    // Demo mode only has team log summaries, so this uses every team's logs on this device (the server uses the athlete's whole history).
+    return db.members
+      .filter((m) => m.teamId === teamId)
+      .filter((m) => {
+        const logs = db.logs.filter((l) => l.userId === m.userId).map((l) => ({ date: l.date }) as WorkoutLog);
+        return easingFor(logs).active;
+      })
+      .map((m) => m.userId);
+  },
+
+  async testingEligibility(teamId, day) {
+    const { db, user } = await me();
+    if (!isCoach(db, teamId, user.id)) return {};
+    return Object.fromEntries(db.members.filter((m) => m.teamId === teamId).map((m) => [m.userId, canLoadTest(db, m.userId, day, teamId)]));
   },
 
   async recordConsent(teamId, userId, perms) {
@@ -518,6 +659,7 @@ export const localBackend: Backend = {
     if (t.reps != null && !db.testSessions.some((x) => x.teamId === t.teamId && x.day === t.day && x.battery !== 'jump')) {
       throw new BackendError("Strength checks open when your coach confirms they're supervising.");
     }
+    if (t.reps != null && !canLoadTest(db, t.userId, t.day, t.teamId)) throw new BackendError('Not eligible for testing today.');
     const row: TestResult = { ...t, id: uid(), e1rm: t.unit === 'lb' && t.reps != null ? e1rm(t.value, t.reps) : null, voided: false };
     db.tests.push(row);
     await save(db);
@@ -572,6 +714,12 @@ export const localBackend: Backend = {
         perms: { ...NO_PERMS, participation: user.isMinor === false },
         consentVersion: null,
       });
+      // Joining a second team keeps the current program (TM-2): pin it before the new membership could change the default.
+      const others = db.members.filter((m) => m.userId === user.id && m.teamId !== team.id);
+      if (others.length && !db.liftProgram?.[user.id]) {
+        const first = [...others].sort((a, b) => a.joinedAt.localeCompare(b.joinedAt))[0];
+        db.liftProgram = { ...(db.liftProgram ?? {}), [user.id]: first.teamId };
+      }
       await save(db);
     }
     return { ...team, coachName: db.users.find((u) => u.id === team.coachId)?.name };
@@ -580,6 +728,8 @@ export const localBackend: Backend = {
   async leaveTeam(teamId) {
     const { db, user } = await me();
     db.members = db.members.filter((m) => !(m.teamId === teamId && m.userId === user.id));
+    // Leaving the program team falls back to the remaining team (liftTeamOf), or the personal program.
+    if (db.liftProgram?.[user.id] === teamId) db.liftProgram = { ...db.liftProgram, [user.id]: null };
     await save(db);
   },
 

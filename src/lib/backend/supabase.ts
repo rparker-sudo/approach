@@ -71,6 +71,10 @@ type PermRow = {
   c_testing?: boolean;
   consent_version?: number | null;
   consent_status?: string;
+  // v2.2 (migration 005)
+  level?: number | null;
+  level_set_by?: string | null;
+  level_set_at?: string | null;
 };
 const PERM_COLS = 'c_participation,c_checkins,c_share_checkins,c_boards,c_attendance,c_testing,consent_version';
 function permsOf(r: PermRow, isMinor: boolean | null | undefined): { perms: Perms; version: number | null } {
@@ -305,18 +309,34 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
       // team_members has one link to teams (team_id), so this embed is unambiguous.
       type Res = { data: unknown; error: { message: string } | null };
       const embed = (cols: string) => `team:teams!team_members_team_id_fkey(${cols})`;
-      let { data, error }: Res = await withTeamCols((cols) => sb.from('team_members').select(`group_id,${PERM_COLS},${embed(cols)}`).eq('user_id', id));
+      let { data, error }: Res = await withTeamCols((cols) =>
+        sb.from('team_members').select(`group_id,${PERM_COLS},level,level_set_by,joined_at,${embed(cols)}`).eq('user_id', id),
+      );
+      if (isMissing(error)) ({ data, error } = (await sb.from('team_members').select(`group_id,${PERM_COLS},joined_at,${embed(TEAM_SELECT)}`).eq('user_id', id)) as Res);
       if (isMissing(error)) ({ data, error } = (await sb.from('team_members').select(`group_id,consent_status,${embed(TEAM_SELECT)}`).eq('user_id', id)) as Res);
       if (isMissing(error)) ({ data, error } = (await sb.from('team_members').select(`group_id,${embed(TEAM_SELECT)}`).eq('user_id', id)) as Res);
       if (isMissing(error)) ({ data, error } = (await sb.from('team_members').select(embed(TEAM_SELECT)).eq('user_id', id)) as Res);
       if (error) fail(error);
-      // Without the consent columns (older database) a minor or unknown age stays read-only.
-      return (data as unknown as (PermRow & { group_id?: string | null; team: TeamRow | null })[])
+      // v2.2: which team's lift program the athlete follows (falls back to the first-joined team before migration 005).
+      const rows = (data as unknown as (PermRow & { group_id?: string | null; joined_at?: string; team: TeamRow | null })[])
         .filter((r) => r.team)
-        .map((r) => {
-          const { perms, version } = permsOf(r, me.is_minor);
-          return { ...toTeam(r.team!), myGroupId: r.group_id ?? null, myPerms: perms, myConsentVersion: version };
-        });
+        .sort((a, b) => (a.joined_at ?? '').localeCompare(b.joined_at ?? ''));
+      const lp = await sb.rpc('my_lift_program');
+      if (lp.error && !isMissing(lp.error)) fail(lp.error);
+      const liftTeam = (lp.data as string | null) ?? rows[0]?.team?.id ?? null;
+      // Without the consent columns (older database) a minor or unknown age stays read-only.
+      return rows.map((r) => {
+        const { perms, version } = permsOf(r, me.is_minor);
+        return {
+          ...toTeam(r.team!),
+          myGroupId: r.group_id ?? null,
+          myPerms: perms,
+          myConsentVersion: version,
+          myLevel: r.level ?? null,
+          myLevelConfirmed: !!r.level_set_by,
+          isLiftProgram: r.team!.id === liftTeam,
+        };
+      });
     },
 
     async createTeam(name) {
@@ -351,9 +371,16 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
       type Res = { data: unknown; error: { message: string } | null };
       let { data, error }: Res = await sb
         .from('team_members')
-        .select(`user_id,joined_at,group_id,${PERM_COLS},profile:profiles!team_members_user_id_fkey(name,position,is_minor)`)
+        .select(`user_id,joined_at,group_id,${PERM_COLS},level,level_set_by,level_set_at,profile:profiles!team_members_user_id_fkey(name,position,is_minor)`)
         .eq('team_id', teamId)
         .order('joined_at');
+      if (isMissing(error)) {
+        ({ data, error } = (await sb
+          .from('team_members')
+          .select(`user_id,joined_at,group_id,${PERM_COLS},profile:profiles!team_members_user_id_fkey(name,position,is_minor)`)
+          .eq('team_id', teamId)
+          .order('joined_at')) as Res);
+      }
       if (isMissing(error)) {
         ({ data, error } = (await sb
           .from('team_members')
@@ -397,8 +424,60 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
             const { perms, version } = permsOf(r, r.profile?.is_minor);
             return { perms, consentVersion: version };
           })(),
+          level: r.level ?? null,
+          levelConfirmed: !!r.level_set_by,
+          levelSetAt: r.level_set_at ?? null,
         }),
       );
+    },
+
+    async setMySelfLevel(teamId, level) {
+      const { error } = await sb.rpc('set_my_self_level', { t: teamId, lvl: level });
+      if (error && !isMissing(error)) fail(error);
+    },
+
+    async setMemberLevel(teamId, memberId, level) {
+      const { error } = await sb.rpc('set_member_level', { t: teamId, athlete: memberId, lvl: level });
+      if (error) fail(error);
+    },
+
+    async memberLevels(teamId) {
+      const { data, error } = await sb.rpc('member_levels', { t: teamId });
+      if (isMissing(error)) return [];
+      if (error) fail(error);
+      return (data as { user_id: string; team_level: number | null; confirmed: boolean; set_at: string | null; resolve_level: number | null }[]).map((r) => ({
+        userId: r.user_id,
+        teamLevel: r.team_level,
+        confirmed: r.confirmed,
+        setAt: r.set_at,
+        resolveLevel: r.resolve_level,
+      }));
+    },
+
+    async setLiftProgram(teamId) {
+      const { error } = await sb.rpc('set_lift_program', { t: teamId });
+      if (error) fail(error);
+    },
+
+    async membersFollowingOther(teamId) {
+      const { data, error } = await sb.rpc('members_following_other', { t: teamId });
+      if (isMissing(error)) return [];
+      if (error) fail(error);
+      return (data as (string | { members_following_other: string })[]).map((x) => (typeof x === 'string' ? x : x.members_following_other));
+    },
+
+    async membersReturning(teamId) {
+      const { data, error } = await sb.rpc('members_returning', { t: teamId });
+      if (isMissing(error)) return [];
+      if (error) fail(error);
+      return (data as (string | { members_returning: string })[]).map((x) => (typeof x === 'string' ? x : x.members_returning));
+    },
+
+    async testingEligibility(teamId, day) {
+      const { data, error } = await sb.rpc('testing_eligibility', { t: teamId, d: day });
+      if (isMissing(error)) return {};
+      if (error) fail(error);
+      return Object.fromEntries((data as { user_id: string; eligible: boolean }[]).map((r) => [r.user_id, r.eligible]));
     },
 
     async recordConsent(teamId, memberId, perms) {

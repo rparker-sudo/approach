@@ -43,14 +43,45 @@ export function today(): Date {
 
 /* ---------- Day types ---------- */
 
-export function eventOn(program: Program, d: Date): CalendarEvent | undefined {
+const DAY_RANK: Record<DayType, number> = { tournament: 3, game: 2, practice: 1, off: 0 };
+
+/** All volleyball events on a date (an athlete's combined schedule can have one per team). Breaks are separate. */
+export function eventsOn(program: Program, d: Date): CalendarEvent[] {
   const k = dateKey(d);
-  return program.events?.find((e) => e.date === k);
+  return (program.events ?? []).filter((e) => e.date === k && e.type !== 'break');
 }
 
-/** A calendar event for that date, otherwise the default week. */
+/** The event that decides the day: this program's own event first, else the biggest (tournament > game > practice). */
+export function eventOn(program: Program, d: Date): CalendarEvent | undefined {
+  const all = eventsOn(program, d);
+  const own = all.find((e) => !e.teamName);
+  const other = [...all.filter((e) => e.teamName)].sort((a, b) => DAY_RANK[b.type as DayType] - DAY_RANK[a.type as DayType])[0];
+  if (own && other && DAY_RANK[other.type as DayType] > DAY_RANK[own.type as DayType]) return other;
+  return own ?? other;
+}
+
+/** A calendar event for that date, otherwise the default week. Matches on any of the athlete's teams count (union, TM-2). */
 export function dayTypeOn(program: Program, d: Date): DayType {
-  return eventOn(program, d)?.type ?? program.volleyballWeek[weekdayOf(d)];
+  return (eventOn(program, d)?.type as DayType | undefined) ?? program.volleyballWeek[weekdayOf(d)];
+}
+
+/** TM-3: a break on this program's team covering the date. Another team's break (teamName set) doesn't stop lifting. */
+export function breakOn(program: Program, d: Date, includeOtherTeams = false): CalendarEvent | undefined {
+  const k = dateKey(d);
+  return (program.events ?? []).find(
+    (e) => e.type === 'break' && k >= e.date && k <= (e.endDate ?? e.date) && (includeOtherTeams || !e.teamName),
+  );
+}
+
+/** Add or replace a break from `start` to `end` (inclusive). `original` is the start date of the break being edited. */
+export function withBreak(program: Program, start: string, end: string, original?: string, label?: string): Program {
+  const rest = (program.events ?? []).filter((e) => !(e.type === 'break' && e.date === (original ?? start)));
+  const [a, b] = start <= end ? [start, end] : [end, start];
+  return { ...program, events: [...rest, { date: a, endDate: b, type: 'break', ...(label?.trim() ? { label: label.trim() } : {}) }] };
+}
+
+export function withoutBreak(program: Program, start: string): Program {
+  return { ...program, events: (program.events ?? []).filter((e) => !(e.type === 'break' && e.date === start)) };
 }
 
 /** Sessions built around a big lower-body lift. Kept off the day before a match when possible. */
@@ -74,6 +105,8 @@ export type DayPlan = {
   light?: boolean;
   /** Testing day (P6): the lift is replaced by a Testing session. */
   test?: TestBattery;
+  /** TM-3: a break on this program's team. No lift. */
+  break?: boolean;
 };
 
 const MATCH_WORD: Record<DayType, string> = { game: 'match', tournament: 'tournament', practice: 'practice', off: 'day off' };
@@ -145,8 +178,15 @@ export function weekPlan(program: Program, monday: Date): DayPlan[] {
     }
   }
 
-  // 4. Testing days replace that day's lift with a Testing session (the day keeps its day type).
+  // 4. Break days (this program's team only): no lift sessions, no testing.
+  for (let i = 0; i < 7; i++) {
+    if (!breakOn(program, days[i])) continue;
+    plan[i] = { ...plan[i], sessionId: null, break: true, note: 'Break week', source: plan[i].source };
+  }
+
+  // 5. Testing days replace that day's lift with a Testing session (the day keeps its day type).
   for (const p of plan) {
+    if (p.break) continue;
     // A match added later within 48 hours cancels the testing day (P6.1).
     if (p.event?.test && !testBlocked(program, p.date)) {
       p.test = p.event.test;
@@ -168,8 +208,9 @@ export function testBlocked(program: Program, key: string): string | null {
 
 /** Add (battery) or remove (null) a testing day on a date. The day keeps its underlying day type. */
 export function withTest(program: Program, key: string, battery: TestBattery | null): Program {
-  const existing = (program.events ?? []).find((e) => e.date === key);
-  const rest = (program.events ?? []).filter((e) => e.date !== key);
+  const own = (e: CalendarEvent) => e.type !== 'break' && !e.teamName;
+  const existing = (program.events ?? []).find((e) => e.date === key && own(e));
+  const rest = (program.events ?? []).filter((e) => !(e.date === key && own(e)));
   const base = program.volleyballWeek[weekdayOf(fromKey(key))];
   if (battery) return { ...program, events: [...rest, { ...(existing ?? { date: key, type: base }), test: battery }] };
   if (!existing) return program;
@@ -198,8 +239,10 @@ export function formatKey(key: string, opts: Intl.DateTimeFormatOptions = { week
 
 /** Set, change or clear (type null) the event on a date. */
 export function withEvent(program: Program, key: string, type: DayType | null, label?: string): Program {
-  const existing = (program.events ?? []).find((e) => e.date === key);
-  const rest = (program.events ?? []).filter((e) => e.date !== key);
+  // Only this program's own day event changes; breaks and other teams' events stay.
+  const own = (e: CalendarEvent) => e.type !== 'break' && !e.teamName;
+  const existing = (program.events ?? []).find((e) => e.date === key && own(e));
+  const rest = (program.events ?? []).filter((e) => !(e.date === key && own(e)));
   // A testing day stays on the date unless the day becomes a match (then it can't be a testing day).
   const test = existing?.test && type !== 'game' && type !== 'tournament' ? existing.test : undefined;
   if (!type) {

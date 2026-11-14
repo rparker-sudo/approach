@@ -92,6 +92,11 @@ export type Team = {
   myPerms?: Perms;
   /** Athletes only: consent form version on file (adults: 2 once they've saved "Your choices"; null = not yet). */
   myConsentVersion?: number | null;
+  /** Athletes only (v2.2): their level on this team (1–3) and whether this team's coach confirmed it. */
+  myLevel?: number | null;
+  myLevelConfirmed?: boolean;
+  /** Athletes only (v2.2): this is the team whose lift program they follow. */
+  isLiftProgram?: boolean;
   settings: TeamSettings;
 };
 
@@ -134,7 +139,14 @@ export type Member = {
   perms: Perms;
   /** Form version recorded (1 = pass 1 form, 2 = six boxes); null = none. */
   consentVersion: number | null;
+  /** v2.2: level on this team (1–3; null = unknown), confirmed by this team's coach or self-reported. */
+  level?: number | null;
+  levelConfirmed?: boolean;
+  levelSetAt?: string | null;
 };
+
+/** Coach view of an athlete's levels (v2.2). resolveLevel can be lower than teamLevel because of another team; never named. */
+export type MemberLevel = { userId: string; teamLevel: number | null; confirmed: boolean; setAt: string | null; resolveLevel: number | null };
 
 export type TeamProgram = {
   teamId: string;
@@ -245,6 +257,18 @@ export interface Backend {
   deleteTeam(teamId: string): Promise<void>;
   listMembers(teamId: string): Promise<Member[]>;
   removeMember(teamId: string, userId: string): Promise<void>;
+  /** v2.2 level (compliance § Level): the athlete fills in their self-reported level once; the coach sets or confirms it. */
+  setMySelfLevel(teamId: string, level: number): Promise<void>;
+  setMemberLevel(teamId: string, userId: string, level: number): Promise<void>;
+  memberLevels(teamId: string): Promise<MemberLevel[]>;
+  /** v2.2 multiple teams: follow one team's lift program (null = personal program). */
+  setLiftProgram(teamId: string | null): Promise<void>;
+  /** Coach: members who follow another team's lift program (no team named). */
+  membersFollowingOther(teamId: string): Promise<string[]>;
+  /** Coach: members returning from a break this week (G9). */
+  membersReturning(teamId: string): Promise<string[]>;
+  /** Coach: who can do strength checks that day (yes/no, no reason). */
+  testingEligibility(teamId: string, day: string): Promise<Record<string, boolean>>;
   /** Coach records a minor's form-v2 boxes (participation false clears them all). */
   recordConsent(teamId: string, userId: string, perms: Perms): Promise<void>;
   updateTeamSettings(teamId: string, patch: Partial<TeamSettings>): Promise<void>;

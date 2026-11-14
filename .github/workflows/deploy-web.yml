@@ -20,9 +20,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # Site lives at https://<owner>.github.io/<repo>/ unless you set a custom domain (APP_URL + BASE_PATH variables).
-      EXPO_BASE_URL: ${{ vars.BASE_PATH != '' && vars.BASE_PATH || format('/{0}', github.event.repository.name) }}
-      EXPO_PUBLIC_APP_URL: ${{ vars.APP_URL != '' && vars.APP_URL || format('https://{0}.github.io/{1}', github.repository_owner, github.event.repository.name) }}
+      # The site lives at the root of the custom domain https://approachstrength.com (set under Settings → Pages;
+      # the old github.io address forwards there). The APP_URL and BASE_PATH repository variables still override these.
+      EXPO_BASE_URL: ${{ vars.BASE_PATH != '' && vars.BASE_PATH || '/' }}
+      EXPO_PUBLIC_APP_URL: ${{ vars.APP_URL != '' && vars.APP_URL || 'https://approachstrength.com' }}
       EXPO_PUBLIC_APP_STORE_ID: ${{ vars.APP_STORE_ID }}
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}

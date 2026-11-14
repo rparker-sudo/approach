@@ -178,7 +178,7 @@ Supabase and GitHub (Pages, Actions) only. `pg_cron` is a built-in Supabase exte
 
 ## 6. Deployment and usage
 
-- **Website:** https://rparker-sudo.github.io/approach/ (deploys from `main`; 2.2.0 deployed November 14, 2026).
+- **Website:** https://approachstrength.com (custom domain on GitHub Pages since November 14, 2026; the old https://rparker-sudo.github.io/approach/ address forwards there). Deploys from `main`; 2.2.0 deployed November 14, 2026.
 - **Supabase:** live, Free plan. 002–007 applied (005–007 on November 14, 2026, with pg_cron enabled, per the owner).
 - **Users:** the owner plus fewer than 10 others, all 18+, per the owner **(unverified count)**.
 

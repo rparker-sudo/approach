@@ -247,17 +247,24 @@ function Board({ teamId }: { teamId: string }) {
     : [{ title: null, tiles: shown }];
 
   // [UX proposal] F9a: if the roster doesn't fit at the minimum tile height, page every 15 s.
-  const headerRows = arrange ? sections.length : 0;
-  const fit = fitGrid(shown.length, grid.w, Math.max(0, grid.h - headerRows * 40));
+  // Rack sections flow left to right and wrap: size tiles by simulating that flow so everything fits when it can.
+  const fit = arrange ? fitFlow(sections.map((x) => x.tiles.length), grid.w, grid.h) : fitGrid(shown.length, grid.w, grid.h);
   const perPage = fit.perPage;
-  const pages = Math.max(1, Math.ceil(shown.length / Math.max(1, perPage)));
+  const flow = 'lineOf' in fit ? (fit as Flow) : null;
+  const pages = flow?.lineOf
+    ? Math.max(1, Math.ceil((Math.max(0, ...flow.lineOf) + 1) / (flow.linesPerPage ?? 1)))
+    : Math.max(1, Math.ceil(shown.length / Math.max(1, perPage)));
   useEffect(() => {
     if (pages <= 1) return;
     const r = setInterval(() => setPage((n) => n + 1), PAGE_MS);
     return () => clearInterval(r);
   }, [pages]);
   const pageIndex = page % pages;
-  const onPage = new Set(shown.slice(pageIndex * perPage, (pageIndex + 1) * perPage).map((x) => x.member.userId));
+  const onPage = new Set(
+    flow?.lineOf
+      ? sections.flatMap((sec, i) => (Math.floor(flow.lineOf![i] / (flow.linesPerPage ?? 1)) === pageIndex ? sec.tiles.map((x) => x.member.userId) : []))
+      : shown.slice(pageIndex * perPage, (pageIndex + 1) * perPage).map((x) => x.member.userId),
+  );
 
   const filterKeys: (string | null)[] = [null, ...groups.map((g) => g.id), ...racks.map((r) => `rack:${r.id}`)];
   const filterLabel = (k: string | null) => (!k ? 'All' : k.startsWith('rack:') ? racks.find((r) => `rack:${r.id}` === k)?.name ?? 'Rack' : groupName(k));
@@ -281,14 +288,15 @@ function Board({ teamId }: { teamId: string }) {
   else if (!members.length) body = <Empty text="No athletes to show yet. Athletes appear once their board permission is on." />;
   else
     body = (
-      <View style={{ gap: 10 }}>
+      <View style={{ flexDirection: arrange ? 'row' : 'column', flexWrap: 'wrap', columnGap: 28, rowGap: 10 }}>
         {sections.map((sec, i) => {
           const tiles = sec.tiles.filter((x) => onPage.has(x.member.userId));
           if (sec.title && !tiles.length && sec.tiles.length) return null; // on another page
+          if (flow?.lineOf && Math.floor(flow.lineOf[i] / (flow.linesPerPage ?? 1)) !== pageIndex) return null;
           return (
             <View key={i} style={{ gap: 8 }}>
               {sec.title ? <Text style={{ color: P.ink, fontSize: big(24), fontWeight: '700' }}>{sec.title}</Text> : null}
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: GAP }}>
+              <View style={{ flexDirection: 'row', flexWrap: arrange ? 'nowrap' : 'wrap', gap: GAP }}>
                 {tiles.map((tile) => (
                   <BoardTile key={tile.member.userId} tile={tile} w={fit.w} h={fit.h} accent={accent} now={now} groupName={groupName} test={today_.test} />
                 ))}
@@ -391,6 +399,40 @@ function Empty({ text, onSeason }: { text: string; onSeason?: () => void }) {
       {onSeason ? <BoardButton label="Season view" onPress={onSeason} /> : null}
     </View>
   );
+}
+
+/** Rack mode: the largest tile (min height 150) at which the wrapped sections fit; otherwise the minimum size, paged. */
+type Flow = { w: number; h: number; perPage: number; lineOf?: number[]; linesPerPage?: number };
+function fitFlow(counts: number[], w: number, h: number): Flow {
+  const n = counts.reduce((a, b) => a + b, 0);
+  if (!n || !w || !h) return { w: 280, h: 170, perPage: Math.max(n, 1) };
+  const HEADER = 40;
+  const COL_GAP = 28;
+  const ROW_GAP = 10;
+  const lineOf = (tw: number) => {
+    const out: number[] = [];
+    let line = 0;
+    let x = 0;
+    for (const k of counts) {
+      const sw = Math.max(1, k) * tw + (Math.max(1, k) - 1) * GAP;
+      if (x > 0 && x + COL_GAP + sw > w) {
+        line++;
+        x = sw;
+      } else x += (x > 0 ? COL_GAP : 0) + sw;
+      out.push(line);
+    }
+    return out;
+  };
+  const height = (lines: number, th: number) => lines * (HEADER + th) + (lines - 1) * ROW_GAP;
+  for (let tw = Math.floor((w - GAP * 5) / 6); tw >= 160; tw -= 8) {
+    const th = Math.max(150, Math.floor(tw * 0.8));
+    const lines = Math.max(0, ...lineOf(tw)) + 1;
+    if (height(lines, th) <= h) return { w: tw, h: th, perPage: n };
+  }
+  // Doesn't fit at the minimum size: page by whole lines of rack sections (never cut a section).
+  const tw = Math.max(160, Math.floor((w - GAP * 5) / 6));
+  const linesPerPage = Math.max(1, Math.floor((h + ROW_GAP) / (HEADER + 150 + ROW_GAP)));
+  return { w: tw, h: 150, perPage: n, lineOf: lineOf(tw), linesPerPage };
 }
 
 /** 6 columns (fewer for small rosters); minimum tile height 150 px. perPage = tiles that fit. */

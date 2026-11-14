@@ -71,7 +71,7 @@ export function easingFor(logs: WorkoutLog[], today: Date = todayDate()): Easing
 
 /* ---------- 1.1 Level resolution (safety-guidelines §2a) ---------- */
 const STRENGTH_ROLES = new Set(['main', 'secondary', 'accessory']);
-const isStrength = (pe: ProgramExercise, ex: Exercise) =>
+export const isStrength = (pe: Pick<ProgramExercise, 'role'>, ex: Exercise) =>
   pe.role ? STRENGTH_ROLES.has(pe.role) : ex.category === 'lower' || ex.category === 'upper';
 
 /**
@@ -162,4 +162,24 @@ export function swapsFor(program: Program, session: Session, level: Level): { fr
     else if (r.id !== ex.id) out.push({ from: ex.name, to: r.name });
   }
   return out;
+}
+
+/* ---------- 1.6 Coach effort clamp (builder, D-028) ---------- */
+export type EffortProblem = { block: boolean; message: string };
+
+/**
+ * Strength slots: above RPE 8 (7 in-season), "failure", "to failure" and "max" are blocked for teams with any minor,
+ * and a warning on adult-only teams. Power slots may keep "Max effort" (max speed). Other slots aren't clamped.
+ */
+export function effortProblem(pe: Pick<ProgramExercise, 'role' | 'effort' | 'exerciseId'>, phase: Phase, hasMinor: boolean): EffortProblem | null {
+  const ex = getExercise(pe.exerciseId);
+  if (!isStrength(pe, ex)) return null;
+  const ceiling = phase === 'in' ? 7 : 8;
+  const nums = (pe.effort.match(/RPE\s*(\d+)(?:\s*[–-]\s*(\d+))?/i) ?? []).slice(1).filter(Boolean).map(Number);
+  const tooHard = /fail|\bmax\b/i.test(pe.effort) || nums.some((n) => n > ceiling);
+  if (!tooHard) return null;
+  return {
+    block: hasMinor,
+    message: `For athletes under 18, strength work stays at RPE ${ceiling} or below. Stop with about 2 reps left.`,
+  };
 }

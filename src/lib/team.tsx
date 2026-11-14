@@ -29,6 +29,7 @@ import {
 import { dateKey, today } from './calendar';
 import { LEVEL_OF } from './athlete';
 import { isLow } from './readiness';
+import { effortProblem } from './resolve';
 import { useStore } from './store';
 import type { AppData, CalendarEvent, LocalTeamCalendar, Position, Program, ReadinessEntry, TestBattery } from './types';
 
@@ -294,11 +295,13 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const accountRef = useRef<Account | null>(account);
   const dataRef = useRef(data);
   const teamsRef = useRef<Team[]>(teams);
+  const membersRef = useRef<Record<string, Member[]>>(members);
   // Latest values for async callbacks. Declared before the other effects so it runs first.
   useEffect(() => {
     accountRef.current = account;
     dataRef.current = data;
     teamsRef.current = teams;
+    membersRef.current = members;
   });
 
   const flushLogs = useCallback(async () => {
@@ -492,6 +495,10 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     async (teamId: string, groupKey: string) => {
       const local = dataRef.current.programs.find((p) => p.id === teamProgramId(teamId, groupKey));
       if (!local) throw new BackendError('Build a workout for this group first.');
+      // 1.6 backstop: a team with any minor can't post strength effort above the ceiling.
+      const hasMinor = (membersRef.current[teamId] ?? []).some((m) => m.isMinor !== false);
+      const blocked = local.sessions.flatMap((s) => s.exercises).map((e) => effortProblem(e, local.phase, hasMinor)).find((x) => x?.block);
+      if (blocked) throw new BackendError(`${blocked.message} Fix the effort on the highlighted exercises, then post.`);
       const team = teamsRef.current.find((t) => t.id === teamId);
       // The calendar travels separately (team_calendars); per-date lift choices stay with the program.
       const { unposted: _u, postedAt: _p, lightDates: _l, ...program } = local;

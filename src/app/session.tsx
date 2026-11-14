@@ -6,7 +6,9 @@ import { ALL_EQUIPMENT, CATEGORY_LABEL, EXERCISES, fits, getExercise } from '../
 import { formatRest, restSecFor } from '../lib/generator';
 import { useStore } from '../lib/store';
 import { resolveFor } from '../lib/athlete';
-import { formatMinutes } from '../lib/rest';
+import { estimateMinutes, FLOOR_MESSAGE, formatMinutes, REST_FLOOR, tierOf } from '../lib/rest';
+import { effortProblem } from '../lib/resolve';
+import { useTeams } from '../lib/team';
 import VersionLine, { DroppedLine } from '../components/VersionLine';
 import type { ExerciseCategory, ProgramExercise, Session } from '../lib/types';
 
@@ -18,6 +20,8 @@ export default function SessionScreen() {
   const program = data.programs.find((p) => p.id === programId);
   const session = program?.sessions.find((s) => s.id === sessionId);
   const [picker, setPicker] = useState<{ replaceIndex: number | null } | null>(null);
+  const [floorNote, setFloorNote] = useState<Record<number, string>>({});
+  const { members } = useTeams();
 
   if (!program || !session) return <Screen><Body muted>Session not found.</Body></Screen>;
   const coach = data.profile?.role === 'coach';
@@ -60,6 +64,7 @@ export default function SessionScreen() {
   }
 
   const gym = program.equipment ?? ALL_EQUIPMENT;
+  const hasMinor = !!program.teamId && (members[program.teamId] ?? []).some((m) => m.isMinor !== false);
   const swapping = picker?.replaceIndex != null ? getExercise(session.exercises[picker.replaceIndex].exerciseId) : null;
   const usable = EXERCISES.filter((x) => fits(x, gym));
   const pickerGroups: { title: string; items: typeof EXERCISES; dim?: boolean }[] = [
@@ -89,6 +94,14 @@ export default function SessionScreen() {
     [list[i], list[j]] = [list[j], list[i]];
     update({ ...session!, exercises: list });
   }
+  /** Coach rest wins, within the floors (tier A ≥ 2:00, tier P ≥ 1:30). Below the floor resets to it, with the reason. */
+  function setRest(i: number, sec: number) {
+    const ex = getExercise(session!.exercises[i].exerciseId);
+    const floor = REST_FLOOR[tierOf(ex, program!.equipment)] ?? 0;
+    const next = Math.min(600, Math.max(floor, sec));
+    setFloorNote((n) => ({ ...n, [i]: sec < floor ? FLOOR_MESSAGE[tierOf(ex, program!.equipment)] ?? '' : '' }));
+    setEx(i, { restSec: next, restSetByCoach: true });
+  }
   function remove(i: number) {
     update({ ...session!, exercises: session!.exercises.filter((_, k) => k !== i) });
   }
@@ -96,7 +109,7 @@ export default function SessionScreen() {
     if (picker?.replaceIndex != null) {
       setEx(picker.replaceIndex, { exerciseId });
     } else {
-      update({ ...session!, exercises: [...session!.exercises, { exerciseId, sets: 3, reps: '8', effort: 'RPE 7', role: 'accessory', restSec: 60 }] });
+      update({ ...session!, exercises: [...session!.exercises, { exerciseId, sets: 3, reps: '8', effort: 'RPE 7', role: 'accessory' }] });
     }
     setPicker(null);
   }
@@ -118,10 +131,16 @@ export default function SessionScreen() {
       ) : null}
 
       <Field label="Session name" value={session.name} onChangeText={(t) => update({ ...session, name: t })} />
-      <Body muted style={{ fontSize: 14 }}>{session.focus}</Body>
+      <Body muted style={{ fontSize: 14 }}>
+        {`${session.focus} · ${formatMinutes(
+          estimateMinutes(session.exercises.map((e) => ({ ex: getExercise(e.exerciseId), sets: e.sets, reps: e.reps, restSec: restSecFor(e, { phase: program.phase, equipment: program.equipment }) }))),
+        )}`}
+      </Body>
 
       {session.exercises.map((e, i) => {
         const info = getExercise(e.exerciseId);
+        const rest = restSecFor(e, { phase: program.phase, equipment: program.equipment });
+        const problem = program.teamId ? effortProblem(e, program.phase, hasMinor) : null;
         return (
           <Card key={`${e.exerciseId}-${i}`}>
             <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -153,17 +172,28 @@ export default function SessionScreen() {
               </View>
               <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
                 <Label>Effort</Label>
-                <TextInput style={{ minWidth: 0 }} value={e.effort} onChangeText={(t) => setEx(i, { effort: t })} />
+                <TextInput
+                  style={{ minWidth: 0, ...(problem ? { borderColor: problem.block ? colors.error : colors.warning, borderWidth: 2 } : null) }}
+                  value={e.effort}
+                  onChangeText={(t) => setEx(i, { effort: t })}
+                  accessibilityHint={problem?.message}
+                />
               </View>
             </Row>
+            {problem ? (
+              <Text accessibilityRole="alert" style={{ fontSize: 13, color: problem.block ? colors.error : colors.warning }}>
+                {problem.block ? problem.message : `${problem.message} This team is all adults, so you can still post it.`}
+              </Text>
+            ) : null}
             <Row style={{ justifyContent: 'space-between' }}>
               <Label>Rest</Label>
               <Row style={{ gap: 6 }}>
-                <Button small kind="ghost" title="−15s" onPress={() => setEx(i, { restSec: Math.max(0, restSecFor(e) - 15) })} />
-                <Text style={{ minWidth: 64, textAlign: 'center', fontWeight: '600' }}>{formatRest(restSecFor(e))}</Text>
-                <Button small kind="ghost" title="+15s" onPress={() => setEx(i, { restSec: Math.min(600, restSecFor(e) + 15) })} />
+                <Button small kind="ghost" title="−15s" onPress={() => setRest(i, rest - 15)} />
+                <Text style={{ minWidth: 64, textAlign: 'center', fontWeight: '600' }}>{formatRest(rest)}</Text>
+                <Button small kind="ghost" title="+15s" onPress={() => setRest(i, rest + 15)} />
               </Row>
             </Row>
+            {floorNote[i] ? <Text style={{ fontSize: 13, color: colors.muted }}>{floorNote[i]}</Text> : null}
             <TextInput
               style={{ fontSize: 14 }}
               placeholder="Notes (optional)"
@@ -188,7 +218,7 @@ export default function SessionScreen() {
       <Card>
         <Label>What does effort mean?</Label>
         <Body style={{ fontSize: 14 }}>
-          RPE is how hard a set feels, 1–10. RPE 7 means about 3 reps left in the tank. Rarely go to failure, never in-season.
+          RPE is how hard a set feels, 1–10. RPE 7 means about 3 reps left in the tank. Strength sets stop with about 2 reps left: RPE 8 or below, RPE 7 in-season.
         </Body>
       </Card>
 

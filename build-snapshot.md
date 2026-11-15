@@ -210,25 +210,26 @@ Supabase and GitHub (Pages, Actions) only. `pg_cron` is a built-in Supabase exte
 
 ## 6. Deployment and usage
 
-- **App:** https://app.approachstrength.com once the owner moves the Pages custom domain **(pending)**. Until then it is still served on the apex (2.2.0, deployed November 14, 2026). Deploys from `main`.
-- **Website:** https://approachstrength.com from `rparker-sudo/approachstrength-site` **(pending: the owner creates the repo; Claude Code pushes the generated site)**.
-- **Supabase:** live, Free plan. 002–007 applied (005–007 on November 14, 2026, with pg_cron enabled, per the owner). 008 **(pending)**.
+- **App:** https://app.approachstrength.com (Pages custom domain moved 11/15). 2.2.1 deployed from `main` on November 15, 2026.
+- **Website:** https://approachstrength.com from `rparker-sudo/approachstrength-site` (placeholder + legal pages, live 11/15). When the owner set the custom domain, GitHub added `CNAME` to that repo.
+- **Supabase:** live, Free plan. 002–007 applied (005–007 on November 14, 2026, with pg_cron enabled, per the owner). 008 applied November 15, 2026 (owner). Auth Site URL and Redirect URLs moved to `app.` 11/15.
 
 ### Settings changes (old → new), 2.2.1 §1–§3, §8
 Every change listed in the spec, made by the owner in a dashboard. Filled in as each step is done.
 
 | Where | Setting | Old | New | Done |
 |---|---|---|---|---|
-| `rparker-sudo/approach` → Actions variables | `APP_URL` | (owner to read off; 2.2.0 workflow default `https://approachstrength.com`) | `https://app.approachstrength.com` | pending |
-| same | `BASE_PATH` | (owner to read off; workflow default `/`) | `/` | pending |
-| same | `SITE_URL` | (none) | `https://approachstrength.com` | pending |
-| `rparker-sudo/approach` → Pages | Custom domain | `approachstrength.com` | `app.approachstrength.com` (Enforce HTTPS) | pending |
-| `rparker-sudo/approachstrength-site` → Pages | Source / custom domain | (repo doesn't exist) | `main` / root; `approachstrength.com` (Enforce HTTPS); `www` redirects | pending |
-| Supabase → Auth → URL Configuration | Site URL | (owner to read off) | `https://app.approachstrength.com` | pending |
-| same | Redirect URLs | (owner to read off) | `https://app.approachstrength.com/**`, `http://localhost:*/**` (github.io and apex entries removed after the live tests) | pending |
-| Supabase → Auth → Email templates / SMTP | Subjects, sender name | (owner to read off) | "Approach Strength" | pending |
-| Supabase → SQL | Migration | 002–007 | + `008_approach_2_2_1.sql` | pending |
-| Cloudflare DNS | `app` CNAME, apex A/AAAA, `www` CNAME, GitHub TXT | done by the owner 11/14 | unchanged; to be verified (the sandbox can't resolve DNS) | pending |
+| `rparker-sudo/approach` → Actions variables | `APP_URL` | `https://approachstrength.com` | `https://app.approachstrength.com` | 11/15 |
+| same | `BASE_PATH` | `/` | `/` (unchanged) | 11/15 (checked) |
+| same | `SITE_URL` | not set | `https://approachstrength.com` | 11/15 |
+| `rparker-sudo/approach` → Pages | Custom domain | `approachstrength.com` | `app.approachstrength.com`, Enforce HTTPS | 11/15 |
+| `rparker-sudo/approachstrength-site` → Pages | Source / custom domain | (repo didn't exist) | Repo created 11/15; Pages from `main` / root; custom domain `approachstrength.com`, Enforce HTTPS; `www` redirects to the apex | 11/15 (owner checked: home, `/privacy`, `/terms`, `/consent`, `www`, `app.`) |
+| Supabase → Auth → URL Configuration | Site URL | `http://localhost:3000` | `https://app.approachstrength.com` | 11/15 |
+| same | Redirect URLs | none | `https://app.approachstrength.com/**`, `http://localhost:*/**` | 11/15 (no old github.io or apex entries existed, so nothing to remove later) |
+| Supabase → Auth → Email templates | Subjects | "Confirm your email address", "Reset your password" | **not changed** | Gap accepted by the owner 11/15: the Free plan with default SMTP can't edit templates. The default emails don't name the product (no old name shown). Deferred to 2.2.2 (custom SMTP needs planning approval, or Pro). |
+| Supabase → Auth → SMTP | Sender name | default SMTP | not changeable on default SMTP | — |
+| Supabase → SQL | Migration | 002–007 | + `008_approach_2_2_1.sql` | 11/15 (owner) |
+| Cloudflare DNS | `app` CNAME, apex A/AAAA, `www` CNAME, GitHub TXT | done by the owner 11/14 | unchanged; verified by the owner 11/15 (all DNS only) | 11/15 |
 - **Users:** the owner plus fewer than 10 others, all 18+, per the owner **(unverified count)**.
 
 ---
@@ -289,6 +290,7 @@ $0 now. Future: Apple Developer Program $99/year; Supabase Pro about $25/month i
 
 **Not built / partial (honest list):**
 - ~~Contact email in the source docs~~: fixed in the 11/14 docs; the find-and-replace is removed (2.2.1 §7.1).
+- **Auth email templates not renamed (accepted gap, 11/15):** Supabase Free + default SMTP can't edit templates. The emails keep Supabase's wording, which doesn't name the product. Deferred to 2.2.2.
 - **Live checks (2.2.1)** wait for the owner's dashboard steps: HTTPS on `app.`, the github.io redirect, auth emails, the apex and `www`, and the two-device board test on `app.` **(pending)**.
 - **F19b week grid:** no drag-to-move and no "Switch to home / weight room" per day. The coach builds school + home weeks from Week setup and edits sessions.
 - **F28e:** "Run jump tests as stations" isn't built (load tests correctly can't be stations).

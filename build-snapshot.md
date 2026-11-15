@@ -8,7 +8,7 @@
 
 ## 1. Version and changes
 
-**Current version:** 2.2.1 (`app.json`, `package.json`). Branch `v2.2.1` from the hand-off commit `e2bde34` (docs of Sat Nov 14, 2026). Acceptance report: `reports/v2.2.1-acceptance.md`. **Not deployed yet (pending the owner's approval).**
+**Current version:** 2.2.1 (`app.json`, `package.json`). Branch `v2.2.1` from the hand-off commit `e2bde34` (docs of Sat Nov 14, 2026). Acceptance report: `reports/v2.2.1-acceptance.md`. **Deployed November 15, 2026** (owner approved; tag `v2.2.1`).
 
 **2.2.1 in short** (details in §3a):
 - The app moves to `app.approachstrength.com`; a placeholder website (new repo `rparker-sudo/approachstrength-site`) takes the apex with `/privacy`, `/terms`, `/consent` at the same URLs.
@@ -291,7 +291,7 @@ $0 now. Future: Apple Developer Program $99/year; Supabase Pro about $25/month i
 **Not built / partial (honest list):**
 - ~~Contact email in the source docs~~: fixed in the 11/14 docs; the find-and-replace is removed (2.2.1 §7.1).
 - **Auth email templates not renamed (accepted gap, 11/15):** Supabase Free + default SMTP can't edit templates. The emails keep Supabase's wording, which doesn't name the product. Deferred to 2.2.2.
-- **Live checks (2.2.1)** wait for the owner's dashboard steps: HTTPS on `app.`, the github.io redirect, auth emails, the apex and `www`, and the two-device board test on `app.` **(pending)**.
+- **Live checks (2.2.1): passed 11/15 (owner):** HTTPS and deep links on `app.`, the github.io redirect, the auth emails end to end, the apex and `www`, the two-device board test on `app.`, Settings → Legal links. Tag `v2.2.1` pushed.
 - **F19b week grid:** no drag-to-move and no "Switch to home / weight room" per day. The coach builds school + home weeks from Week setup and edits sessions.
 - **F28e:** "Run jump tests as stations" isn't built (load tests correctly can't be stations).
 - **F27c/F27d:** no "Timed" work toggle or work timer for tier C/D rows. Reps and holds are typed as text.

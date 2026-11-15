@@ -1,5 +1,5 @@
-# Compliance: Hard Rules (v2.1.1 live → v2.2)
-Owner: Legal & Compliance (07) · Updated Tue Nov 10, 2026 (after the team meeting) · Not legal advice. **No attorney has reviewed this (TM-6). Legal still recommends one before any minor signs.**
+# Compliance: Hard Rules (v2.2 live → 2.2.1 + marketing site)
+Owner: Legal & Compliance (07) · Updated Sat Nov 14, 2026 (hand-off session with Ryan) · Not legal advice. **No attorney has reviewed this (TM-6). Legal still recommends one before any minor signs.**
 Source of truth: Approach project → `legal/compliance-v2.1.md`. `legal/data-requirements.md` holds the long-range rules for a public launch. This file is the subset that applies **now**. Every MUST is tested. Sections marked **v2.2** are new for Product's `product/specs/v2.2.md` (pass 1 unless noted).
 
 **Changes on 11/10:**
@@ -10,10 +10,37 @@ Source of truth: Approach project → `legal/compliance-v2.1.md`. `legal/data-re
 - The district-user rule is replaced, and TM-5 and TM-6 are logged as accepted risks.
 - **Reviews:** `team_members.level` (§ Level) and multi-team visibility (§ Multiple teams).
 
-Contact email for all legal pages and the form: **Ryan@thehbcvbc.com** (FA-3). C18 is still open: Branding recommends moving to an Approach domain.
+**Changes on 11/13:**
+- TM-8 and TM-9 logged as accepted risks.
+- The "founder doesn't coach the soft-launch team" rule is replaced by founder-as-coach rules.
+- AD/principal approval request drafted (`legal/ad-approval-request.md`).
+- **B5 closed:** rack-partner names approved under box 4.
+- Wording and field sign-offs for v2.2 are in `legal/v2.2-copy-review.md`.
+
+**Changes on 11/14:**
+- **C13/C18 closed:** contact email is `ryan@approachstrength.com`.
+- Zoho reviewed (§ Third parties).
+- Live legal pages checked against the source (§ Live page check).
+- TM-13 coach clause written (Terms §4, in `legal/soft-launch-notice.md`), and R11 logged for outside coaches.
+- § Marketing site rules (TM-15, TM-16).
+- J1–J3 build rulings.
+- **Name:** "Approach Strength" (TM-14) in all user-facing legal text.
+
+**Changes on 11/14 (hand-off session with Ryan):**
+- **R12 accepted:** Branding's check found a federal conflict; Ryan keeps the name and publishes the marketing site now (§ Accepted risks).
+- **Zoho plan recorded:** paid trial now, reverting to Free when it ends (§ Third parties).
+- **§ Age wording updated** for UX F1 v3.2 (age question on sign-up only, never on log-in). Approved.
+- **Marketing-site copy signed off** (`docs/copy/website-copy.md` v1.1, with Legal's edits).
+- § Level item 8 updated to D-031 (lower level), closing C20 for this file.
+
+**Contact email for all legal pages, the consent form, and the AD letter: `ryan@approachstrength.com`** (TM-10, D-033). The club address `Ryan@thehbcvbc.com` must not appear anywhere users can see. **C13 and C18 closed.**
+- MUST (2.2.1): legal pages are generated **only** from Legal's text in `docs/legal/`. Remove the build script's find-and-replace of the email (build review §5). No build step may edit legal wording.
+- **Public name: "Approach Strength"** (TM-14) in every user-facing legal page, form, and letter. Branding's trademark check found a conflict (R12); **Ryan accepted the risk on 11/14** and keeps the name. ™ at most, never ®.
 
 ## Age
-- MUST: neutral month/year-of-birth gate before anything else; under 13 blocked; nothing stored but a local block flag.
+- MUST: a neutral month/year-of-birth question **before any account or on-device profile is created and before any data is collected** (no email, name, role, or anything else first). Under 13 blocked; nothing stored but a local block flag.
+- MUST (2.2.1, UX F1 v3.2): logging in to an **existing** account never asks the age question; the account already has `birth_year` and `is_minor`. A pre-2.1 account with no birth year answers it once after log-in, before anything else in the app; under 13 → signed out and deletion requested.
+- MUST: the local block flag also hides **Log in** on that device, and the block screen survives reloads.
 - MUST: coaches 18+.
 - MUST: store birth year + is_minor only, never the full date.
 - MUST: on actual knowledge of an under-13 user, delete the account (use `delete_my_account` or the admin equivalent) within 72 hours.
@@ -62,15 +89,38 @@ Contact email for all legal pages and the form: **Ryan@thehbcvbc.com** (FA-3). C
 
 ## Third parties
 - MUST NOT: ad SDKs, analytics that share data for the vendor's own use, tracking pixels (app, web pages, or emails), App Tracking Transparency.
-- Allowed vendors now: Supabase, GitHub Pages. Adding any vendor needs a Legal review.
+- Allowed vendors now: **Supabase, GitHub Pages, Zoho Mail** (approved 11/14, below). Adding any vendor needs a Legal review.
+
+### Zoho Mail review (mailbox for `ryan@approachstrength.com`)
+**Verdict: approved for the contact mailbox, on either plan, with the conditions below. Legal recommends Mail Lite.** Plan (Ryan, 11/14): **paid-plan trial now; it reverts to Mail Free when the trial ends.** Legal's view on the record: Lite is still recommended (~$12/yr). Sign the DPA **during the trial**, and confirm it stays in force on Free; if it doesn't, that's the reason to keep Lite.
+
+*What this mailbox will hold:* parent and user emails, deletion and privacy requests, and **scans or photos of signed consent forms** (the coach note on form v2 says to email copies here). That makes it a store of minors' personal information and of the C12 proof records, not just a contact address.
+
+| Check | Finding (Zoho's own pages, 11/14) | OK? |
+|---|---|---|
+| Ads or selling data | "We will never serve you ads, nor sell your data to third party vendors," including free versions | ✅ |
+| Data location | Accounts on zoho.com are stored in Zoho's US data center (verify in the account profile) | ✅ |
+| Data processing terms | Zoho offers a DPA that admins sign electronically; whether it covers the Free plan isn't stated | ⚠️ Sign it during the trial; confirm it covers Free |
+| Free plan | Up to 5 users, 5 GB each, one domain, **webmail and Zoho apps only (no IMAP/POP/ActiveSync)**; support terms not stated | ⚠️ Usable |
+| Mail Lite | About US$1/user/month billed yearly (5 GB) or $1.25 (10 GB); adds desktop and mail-app access | ✅ |
+
+**Why Lite:** the mailbox has to keep signed consent copies for 5 years after an account closes (C12). A paid plan gives clearer contract terms and support, and avoids any risk of a free account being limited or closed for inactivity (check Zoho's free-plan terms if staying on Free).
+
+**Conditions (either plan; Ryan hasn't confirmed 1–3 yet):**
+1. Turn on **two-factor sign-in** for the Zoho admin and mailbox. Use a strong unique password, stored outside district systems.
+2. **Sign Zoho's DPA** from the admin console (or request it from Zoho legal) and save a copy with the Legal records.
+3. **No auto-forwarding** to any other address, especially district or club email. Read it only on personal devices.
+4. Make a folder or label "Consent records" for form scans. Never delete those before 5 years after the athlete's account closes. Delete other personal emails (e.g., finished deletion requests) after 12 months.
+5. Don't connect third-party add-ons or "AI assistants" that read mailbox content unless Legal reviews them (e.g., leave Zia off for consent-record mail if possible).
+6. The Privacy Notice lists **Zoho Mail (our email)** under service providers. Done in the notice.
 
 ## Deletion and retention
 - MUST: in-app account deletion for athletes and coaches. Deleted data is removed within 30 days.
 
-### C12 retention fix (v2.2 P1: proposal for Product and Claude Code)
-**Problem:** the Privacy Notice and consent form promise to keep consent and supervision records for 5 years. But consent lives on `team_members`, and supervision on `test_sessions`. Both are wiped by `on delete cascade` when an athlete or coach deletes their account or a team. So the promise is broken today, and the record that matters most after an injury (that a parent consented and a coach supervised) disappears.
+### C12 retention fix (v2.2 P1: built in 2.2.0)
+**Problem:** the Privacy Notice and consent form promise to keep consent and supervision records for 5 years. But consent lives on `team_members`, and supervision on `test_sessions`. Both are wiped by `on delete cascade` when an athlete or coach deletes their account or a team.
 
-**Proposed fix:** write a minimal **proof record** at the moment of the event, in tables with **no foreign keys**, so deletions can't cascade into them.
+**Fix:** write a minimal **proof record** at the moment of the event, in tables with **no foreign keys**, so deletions can't cascade into them.
 1. **`consent_archive`**, one row each time a coach records or changes consent:
    - `athlete_user_id` (plain uuid, no FK), athlete name as shown to the coach, birth year
    - `team_id` (plain uuid), team name, `coach_user_id`, coach name
@@ -100,18 +150,25 @@ Contact email for all legal pages and the form: **Ryan@thehbcvbc.com** (FA-3). C
 
 ## Founder and district rules (replaces "no district users," TM-5)
 The soft-launch team may come from the founder's own district (TM-5). These rules reduce, but don't remove, the R1 risk:
-- MUST: build, run, and support Approach only on **personal time, personal devices, personal networks, and personal or business accounts**. Never district email, Drive, laptops, or Wi-Fi.
+- MUST: build, run, and support Approach Strength only on **personal time, personal devices, personal networks, and personal or business accounts**. Never district email, Drive, laptops, or Wi-Fi.
 - MUST: no **coach board** on district-owned screens, projectors, or networks. The coach uses a personal device and a personal hotspot (or none) until the attorney says otherwise.
-- MUST: before the first minor's form is recorded, the district coach confirms in writing that their school or athletic department allows them to use Approach with the team (Terms §4). Keep that confirmation with the consent records.
-- MUST: no district logos, mascots, or artwork in Approach, demos, or marketing (D-023 R1 note). Team logos stay out of v2.2 until Legal and Branding sign off.
-- MUST: the founder never uses access to district records (rosters, grades, health or eligibility files) to recruit or support Approach users. Athletes join only through the coach's team code.
-- SHOULD: the founder doesn't coach the soft-launch team himself, and isn't its coach's supervisor.
+- MUST: before the first minor's form is recorded, the district coach confirms in writing that their school or athletic department allows them to use Approach Strength with the team (Terms §4). **Since Ryan is the coach (TM-9), this means a signed approval from Ryan's own AD or principal**, using `legal/ad-approval-request.md`, ideally answering whether the coaching counts as part of his duties. Keep it with the consent records. A "needs ed-tech/privacy review" answer means **no minors until that review is done.**
+- MUST: no district logos, mascots, or artwork in Approach Strength, demos, or marketing (D-023 R1 note). Team logos stay out of v2.2 until Legal and Branding sign off.
+- MUST: the founder never uses access to district records (rosters, grades, health or eligibility files) to recruit or support Approach Strength users. Athletes join only through the coach's team code.
+- ~~SHOULD: the founder doesn't coach the soft-launch team himself.~~ **Reversed by TM-9 (11/13): Ryan coaches it.** Replaced by these founder-as-coach rules:
+  - MUST: as coach, Ryan sees his athletes only through the **coach view**, like any coach. He doesn't use owner or admin access (Supabase dashboard, service role, SQL) to look at his own athletes' data, except to fix a bug, answer a deletion or legal request, or meet a legal duty. Log each such access (date, reason) in a private note.
+  - MUST: owner/admin work on Approach Strength (code, database, vendor accounts) happens on personal time and devices, never during contract hours or on district networks, even when it's about his own team.
+  - MUST: consent forms Ryan collects as coach go through the normal flow: record exactly the boxes checked, and keep the signed copies off district systems.
+  - MUST: pilot **feedback** comes from coaches (TM-9b). Ryan doesn't run research interviews with his own athletes or their parents. Another adult does, with the research consent form (Market Research).
 
 ## Accepted risks (founder decisions, logged by Legal)
 | Ref | Decision | Risk Legal recorded | Mitigations in place | Legal recommends |
 |---|---|---|---|---|
-| **TM-5** (11/10) | Soft-launch team from Ryan's own district | **R1 is now live:** possible district claim on Approach's IP; outside-employment and conflict-of-interest policy exposure; a public-school coach using the app with students may bring in FERPA, SOPIPA, and district app-approval rules (attorney Q17). | Founder and district rules above; coach's written school approval; consent per team; no student records used. | Get the district policy and IP check from an attorney before any minor signs. |
+| **TM-5** (11/10) | Soft-launch team from Ryan's own district | **R1 is now live:** possible district claim on the app's IP; outside-employment and conflict-of-interest policy exposure; a public-school coach using the app with students may bring in FERPA, SOPIPA, and district app-approval rules (attorney Q17). | Founder and district rules above; coach's written school approval; consent per team; no student records used. | Get the district policy and IP check from an attorney before any minor signs. |
 | **TM-6** (11/10) | No attorney or CSCS gate before the first minor; load tests stay live with the supervision lock | Unreviewed consent form, notice, and Terms; no entity, so the founder is personally liable; strength checks on minors without a CSCS protocol review (R6; Training Content's disagreement recorded twice). | Supervision lock, eligibility rules, no 1RM, coach-confirmed level for load tests, C12 proof records. | An attorney consult (~$1K, Finance shows it as "deferred"), entity formation, and insurance before the first minor. Turn off load tests for minors until CSCS review. |
+| **TM-8** (11/13) | No insurance, LLC, or quote gate before the first minor. Ryan: Approach is "just the vehicle" for programming he already does as coach | **Personal liability:** Ryan's role as the app's **owner** (the product's load and level logic, minors' data in his own Supabase account) is private business, likely outside district defense (Gov. Code §825 covers only acts within his job). With no entity, a claim about the product reaches personal assets. No general liability coverage (~$444/yr per Finance). Personal homeowner's or umbrella policies often exclude business activities. | Supervision lock, eligibility and level rules, no 1RM, G2/G5 caps, C12 proof records, coach-only load tests, the AD letter separating coaching from product. | Free quotes first (Finance drafts are ready). Then general liability coverage and an attorney consult before the first minor. Ask a broker whether a personal umbrella covers anything. Form an LLC (with a CPA) before outside coaches join. Training suggests load tests adult-only during the pilot (not adopted). |
+| **TM-9** (11/13) | Ryan coaches the soft-launch team himself | **R1 at its strongest:** a district employee using his own app with his own students, as both coach and owner. It raises the district IP claim (Q1), outside-business disclosure (Q2), FERPA/SOPIPA and district app review (Q17), and mandated-reporter duties through the app (Q4). His team can't validate the product (Market Research). | Founder-as-coach rules above; written AD/principal approval that separates coaching from the product; full disclosure of ownership; no district records, devices, or networks; feedback from outside coaches. | Send the AD letter (attorney review first if possible). No minors until it's signed, and until any district ed-tech review it requires is done. |
+| **R12 / TM-14** (11/14) | Keep "Approach Strength" and **publish the marketing site now** despite Branding's finding | A live, allowed federal application for **APPROACH** (Serial 97166472, Fullsteam, Class 42: workout scheduling and member software for sport clubs). "Strength" is descriptive, so the marks may be compared on "APPROACH." A public site with prices is public use in commerce, which raises the chance of a demand letter. A forced rename after families sign means re-collecting consent forms and reprinting. | ™ only, never ®; no filing; no paid ads, merch, or signage; a plain site with no sales; the bundle ID isn't locked yet. | A trademark attorney's opinion (free clinic/SBDC or flat fee) **before the App Store listing, any paid promotion, or the first outside coach's forms**. Branding recommended one before forms print. |
 
 ---
 
@@ -125,7 +182,7 @@ The soft-launch team may come from the founder's own district (TM-5). These rule
 5. **Who can see:** the athlete (shown in Settings or Program as "Your level on [team]: Intermediate (set by your coach)") and that team's coach. **Never** teammates, boards, ticker, rack labels, or other teams' coaches.
 6. **Uses allowed:** G8 exercise resolution, load-test eligibility, rack auto-assign (D-026: "by experience" racks keep shuffled numbers, and levels never show). **Not allowed:** ranking, points, board grouping labels, or anything visible to teammates.
 7. **Retention:** deleted with the team membership. Carrying it into solo mode at season end (I3) is the athlete's choice, copied to their own profile.
-8. **Two teams with different levels (TM-2):** use the level from the team whose **lift program the athlete is following**. → **Training Content (02)** to confirm, or say whether the lower of the two should always win for safety.
+8. **Two teams with different levels (TM-2):** **settled by D-031:** exercise resolution uses the **lower** of the athlete's levels across teams. Minor load tests need the testing team's coach-confirmed level ≥ 2 **and** no other team's coach has set level 1. No coach sees another team's level (copy review §4; J1 in 2.2.1).
 9. **Acceptance:**
    - An athlete can't update `level` (API test).
    - A minor with self-reported "advanced" and no coach confirmation sees no strength check on a testing day.
@@ -145,7 +202,7 @@ The soft-launch team may come from the founder's own district (TM-5). These rule
 4. **Combined schedule (athlete only):** the athlete's app combines both teams' practices, matches, and tournaments. Caps, match-day, and 48-hour testing rules check against all of them.
    - When a rule moves or blocks something, the coach sees a **neutral reason** ("Moved: schedule conflict," "Not eligible for testing today"), never "match with [other team]."
 5. **History belongs to the athlete (I2):** progression and weight suggestions may use all of the athlete's own logs and tests internally. **A coach never sees another team's raw history**, including when an athlete switches active programs. The new coach sees only data created under their program from the switch onward, plus the resulting weight suggestions.
-6. **Boards:** a team's boards count only sessions from **that team's** program and that team's attendance, under that team's box 4 and box 5. The non-active team can show the athlete as "Following another team's program" or leave them off its Sessions, Consistency, and Overall lists. → **Product (01)** decides which (Overall fairness, TM-4). Either is fine legally, as long as no other-team data appears.
+6. **Boards:** a team's boards count only sessions from **that team's** program and that team's attendance, under that team's box 4 and box 5. Product chose (D-027) to leave the athlete off the non-active team's Sessions, Consistency, Streak, Overall, and live board. No other-team data appears.
 7. **Leaving a team:** removing the athlete from Team B ends Coach B's access immediately (existing rule) and never affects Team A.
 8. **Acceptance:**
    - Coach B can't read logs, check-ins, tests, or calendar events from Team A for a shared athlete (API tests).
@@ -155,7 +212,97 @@ The soft-launch team may come from the founder's own district (TM-5). These rule
 
 ---
 
-## Still open for Legal (from the 11/10 action items)
-- T5–T7 wording (copy fixes, G3 pain message, G4 head-injury line)
-- Rack-partner names under consent box 4 (D-026)
-- Refreshing the attorney packet: context, district team, G6/I6, Q17
+## Review: rack-partner names (B5, D-026 R5; pass 2)
+**Verdict: approved under consent box 4, with conditions. The count-only fallback is no longer needed.**
+*Why it's covered:* box 4 lets teammates see the athlete's board name and workout progress on the live board, and the live board already shows tiles grouped under rack headers (R4). A teammate's "You're on Rack 2 with Jordan M." card reveals nothing the board doesn't already show to the same audience. Form v2 and the notice now say so explicitly, which was added before any family signed.
+
+1. **Shown by name only** if the partner has board consent (`c_boards`: box 4 for minors, the boards toggle for adults) **and** isn't set to Hidden, using the partner's own board-name setting ("Jordan M." or initials). Everyone else shows as "1 more teammate" / "2 more teammates."
+2. **Never in the card:** level, position, the auto-assign method, full last names, or anything about why someone is in that rack.
+3. An athlete **always** sees their own rack, even without box 4 (it's their own information, box 1). They see partners' names under the partners' consent, not their own.
+4. Only current members of **that** team see the card. Other teams' coaches never see rack membership (§ Multiple teams).
+5. **"By experience" racks:** teammates can guess who's newer from who's grouped together. That's acceptable, because level isn't health data and isn't displayed. But the Racks setup helper should say: "Grouping by experience can show who's newer. Balanced mix is the default." → **UX (03)** to add to the Racks screen; Product to confirm balanced mix as the default method.
+6. **Acceptance:**
+   - A partner without box 4, or set to Hidden, appears only in the count (API check of the card payload: no name field).
+   - The rack card payload contains no level, position, or method.
+   - An athlete without box 4 still sees their own rack.
+
+## Live page check (11/14): `approachstrength.com/privacy`, `/terms`, `/consent`
+Checked against Legal's source text. **Full word-for-word comparison wasn't possible from the planning chat**, so this is a structural check plus 13 targeted clauses. **The real fix is mechanical:** once the 2.2.1 build generates pages only from `docs/legal/` (no regex), an acceptance check compares each page's text to its source file (normalize whitespace, then compare).
+
+| Item | Live | Source | Result |
+|---|---|---|---|
+| Contact email (all three pages) | `ryan@approachstrength.com` | `ryan@approachstrength.com` | ✅ |
+| Touch height outside testing days, device-only (C11) | Present | Present | ✅ |
+| "More than one team… each team's coach needs their own form" | Present | Present | ✅ |
+| Experience level row; one-team line; 5-year proof record (form) | Present | Present | ✅ |
+| Terms §7, no signing a form for someone else | Present | Present | ✅ |
+| **Rack groups and rack-partner names (B5, 11/13)** in the notice and form box 4 | **Missing** | Added 11/13 | ❌ No minor has signed, so nothing to re-collect. Ships in 2.2.1 |
+| Name | "Approach" | "Approach Strength" | ❌ 2.2.1 (TM-14), **before the first form is printed** |
+| Coach clause (TM-13), Zoho as a provider, marketing-site line | Not yet | Added 11/14 | ❌ 2.2.1 |
+
+**Conclusion:** the live pages are the 11/10 text plus the email swap. No form may be printed from the current live `/consent` page until 2.2.1 ships.
+
+## Build rulings J1–J3 (from `claude/build-review-2.2.md` §6)
+- **J1, `member_levels.swap_level` (a number) readable by the coach through the API: not allowed.** It breaks copy review §4.1 ("no coach ever learns another team's level exists"). **2.2.1:** return only the swap list ("Adjusted for this athlete" items), with no level value and no flag saying another team caused it.
+- **J2, new table `station_runs`: approved after the fact.** It holds team-level rotation timing with no athlete data. Conditions: no user ids other than the coach's; RLS limited to that team's coach and members; deleted with the team. *Process note:* it was added without a review (rule G-5). Future builds must stop for Legal on any new table.
+- **J3, `team_effort.ranked` visible to teammates: not allowed as built.** It tells minors that a teammate follows another team's program. **2.2.1:** the teammate-facing payload contains **only ranked rows**. Unranked athletes are left out, with no flag and no reason. The coach's own view may show "Following another team's program" (already allowed).
+
+## Outside coaches (TM-13) and R11
+**Rules before an outside coach records any minor's consent form:**
+- MUST: the coach accepts the **Coach Terms** (Terms §4) at coach sign-up with a separate checkbox. Store `coach_terms_version` and `coach_terms_accepted_at` on the coach's profile (**new fields, approved by Legal for this purpose**). Existing coach accounts must accept before recording consent or confirming supervision. **Built in 2.2.1 §8.**
+- MUST: the coach's **own written approval** from their school (AD/principal) or club director, kept by the coach. Approach Strength asks for a copy (email it to `ryan@approachstrength.com`) **before** that team's first minor's form is recorded. Ryan logs the date received.
+- MUST: everything in § Founder and district rules about screens, networks, and records applies to every coach through Terms §4.
+- SHOULD (Training): no strength checks for outside coaches' minors until a CSCS reviews the protocol. *(Not adopted; recorded.)*
+
+| Ref | Decision | Risk Legal recorded | Mitigations | Legal recommends |
+|---|---|---|---|---|
+| **R11 / TM-13** (11/14) | Outside coaches may run real blocks with minors once the coach clause is live and the coach has school/club approval. No insurance step | **Other people's minors** go into Ryan's Supabase under Ryan's product logic, with no entity or insurance. TM-8's "just the vehicle" reasoning doesn't reach outside coaches' athletes. The coach clause shifts responsibility on paper only: a coach's indemnity is worth what the coach can pay, many school employees can't or won't sign one, and a minor's claims may survive a parent's release (attorney Q8). | Coach Terms with responsibilities and indemnity; written approval per coach; supervision lock; eligibility and level rules; C12 proof records; incident reporting by coaches. | **Before the first outside coach's minor:** general liability coverage (~$444/yr, Finance), an LLC, and an attorney consult on the coach clause. Training: CSCS review before outside coaches run strength checks. |
+
+## Marketing site rules (`approachstrength.com`, TM-15, TM-16)
+Applies to the apex site and any page outside `app.`. **Legal signed off `docs/copy/website-copy.md` v1.1 on 11/14** (with Legal's edits to the Testing days row and the Safety page). Any later wording change needs Legal again.
+
+**Data and tracking**
+- MUST NOT: analytics, pixels, tag managers, chat widgets, heatmaps, A/B testing tools, or embedded social or video players (YouTube, Instagram). Links out are fine.
+- MUST: **no cookies** and no local storage on the marketing site. Self-host fonts (no Google Fonts or other font CDNs, which log visitor IPs). No JavaScript.
+- MUST NOT: sign-up, waitlist, contact, newsletter, or demo-request **forms**, or **buy, checkout, or "start trial" buttons**, unless Legal reviews them first. Contact is a plain `mailto:ryan@approachstrength.com` link.
+- MUST: sign-in happens only on `app.` The marketing page has **Coach** and **Athlete** buttons that link to `app.` sign-in, and an **Administrator** button that opens the fake-data preview.
+- MUST: the footer links Privacy, Terms, and Parent consent form at their **current URLs** (`/privacy`, `/terms`, `/consent`). They never move, because printed forms point to them. The Privacy Notice states that the marketing site sets no cookies and uses no analytics.
+
+**Who it speaks to**
+- MUST: written for **coaches, athletic directors, and parents.** The athlete section addresses parents ("for your athlete"), not minors. No calls to action aimed at teens.
+- MUST NOT: photos or video of real athletes, teams, schools, or the founder's district. No school or club names, logos, mascots, or colors. Demo-mode screenshots with fake data, or licensed stock/illustrations with no identifiable minors.
+- MUST NOT: testimonials, quotes, ratings, star counts, user numbers, or "trusted by" logos unless they're real, the person agreed in writing, and Legal has reviewed them. **Nothing invented or "representative,"** and nothing from minors.
+
+**Claims**
+- MUST NOT: injury-prevention, treatment, medical, or guaranteed-results claims ("prevent ACL tears," "add 4 inches to your vertical," "safe for all ages"). No "proven," "science-backed," "clinically," or "#1" unless a cited source supports the exact claim and Legal approves it.
+- MUST NOT: comparisons naming competitors (Volt, TeamBuildr, TrainHeroic, etc.) or their prices.
+- MUST: strength checks are described as supervised rep-max tests with coach confirmation. Never "max testing" or "1RM."
+- MUST: other sports in previews are labeled "Example: volleyball today, more sports later" (Training).
+- MUST: when the site describes boards, it says jump-test improvement can appear **with parent permission**, and strength-check results never do.
+
+**Feature previews (TM-15)**
+- MUST: every feature has a label next to it: **Live**, **Coming soon** (roadmap Next), or **Later.** Unbuilt features have no image (UX U2) or a "Preview" tag. Screenshots come only from demo mode with fake names and data.
+- MUST NOT show: AI-generated programs, chat or social feeds, true 1RM testing for minors, personalized nutrition, public lift numbers, or heart-rate data presented as available.
+- MUST: the **Administrator preview** uses only fake data, labeled "Sample data. Coming soon." It must not suggest Approach Strength is offered to schools or districts now (D-006), shows team totals only, and collects nothing.
+
+**Pricing (TM-16)**
+- MUST: next to **every** price: "Planned price. May change. Free during the pilot." No buy buttons, no "reserve this price," and no deadline or scarcity language.
+- MUST: the Organization tier is labeled **Later**. Athlete and parent prices are addressed to parents. Don't say who pays first until Finance and Product decide.
+- Legal's view on the record: dollar amounts for unbuilt tiers are allowed with these labels. Change them only with a dated note.
+
+**Name and marks**
+- MUST: "Approach Strength" as the name, with **™** at most, **never ®**, until a registration is granted. The footer says "© 2026 Ryan Parker" until an entity exists (then the entity's name).
+
+**Acceptance (marketing site)**
+- The page makes no third-party requests (browser network panel: only `approachstrength.com`).
+- No cookies are set.
+- No forms, `<input>`, or buy buttons exist; no `<script>` tags.
+- Every price has the label, and every feature has a status label.
+- The legal links work.
+- The claim-word search is clean.
+- The published text matches `docs/copy/website-copy.md` v1.1 (Legal's signed-off copy).
+
+## Still open for Legal
+- Zoho conditions 1–3 (two-factor, DPA, no forwarding): Ryan to confirm.
+- Trademark attorney opinion before the App Store, paid promotion, or the first outside coach's forms (R12).
+- The AD/principal approval must be signed before the first minor.

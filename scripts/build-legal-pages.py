@@ -158,37 +158,63 @@ def section(md: str, start: str, end: str | None) -> str:
     return md[a:b]
 
 
-HEADER = """    <header class="site-header">
-      <a href="/" class="lockup" aria-label="Approach Strength home">
-        <picture>
-          <source srcset="/assets/lockup-plain-on-light.svg" media="(prefers-color-scheme: light)" />
-          <img src="/assets/lockup-plain-on-dark.svg" alt="Approach Strength" width="200" height="40" />
-        </picture>
-      </a>
-    </header>"""
-
-FOOTER = """    <footer class="site-footer">
-      <nav><a href="/">Home</a><a href="/privacy">Privacy Notice</a><a href="/terms">Terms</a><a href="/consent">Parent consent form</a><a href="mailto:{email}">{email}</a></nav>
-    </footer>""".format(email=CONTACT)
+APP_URL = 'https://app.approachstrength.com'
+# Site chrome (marketing-site spec §2, copy §1, design §1.4). Shared by the marketing pages and the legal pages.
+NAV = [('/features', 'Features'), ('/pricing', 'Pricing'), ('/safety', 'Safety'), ('/admin-preview', 'For administrators')]
 
 
-def page(title: str, body: str, cls: str = 'legal') -> str:
+def nav_links(current: str | None) -> str:
+    out = []
+    for href, label in NAV:
+        cur = ' aria-current="page"' if href == current else ''
+        out.append(f'<a href="{href}"{cur}>{label}</a>')
+    return ''.join(out)
+
+
+def header(current: str | None = None) -> str:
+    return f"""  <header class="site-header">
+    <div class="wrap header-row">
+      <a href="/" class="lockup"><img class="lockup-screen" src="/assets/lockup-plain-on-dark.svg" alt="Approach Strength" width="206" height="40" /><img class="lockup-print" src="/assets/lockup-plain-on-light.svg" alt="" width="206" height="40" /></a>
+      <nav class="nav-desktop" aria-label="Main">{nav_links(current)}<a class="button" href="{APP_URL}">Log in</a></nav>
+      <details class="menu">
+        <summary><span class="menu-icon" aria-hidden="true"></span>Menu</summary>
+        <nav class="menu-panel" aria-label="Main">{nav_links(current)}<a class="button" href="{APP_URL}">Log in</a></nav>
+      </details>
+    </div>
+  </header>"""
+
+
+HEADER = header()
+
+FOOTER = """  <footer class="site-footer">
+    <div class="wrap">
+      <nav aria-label="Footer"><a href="/privacy">Privacy</a><span aria-hidden="true"> · </span><a href="/terms">Terms</a><span aria-hidden="true"> · </span><a href="/consent">Parent consent form</a><span aria-hidden="true"> · </span><a href="mailto:{email}">{email}</a></nav>
+      <p class="owner">© 2026 Ryan Parker · Approach Strength™ · Free during the pilot.</p>
+    </div>
+  </footer>""".format(email=CONTACT)
+
+
+def page(title: str, body: str, cls: str = 'legal', current: str | None = None, description: str | None = None, full_title: str | None = None) -> str:
+    desc = f'\n  <meta name="description" content="{html.escape(description)}" />' if description else ''
     return f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="color-scheme" content="dark light" />
-  <title>{title} · Approach Strength</title>
+  <meta name="color-scheme" content="dark" />
+  <title>{full_title or f'{title} · Approach Strength'}</title>{desc}
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/site.css" />
 </head>
 <body>
-  <main class="{cls}">
-{HEADER}
+  <a class="skip" href="#main">Skip to content</a>
+{header(current)}
+  <main id="main" class="{cls}">
+    <div class="wrap{' wrap-read' if cls == 'legal' else ''}">
 {body}
-{FOOTER}
+    </div>
   </main>
+{FOOTER}
 </body>
 </html>
 """

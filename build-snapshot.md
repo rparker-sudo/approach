@@ -214,6 +214,14 @@ Supabase and GitHub (Pages, Actions) only. `pg_cron` is a built-in Supabase exte
 - **Website:** https://approachstrength.com from `rparker-sudo/approachstrength-site` (placeholder + legal pages, live 11/15). When the owner set the custom domain, GitHub added `CNAME` to that repo.
 - **Supabase:** live, Free plan. 002–007 applied (005–007 on November 14, 2026, with pg_cron enabled, per the owner). 008 applied November 15, 2026 (owner). Auth Site URL and Redirect URLs moved to `app.` 11/15.
 
+### Marketing site (Part C, spec `docs/specs/marketing-site.md` v1.1)
+- Built by `scripts/build-site.py` into `rparker-sudo/approachstrength-site`: `/`, `/features`, `/pricing`, `/admin-preview`, `/safety`, the legal pages (unchanged words, new site header and footer), and 404.
+- Words come only from copy v1.1; prices only from the site repo's `pricing.json` (= spec §6); admin-preview sample data from `admin-preview.json` (= design §5.2).
+- Screenshots S1–S6 are in `assets/screens/` (demo mode, sample data, approved by the owner 11/15; seed and capture scripts were scratch only, not in the repo).
+- No JavaScript, forms, cookies, or third-party requests; self-hosted fonts.
+- Checks: `scripts/checks/site-copy-match.py` and `legal-pages-match.py` (both in `run-all.sh`), plus a browser pass (tap targets, 320 px, 200% zoom, menu without JS).
+- Report: `reports/marketing-site-acceptance.md`. **Status: built and checked; published after the owner approves.**
+
 ### Settings changes (old → new), 2.2.1 §1–§3, §8
 Every change listed in the spec, made by the owner in a dashboard. Filled in as each step is done.
 

@@ -172,7 +172,7 @@ function JumpStep({ name, hint, unit, onSave, onSkip }: { name: string; hint: st
         ))}
       </Row>
       {best != null ? <Text style={{ fontSize: 15, fontWeight: '600' }}>{`Best: ${best} ${unit}`}</Text> : null}
-      {error ? <Text style={{ color: colors.error, fontSize: 13 }}>{error}</Text> : null}
+      {error ? <Text style={{ color: colors.errorText, fontSize: 13 }}>{error}</Text> : null}
       <Button
         title={busy ? 'Saving…' : 'Save best'}
         disabled={best == null || busy}
@@ -345,7 +345,7 @@ function LiftCheck({ teamId, id, onSaved, onSkip }: { teamId: string; id: LoadTe
       {parseNum(weight) > 0 ? (
         <Text style={{ fontSize: 15 }}>{`Estimated strength: ~${Math.round(e1rm(parseNum(weight), reps))} lb (estimate)`}</Text>
       ) : null}
-      {error ? <Text style={{ color: colors.error, fontSize: 13 }}>{error}</Text> : null}
+      {error ? <Text style={{ color: colors.errorText, fontSize: 13 }}>{error}</Text> : null}
       <Button
         title={busy ? 'Saving…' : 'Save strength check'}
         disabled={!(parseNum(weight) > 0) || busy}

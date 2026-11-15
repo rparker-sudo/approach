@@ -11,7 +11,7 @@ export const CHECKLIST = {
     {
       title: 'Plan it',
       items: [
-        'Pick one of the dates Approach suggests. It never suggests a day within 48 hours before a match or tournament.',
+        'Pick one of the dates Approach Strength suggests. It never suggests a day within 48 hours before a match or tournament.',
         'Confirm levels on your roster. Athletes under 18 need intermediate or advanced, set by you, to do strength checks. Everyone else does the jump tests only.',
         "Athletes should have done each tested lift with good form in recent weeks. Testing isn't the day to learn a lift.",
       ],
@@ -32,7 +32,7 @@ export const CHECKLIST = {
         "Anyone who says they're in pain or run down today skips strength checks. Jump tests are their call; nothing is lost by skipping.",
         "Each lift: warm-up sets, then up to 3 working sets, with 3 minutes' rest.",
         'You stop the set when form breaks or the bar clearly slows. The result is the last set done with good form. Never let anyone grind out a rep.',
-        'No single-rep attempts. Approach estimates strength from the reps.',
+        'No single-rep attempts. Approach Strength estimates strength from the reps.',
       ],
     },
     {

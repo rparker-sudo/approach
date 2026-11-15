@@ -54,7 +54,7 @@ export default function JoinTeamForm({
         accessibilityLabel="Team code"
         style={[display(24), { textAlign: 'center', paddingVertical: 16 }]}
       />
-      {error ? <Text style={{ color: colors.error, fontSize: 13 }}>{error}</Text> : null}
+      {error ? <Text style={{ color: colors.errorText, fontSize: 13 }}>{error}</Text> : null}
       <Button title={busy ? 'Joining…' : 'Join team'} disabled={clean.length !== 6 || busy} onPress={join} />
     </View>
   );

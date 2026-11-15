@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Pressable, Switch, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import type { Team, TeamSettings } from '../lib/backend';
 import { useTeams } from '../lib/team';
 import { BOARD_BG, boardAccent, DEFAULT_ACCENT, isHex, PRESETS, textOn } from '../lib/accent';
 import { showAlert } from '../lib/dialog';
-import { Button, Card, colors, Field, H2, Label, Row, Text } from './ui';
+import { Button, Card, colors, Field, H2, Label, Row, Text, Toggle as Switch44 } from './ui';
 
 /** Coach team settings: effort board toggles, team goal (F10), practice/match lengths (P5.3), med-ball weight (P6.5). */
 export default function TeamSettingsCard({ team, suggestedGoal }: { team: Team; suggestedGoal: number }) {
@@ -64,7 +64,7 @@ export default function TeamSettingsCard({ team, suggestedGoal }: { team: Team; 
       </Row>
       <Field label="Med-ball throw: ball weight (lb)" keyboardType="decimal-pad" value={ball} onChangeText={setBall} />
       <BoardColor team={team} />
-      {msg ? <Text style={{ fontSize: 13, color: msg === 'Saved.' ? colors.muted : colors.error }}>{msg}</Text> : null}
+      {msg ? <Text style={{ fontSize: 13, color: msg === 'Saved.' ? colors.muted : colors.errorText }}>{msg}</Text> : null}
       <Button
         small
         title={busy ? 'Saving…' : 'Save settings'}
@@ -90,14 +90,7 @@ function Toggle({ label, value, onChange }: { label: string; value: boolean; onC
   return (
     <Row style={{ justifyContent: 'space-between', minHeight: 44 }}>
       <Text style={{ fontSize: 15, flex: 1 }}>{label}</Text>
-      <Switch
-        accessibilityLabel={label}
-        value={value}
-        onValueChange={onChange}
-        trackColor={{ true: colors.ink, false: colors.line }}
-        thumbColor={value ? colors.bg : colors.muted}
-        {...({ activeThumbColor: colors.bg } as object)}
-      />
+      <Switch44 accessibilityLabel={label} value={value} onValueChange={onChange} />
     </Row>
   );
 }
@@ -140,7 +133,7 @@ function BoardColor({ team }: { team: Team }) {
           } else setError(v.trim() ? 'Enter a color like #1E5AA8.' : null);
         }}
       />
-      {error ? <Text style={{ fontSize: 13, color: colors.error }}>{error}</Text> : null}
+      {error ? <Text style={{ fontSize: 13, color: colors.errorText }}>{error}</Text> : null}
       {/* Live preview on the board background: a Resting tile, a Done tile, and the goal bar. */}
       <View style={{ backgroundColor: BOARD_BG, borderRadius: 12, padding: 12, gap: 10 }}>
         <Row style={{ gap: 8 }}>
@@ -187,7 +180,7 @@ function BoardColor({ team }: { team: Team }) {
             setChosen(DEFAULT_ACCENT);
             setHex('');
           }}
-          style={{ fontSize: 13, textDecorationLine: 'underline', paddingHorizontal: 8 }}
+          style={{ fontSize: 13, textDecorationLine: 'underline', paddingHorizontal: 8, paddingVertical: 14 }}
         >
           Reset to default
         </Text>

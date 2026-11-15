@@ -323,7 +323,7 @@ function BreakSheet({
           {valid && !orderError ? (
             <Note>{`No lift sessions ${rangeText(start, end)} for athletes on ${program.teamName ?? 'this team'}'s program. Streaks and Consistency pause.`}</Note>
           ) : null}
-          {error ? <Text style={{ color: colors.warning, fontSize: 14 }}>{error}</Text> : null}
+          {error ? <Text style={{ color: colors.warningText, fontSize: 14 }}>{error}</Text> : null}
           <Button title="Save" disabled={!!error} onPress={() => onSave(withBreak(program, start, end, original?.date, label), !original)} />
           {original ? (
             <Button
@@ -485,8 +485,8 @@ function DaySheet({
                       <Chip key={b} label={BATTERY_LABEL[b]} selected={test === b} onPress={() => setTest(b)} />
                     ))}
                   </ChipRow>
-                  {testError ? <Text style={{ fontSize: 13, color: colors.error }}>{testError}</Text> : null}
-                  {spacing ? <Text style={{ fontSize: 13, color: colors.warning }}>{spacing}</Text> : null}
+                  {testError ? <Text style={{ fontSize: 13, color: colors.errorText }}>{testError}</Text> : null}
+                  {spacing ? <Text style={{ fontSize: 13, color: colors.warningText }}>{spacing}</Text> : null}
                   {test && !testError ? (
                     <Text style={{ fontSize: 13, color: colors.muted }}>That day&apos;s lift becomes a Testing session. You confirm supervision on the day.</Text>
                   ) : null}
@@ -503,7 +503,7 @@ function DaySheet({
               </ChipRow>
               {lift === 'auto' && auto.note ? <Note>{auto.note}</Note> : null}
               {lift !== 'auto' && (type === 'game' || type === 'tournament' || (type === null && (usual === 'game' || usual === 'tournament'))) && lift ? (
-                <Text style={{ fontSize: 13, color: colors.warning }}>Lifting on a match day is not recommended.</Text>
+                <Text style={{ fontSize: 13, color: colors.warningText }}>Lifting on a match day is not recommended.</Text>
               ) : null}
 
               <Row>

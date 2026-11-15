@@ -1,7 +1,7 @@
 import tokens from './brand-tokens.json';
 
 /**
- * Approach theme, generated from brand-tokens.json (the brand source of truth).
+ * Approach Strength theme, generated from brand-tokens.json (the brand source of truth).
  * Components read from the mutable `colors` object; ThemeRoot swaps it and
  * re-mounts the tree when the user changes between dark (default) and light.
  */
@@ -10,6 +10,7 @@ export type ThemeName = 'dark' | 'light';
 
 export const BRAND = {
   name: tokens.name,
+  shortName: tokens.shortName,
   tagline: tokens.tagline,
   radius: tokens.radius,
   scale: tokens.typography.scale,
@@ -43,8 +44,12 @@ function build(mode: ThemeName) {
     achievement: t.achievement,
     chartLine: t.chartLine,
     chartGrid: t.chartGrid,
+    /** Borders, bars and fills for errors and warnings. */
     error: tokens.color.status.error,
     warning: tokens.color.status.warning,
+    /** Text and icons for errors and warnings (F-2: ≥ 4.5:1 on both themes). */
+    errorText: tokens.color.status.errorText[mode],
+    warningText: tokens.color.status.warningText[mode],
     /** Day-type chips: tone steps from the palette, darkest/brightest = biggest day. */
     day:
       mode === 'dark'

@@ -63,7 +63,7 @@ function PainCard({ pain }: { pain: boolean }) {
       accessibilityRole="alert"
       style={{ backgroundColor: colors.raised, padding: 14, borderRadius: 12, borderLeftWidth: 4, borderLeftColor: colors.warning, flexDirection: 'row', gap: 10 }}
     >
-      <Text style={{ fontSize: 16, color: colors.warning, fontWeight: '700' }}>!</Text>
+      <Text style={{ fontSize: 16, color: colors.warningText, fontWeight: '700' }}>!</Text>
       <Text style={{ fontSize: 16, lineHeight: 22, flex: 1 }}>
         Don&apos;t train through pain. Talk to your coach, parent, or athletic trainer before you lift today.
       </Text>

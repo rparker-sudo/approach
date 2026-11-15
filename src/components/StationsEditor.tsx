@@ -71,7 +71,7 @@ export default function StationsEditor({ program, session, hasMinor, onChange }:
       {!allowed ? <Text style={{ fontSize: 13, color: colors.muted }}>{NOT_HERE}</Text> : null}
       {msg ? (
         <>
-          <Text style={{ fontSize: 13, color: colors.warning }}>{msg}</Text>
+          <Text style={{ fontSize: 13, color: colors.warningText }}>{msg}</Text>
           {msg === 'Stations need rack groups.' ? (
             <Button small kind="secondary" title="Set up racks" onPress={() => router.push({ pathname: '/racks', params: { teamId: program.teamId! } })} />
           ) : null}
@@ -158,11 +158,11 @@ export default function StationsEditor({ program, session, hasMinor, onChange }:
           <Button small kind="ghost" title="Suggest order" onPress={() => save(suggestOrder(list, stations, program.equipment))} />
         </View>
       </Row>
-      {msg ? <Text accessibilityRole="alert" style={{ fontSize: 13, color: hasMinor && msg === PART1_REASON ? colors.error : colors.warning }}>{msg}</Text> : null}
+      {msg ? <Text accessibilityRole="alert" style={{ fontSize: 13, color: hasMinor && msg === PART1_REASON ? colors.errorText : colors.warningText }}>{msg}</Text> : null}
       {checks.map((c, i) => (
-        <Text key={i} style={{ fontSize: 13, color: c.tone === 'block' ? colors.error : c.tone === 'warn' ? colors.warning : colors.ink }}>{c.text}</Text>
+        <Text key={i} style={{ fontSize: 13, color: c.tone === 'block' ? colors.errorText : c.tone === 'warn' ? colors.warningText : colors.ink }}>{c.text}</Text>
       ))}
-      <Text style={{ fontSize: 14, fontWeight: '600', color: est.total > target ? colors.warning : colors.ink }}>
+      <Text style={{ fontSize: 14, fontWeight: '600', color: est.total > target ? colors.warningText : colors.ink }}>
         {`Part 1 · ${est.part1} min + ${stations.length} stations × (${est.per} + 1) min = about ${Math.round(est.total)} min · target ${target}${est.total > target ? ' ●' : ''}`}
       </Text>
       {est.total > target ? <Text style={{ fontSize: 13, color: colors.muted }}>Try fewer stations or cut a set.</Text> : null}

@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { useState } from 'react';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AgeQuestionScreen } from '../../components/AgeGate';
+import { CoachTermsSheet } from '../../components/CoachTerms';
 import YourChoices, { DEFAULT_CHOICES } from '../../components/YourChoices';
 import { colors, fonts, H1, Icon, Screen, Text } from '../../components/ui';
 import type { AgeAnswer } from '../../lib/age';
@@ -16,11 +17,13 @@ import { useTeams } from '../../lib/team';
  * Route files keep their original names; only the labels changed.
  */
 export default function TabsLayout() {
-  const { data, setProfile, block } = useStore();
-  const { account, checked, deleteAccount, signOut, refresh, teams, setMyChoices } = useTeams();
+  const { data, setProfile, block, mutate } = useStore();
+  const { account, checked, accountUnknown, deleteAccount, signOut, refresh, teams, setMyChoices } = useTeams();
   const [busy, setBusy] = useState(false);
   const insets = useSafeAreaInsets();
   if (!data.profile) return <Redirect href="/onboarding" />;
+  // 2.2.1 §9: a device that was signed in and whose session expired goes straight to Log in (not when offline).
+  if (checked && !account && !accountUnknown && data.profile.hasAccount) return <Redirect href="/sign-in" />;
 
   // Set up before 2.1 with no birth year on file: ask once, before anything else.
   const needsAge = data.profile.birthYear == null && account?.birthYear == null;
@@ -52,7 +55,7 @@ export default function TabsLayout() {
         <Screen>
           <H1>Your choices</H1>
           <Text style={{ fontSize: 15, color: colors.muted }}>
-            Choose what Approach does for you on your team. You can change these later in Settings → Privacy.
+            Choose what Approach Strength does for you on your team. You can change these later in Settings → Privacy.
           </Text>
           <YourChoices initial={DEFAULT_CHOICES} onSave={setMyChoices} />
         </Screen>
@@ -60,52 +63,74 @@ export default function TabsLayout() {
     );
   }
   const coach = data.profile.role === 'coach';
+  // 2.2.1 §8: existing coach accounts see the Coach Terms sheet once on this device; until accepted, recording consent
+  // and starting strength checks stay blocked with a reason line.
+  const termsPrompt = !!account && account.role === 'coach' && account.coachTermsAccepted === false && !(data.coachTermsPrompted ?? []).includes(account.id);
+  const closeTerms = () =>
+    account &&
+    mutate((d) => ({
+      ...d,
+      coachTermsPrompted: [...new Set([...(d.coachTermsPrompted ?? []), account.id])],
+    }));
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.ink,
-        tabBarInactiveTintColor: colors.faint,
-        tabBarStyle: {
-          backgroundColor: colors.bg,
-          borderTopColor: colors.line,
-          // Browsers: give icon + label room, plus the iPhone home-bar area.
-          ...(Platform.OS === 'web' ? { height: 66 + insets.bottom, paddingTop: 4, paddingBottom: 4 + insets.bottom } : null),
-        },
-        tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 12, lineHeight: 16 },
-        sceneStyle: { backgroundColor: colors.bg },
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: coach ? 'Team' : 'Lift',
-          tabBarIcon: ({ color }) => <Icon name={coach ? 'person.3' : 'dumbbell'} color={color as string} />,
+    <>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: colors.ink,
+          tabBarInactiveTintColor: colors.faint,
+          tabBarStyle: {
+            backgroundColor: colors.bg,
+            borderTopColor: colors.line,
+            // Browsers: give icon + label room, plus the iPhone home-bar area.
+            ...(Platform.OS === 'web'
+              ? {
+                  height: 66 + insets.bottom,
+                  paddingTop: 4,
+                  paddingBottom: 4 + insets.bottom,
+                }
+              : null),
+          },
+          tabBarLabelStyle: {
+            fontFamily: fonts.medium,
+            fontSize: 12,
+            lineHeight: 16,
+          },
+          sceneStyle: { backgroundColor: colors.bg },
         }}
-      />
-      <Tabs.Screen
-        name="fuel"
-        options={{
-          title: 'Fuel',
-          tabBarIcon: ({ color }) => <Icon name="fork.knife" color={color as string} />,
-        }}
-      />
-      <Tabs.Screen
-        name="program"
-        options={{
-          title: 'Plan',
-          tabBarIcon: ({ color }) => <Icon name="calendar" color={color as string} />,
-        }}
-      />
-      <Tabs.Screen
-        name="progress"
-        options={{
-          title: 'Progress',
-          href: coach ? null : undefined,
-          tabBarIcon: ({ color }) => <Icon name="volleyball" color={color as string} />,
-        }}
-      />
-    </Tabs>
+      >
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: coach ? 'Team' : 'Lift',
+            tabBarIcon: ({ color }) => <Icon name={coach ? 'person.3' : 'dumbbell'} color={color as string} />,
+          }}
+        />
+        <Tabs.Screen
+          name="fuel"
+          options={{
+            title: 'Fuel',
+            tabBarIcon: ({ color }) => <Icon name="fork.knife" color={color as string} />,
+          }}
+        />
+        <Tabs.Screen
+          name="program"
+          options={{
+            title: 'Plan',
+            tabBarIcon: ({ color }) => <Icon name="calendar" color={color as string} />,
+          }}
+        />
+        <Tabs.Screen
+          name="progress"
+          options={{
+            title: 'Progress',
+            href: coach ? null : undefined,
+            tabBarIcon: ({ color }) => <Icon name="volleyball" color={color as string} />,
+          }}
+        />
+      </Tabs>
+      {termsPrompt ? <CoachTermsSheet onClose={closeTerms} /> : null}
+    </>
   );
 }

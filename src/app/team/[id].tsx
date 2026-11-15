@@ -6,6 +6,7 @@ import AttendanceMarks from '../../components/AttendanceMarks';
 import ConsentSheet from '../../components/ConsentSheet';
 import EffortBoard, { useTeamProgramFor } from '../../components/EffortBoard';
 import TeamSettingsCard from '../../components/TeamSettingsCard';
+import { CoachTermsReason, useCoachTermsOk } from '../../components/CoachTerms';
 import TestingBanner from '../../components/TestingBanner';
 import StationControls from '../../components/StationControls';
 import TestsSection from '../../components/TestsSection';
@@ -28,6 +29,7 @@ export default function TeamScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data } = useStore();
   const t = useTeams();
+  const termsOk = useCoachTermsOk();
   const team = t.teams.find((x) => x.id === id);
   const [busy, setBusy] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -140,7 +142,7 @@ export default function TeamScreen() {
           }}
         />
       ) : null}
-      {error ? <Text style={{ color: colors.error, fontSize: 13 }}>{error}</Text> : null}
+      {error ? <Text style={{ color: colors.errorText, fontSize: 13 }}>{error}</Text> : null}
 
       <ChipRow>
         <Chip label="Team" selected={tab === 'team'} onPress={() => setTab('team')} />
@@ -412,7 +414,8 @@ export default function TeamScreen() {
                     accessibilityRole="button"
                     onPress={() => {
                       // A minor with no form recorded: tapping the row records consent (F3).
-                      if (needsForm && !open) setConsentFor(m.userId);
+                      // Until the Coach Terms are accepted, the row just opens (with the reason line) (2.2.1 §8).
+                      if (needsForm && !open && termsOk) setConsentFor(m.userId);
                       setOpenMember(open ? null : m.userId);
                     }}
                   >
@@ -429,8 +432,7 @@ export default function TeamScreen() {
                             accessibilityRole="button"
                             accessibilityLabel={`${chips.map((c) => c.label).join('. ')}. Parent consent for ${m.name}`}
                             onPress={() => setConsentFor(m.userId)}
-                            hitSlop={12}
-                            style={{ alignSelf: 'flex-start', paddingVertical: 2, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}
+                            style={{ alignSelf: 'flex-start', minHeight: 44, alignItems: 'center', paddingVertical: 2, flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}
                           >
                             {chips.map((c) => (
                               <StatusChip key={c.label} label={c.label} tone={c.tone} />
@@ -444,7 +446,7 @@ export default function TeamScreen() {
                           {mine[0] ? ` · Last lift ${formatDate(mine[0].date)}` : ' · No lifts logged'}
                         </Text>
                         {ci ? (
-                          <Text style={{ fontSize: 12, color: ci.pain ? colors.warning : colors.muted }}>
+                          <Text style={{ fontSize: 12, color: ci.pain ? colors.warningText : colors.muted }}>
                             Today: sleep {ci.sleep} · soreness {ci.soreness} · energy {ci.energy}
                             {ci.pain ? ' · pain' : ''}
                           </Text>
@@ -453,7 +455,7 @@ export default function TeamScreen() {
                           <Text style={{ fontSize: 13, color: colors.muted }}>Not eligible for testing today.</Text>
                         ) : null}
                         {ci?.pain ? (
-                          <Text style={{ fontSize: 12, color: colors.warning }}>{`Check in with ${m.name.split(' ')[0] || m.name} in person.`}</Text>
+                          <Text style={{ fontSize: 12, color: colors.warningText }}>{`Check in with ${m.name.split(' ')[0] || m.name} in person.`}</Text>
                         ) : null}
                       </View>
                       <Pill text={`${week} this week`} achievement={week > 0} />
@@ -465,12 +467,17 @@ export default function TeamScreen() {
                       {extras?.returning.includes(m.userId) ? <StatusChip label="Returning from a break: lighter week" /> : null}
                       <LevelSwaps program={programFor(m.groupId ?? null)} member={m} info={extras?.levels[m.userId]} />
                       {chips.length ? (
-                        <Button
-                          small
-                          kind="secondary"
-                          title={needsForm ? 'Record parent consent' : 'Change parent consent'}
-                          onPress={() => setConsentFor(m.userId)}
-                        />
+                        <>
+                          <Button
+                            small
+                            kind="secondary"
+                            title={needsForm ? 'Record parent consent' : 'Change parent consent'}
+                            disabled={!termsOk}
+                            onPress={() => setConsentFor(m.userId)}
+                          />
+                          {/* 2.2.1 §8: blocked until the coach accepts the Coach Terms (the server rejects it too). */}
+                          {!termsOk ? <CoachTermsReason /> : null}
+                        </>
                       ) : null}
                       <Text style={{ fontSize: 12, color: colors.muted }}>Group</Text>
                       <ChipRow>
@@ -489,7 +496,7 @@ export default function TeamScreen() {
                             { text: 'Remove', style: 'destructive', onPress: () => act(() => t.removeMember(team.id, m.userId)) },
                           ])
                         }
-                        style={{ fontSize: 12, color: colors.faint }}
+                        style={{ fontSize: 12, color: colors.faint, paddingVertical: 15, minHeight: 44, alignSelf: 'flex-start' }}
                       >
                         Remove from team
                       </Text>

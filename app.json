@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Approach",
+    "name": "Approach Strength",
     "slug": "approach",
-    "version": "2.2.0",
+    "version": "2.2.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -16,7 +16,7 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "name": "Approach",
+      "name": "Approach Strength",
       "shortName": "Approach",
       "themeColor": "#0B0B0C",
       "backgroundColor": "#0B0B0C",

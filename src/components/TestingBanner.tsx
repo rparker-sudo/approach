@@ -8,6 +8,7 @@ import { useTeamProgramFor } from './EffortBoard';
 import TestingChecklist from './TestingChecklist';
 import { canTest } from '../lib/backend';
 import { useStore } from '../lib/store';
+import { CoachTermsReason, useCoachTermsOk } from './CoachTerms';
 import { BRAND, Banner, Button, colors, H2, Icon, Text } from './ui';
 
 /**
@@ -16,6 +17,7 @@ import { BRAND, Banner, Button, colors, H2, Icon, Text } from './ui';
  */
 export default function TestingBanner({ team, onReviewLevels }: { team: Team; onReviewLevels?: () => void }) {
   const t = useTeams();
+  const termsAccepted = useCoachTermsOk();
   const { data, mutate } = useStore();
   const [checklist, setChecklist] = useState<'first' | 'again' | null>(null);
   const read = (data.checklistRead ?? []).includes(team.id);
@@ -32,11 +34,13 @@ export default function TestingBanner({ team, onReviewLevels }: { team: Team; on
   // F24a addition: minors with testing on who don't have a coach-confirmed intermediate/advanced level.
   const needLevel = (t.members[team.id] ?? []).filter((m) => m.isMinor !== false && canTest(m.perms) && !(m.levelConfirmed && (m.level ?? 0) >= 2)).length;
   const start = () => (read ? setOpen(true) : setChecklist('first'));
+  // 2.2.1 §8: blocked until the coach accepts the Coach Terms (the server rejects it too).
+  const termsOk = termsAccepted;
 
   return (
     <>
       <Banner
-        action={needsLock && !session ? { label: 'Start strength check', onPress: start } : undefined}
+        action={needsLock && !session && termsOk ? { label: 'Start strength check', onPress: start } : undefined}
       >
         {`Testing day: ${BATTERY_LABEL[battery]}`}
         {needsLock
@@ -45,6 +49,7 @@ export default function TestingBanner({ team, onReviewLevels }: { team: Team; on
             : ' · Strength checks are locked until you confirm you’re supervising.'
           : ' · Jump tests only.'}
       </Banner>
+      {needsLock && !session && !termsOk ? <CoachTermsReason /> : null}
       {needsLock && needLevel ? (
         <Text style={{ fontSize: 13 }}>
           {`${needLevel} athlete${needLevel === 1 ? '' : 's'} under 18 need${needLevel === 1 ? 's' : ''} a confirmed level for strength checks. `}
@@ -89,7 +94,7 @@ export default function TestingBanner({ team, onReviewLevels }: { team: Team; on
               <Icon name={checked ? 'checkmark.square.fill' : 'square'} size={24} color={colors.ink} />
               <Text style={{ flex: 1, fontSize: 15 }}>I&apos;ll be supervising this test, with safeties or spotters set.</Text>
             </Pressable>
-            {error ? <Text style={{ color: colors.error, fontSize: 13 }}>{error}</Text> : null}
+            {error ? <Text style={{ color: colors.errorText, fontSize: 13 }}>{error}</Text> : null}
             <Button
               title={busy ? 'Confirming…' : 'Confirm'}
               disabled={!checked || busy}

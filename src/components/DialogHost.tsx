@@ -77,7 +77,7 @@ export default function DialogHost() {
                     style={{
                       fontSize: 16,
                       fontWeight: '600',
-                      color: destructive ? colors.error : primary ? colors.primaryText : colors.ink,
+                      color: destructive ? colors.errorText : primary ? colors.primaryText : colors.ink,
                     }}
                   >
                     {b.text ?? 'OK'}

@@ -3,8 +3,8 @@
 \set VERBOSITY terse
 \pset footer off
 insert into auth.users (id, raw_user_meta_data) values
- ('00000000-0000-0000-0000-0000000000ca', '{"name":"Coach Alpha","role":"coach","birth_year":"1985","is_minor":"false"}'),
- ('00000000-0000-0000-0000-0000000000cb', '{"name":"Coach Bravo","role":"coach","birth_year":"1980","is_minor":"false"}'),
+ ('00000000-0000-0000-0000-0000000000ca', '{"name":"Coach Alpha","role":"coach","birth_year":"1985","is_minor":"false","coach_terms_version":"2026-11-14"}'),
+ ('00000000-0000-0000-0000-0000000000cb', '{"name":"Coach Bravo","role":"coach","birth_year":"1980","is_minor":"false","coach_terms_version":"2026-11-14"}'),
  ('00000000-0000-0000-0000-0000000000a1', '{"name":"Jordan Miller","role":"athlete","birth_year":"2010","is_minor":"true"}'),
  ('00000000-0000-0000-0000-0000000000b1', '{"name":"Taylor Smith","role":"athlete","birth_year":"2000","is_minor":"false"}');
 insert into teams (id, name, join_code, coach_id) values
@@ -25,10 +25,10 @@ select set_my_self_level(:'A', 3::smallint); select set_my_self_level(:'B', 3::s
 select set_my_self_level(:'A', 1::smallint);
 update team_members set level = 1 where user_id = auth.uid();
 reset role; select team_id = :'A'::uuid as team_a, level, level_set_by is null as self from team_members where user_id = :'J' order by 1 desc; set role authenticated;
-\echo == L2 coach A confirms intermediate; coach B sets beginner; coach A sees swap_level 1 (numbers only, no team/coach names)
+\echo == L2 coach A confirms intermediate; coach B sets beginner; coach A sees only the adjusted exercises (2.2.1 J1: no level, team or coach)
 select pg_temp.u(:'CA'); select set_member_level(:'A', :'J', 2::smallint);
 select pg_temp.u(:'CB'); select set_member_level(:'B', :'J', 1::smallint);
-select pg_temp.u(:'CA'); select team_level, confirmed, swap_level from member_levels(:'A') where user_id = :'J';
+select pg_temp.u(:'CA'); select team_level, confirmed, adjusted from member_levels(:'A', '{"squat":["goblet-squat","back-squat","back-squat"]}') where user_id = :'J';
 \echo == L3 coach A cannot see team B membership row, lift program column, or set B level (expect 2 errors)
 select count(*) as coach_a_sees_team_b_rows from team_members where team_id = :'B';
 select lift_program_team_id from profiles where id = :'J';

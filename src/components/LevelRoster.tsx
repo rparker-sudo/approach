@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { LEVEL_NAME } from '../lib/athlete';
 import type { Member, MemberLevel } from '../lib/backend';
-import { Level, swapsFor } from '../lib/resolve';
+import { getExercise } from '../lib/exercises';
+import { adjustedFor, Level, swapsFor } from '../lib/resolve';
 import type { Program } from '../lib/types';
 import { formatDate } from '../lib/util';
 import Sheet from './Sheet';
-import { BRAND, Button, colors, OptionCard, Text } from './ui';
+import { LEVEL_CHECKLIST, LEVEL_DESCRIPTIONS, LEVEL_PRINCIPLES } from '../lib/levelChecklist';
+import { BRAND, Button, colors, OptionCard, Text, TextLink } from './ui';
 
 /** F24a: level chip. Coach-set = solid outline; self-reported = dotted outline (and "Level not confirmed" text in the row). */
 export function LevelChip({ member, onPress }: { member: Member; onPress: () => void }) {
@@ -17,46 +19,87 @@ export function LevelChip({ member, onPress }: { member: Member; onPress: () => 
       accessibilityRole="button"
       accessibilityLabel={`Level: ${lv ? LEVEL_NAME[lv] : 'not set'}${member.levelConfirmed ? '' : ', not confirmed'}. Set ${member.name}'s level`}
       onPress={onPress}
-      hitSlop={8}
-      style={{
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: BRAND.radius.pill,
-        borderWidth: 1,
-        borderStyle: member.levelConfirmed ? 'solid' : 'dotted',
-        borderColor: member.levelConfirmed ? colors.ink : colors.muted,
-        alignSelf: 'flex-start',
-      }}
+      // F-7: a 44 pt tap area around the small chip.
+      style={{ minHeight: 44, minWidth: 44, justifyContent: 'center', alignSelf: 'flex-start' }}
     >
-      <Text style={{ fontSize: 12, fontWeight: '600', color: member.levelConfirmed ? colors.ink : colors.muted }}>{label}</Text>
+      <View
+        style={{
+          paddingHorizontal: 8,
+          paddingVertical: 3,
+          borderRadius: BRAND.radius.pill,
+          borderWidth: 1,
+          borderStyle: member.levelConfirmed ? 'solid' : 'dotted',
+          borderColor: member.levelConfirmed ? colors.ink : colors.muted,
+        }}
+      >
+        <Text style={{ fontSize: 12, fontWeight: '600', color: member.levelConfirmed ? colors.ink : colors.muted }}>{label}</Text>
+      </View>
     </Pressable>
   );
 }
 
-const DESCRIPTIONS: Record<number, string> = {
-  1: 'Learning the basic lifts.',
-  2: 'Solid form on the main lifts.',
-  3: 'Years of coached lifting, including barbell lifts.',
-};
+/** Training's full level checklist, read-only (2.2.1 §4, Appendix B). */
+export function LevelChecklistSheet({ onClose }: { onClose: () => void }) {
+  return (
+    <Sheet title="Level checklist" onClose={onClose}>
+      <Text style={{ fontSize: 14, color: colors.muted }}>
+        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.muted }}>Principles. </Text>
+        {LEVEL_PRINCIPLES}
+      </Text>
+      {LEVEL_CHECKLIST.map((sec) => (
+        <View key={sec.title} style={{ gap: 8 }}>
+          <Text style={{ fontSize: 16, fontWeight: '600' }}>{sec.title}</Text>
+          {sec.blocks.map((b, i) =>
+            b.kind === 'p' ? (
+              <Text key={i} style={{ fontSize: 14, lineHeight: 20 }}>
+                {b.lead ? `${b.lead} ` : ''}
+                {b.text}
+              </Text>
+            ) : b.kind === 'ol' ? (
+              <View key={i} style={{ gap: 4 }}>
+                {b.items.map((it, k) => (
+                  <Text key={k} style={{ fontSize: 14, lineHeight: 20 }}>{`${k + 1}. ${it}`}</Text>
+                ))}
+              </View>
+            ) : (
+              <View key={i} style={{ borderWidth: 1, borderColor: colors.line, borderRadius: BRAND.radius.sm }}>
+                {b.rows.map(([pattern, check], k) => (
+                  <View key={pattern} style={{ flexDirection: 'row', gap: 10, padding: 8, borderTopWidth: k ? 1 : 0, borderTopColor: colors.line }}>
+                    <Text style={{ width: 84, fontSize: 13, fontWeight: '600' }}>{pattern}</Text>
+                    <Text style={{ flex: 1, fontSize: 13, lineHeight: 18 }}>{check}</Text>
+                  </View>
+                ))}
+              </View>
+            ),
+          )}
+        </View>
+      ))}
+      <Button kind="secondary" title="Close" onPress={onClose} />
+    </Sheet>
+  );
+}
 
 /** F24b: set level sheet. Saving the same level as the self-reported one still confirms it. */
 export function SetLevelSheet({ member, onClose, onSave }: { member: Member; onClose: () => void; onSave: (level: number) => Promise<void> }) {
   const [choice, setChoice] = useState<number | null>(member.level ?? null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [checklist, setChecklist] = useState(false);
   const first = member.name.split(' ')[0] || member.name;
+  if (checklist) return <LevelChecklistSheet onClose={() => setChecklist(false)} />;
   return (
     <Sheet title={`Set ${first}'s level`} onClose={onClose}>
-      {[1, 2, 3].map((lv) => (
-        <OptionCard key={lv} title={LEVEL_NAME[lv]} subtitle={DESCRIPTIONS[lv]} selected={choice === lv} onPress={() => setChoice(lv)} />
+      {([1, 2, 3] as const).map((lv) => (
+        <OptionCard key={lv} title={LEVEL_NAME[lv]} subtitle={LEVEL_DESCRIPTIONS[lv]} selected={choice === lv} onPress={() => setChoice(lv)} />
       ))}
+      <TextLink title="See the full checklist" onPress={() => setChecklist(true)} />
       <Text style={{ fontSize: 13, color: colors.muted }}>
         {`Sets which version of each exercise ${first} gets. Athletes under 18 need intermediate or advanced, set by you, for strength checks.`}
       </Text>
       {!member.levelConfirmed && member.level ? (
         <Text style={{ fontSize: 13, color: colors.muted }}>{`${first} said: ${LEVEL_NAME[member.level]} (not confirmed).`}</Text>
       ) : null}
-      {error ? <Text style={{ color: colors.error, fontSize: 13 }}>{error}</Text> : null}
+      {error ? <Text style={{ color: colors.errorText, fontSize: 13 }}>{error}</Text> : null}
       <Button
         title={busy ? 'Saving…' : 'Save'}
         disabled={choice == null || busy}
@@ -84,11 +127,18 @@ export function LevelSwaps({ program, member, info }: { program?: Program; membe
   const [open, setOpen] = useState(false);
   if (!program || !member.level) return null;
   const teamLevel = member.level as Level;
-  const effective = Math.min(teamLevel, info?.swapLevel ?? teamLevel) as Level;
   const uniq = (list: { from: string; to: string | null }[]) => [...new Map(list.map((x) => [`${x.from}>${x.to}`, x])).values()];
   const own = uniq(program.sessions.flatMap((s) => swapsFor(program, s, teamLevel)));
   const ownKeys = new Set(own.map((x) => x.from));
-  const extra = effective < teamLevel ? uniq(program.sessions.flatMap((s) => swapsFor(program, s, effective))).filter((x) => !ownKeys.has(x.from)) : [];
+  // 2.2.1 J1: the server sends only the exercises this athlete gets instead (no level, team or reason).
+  const extra = uniq(
+    program.sessions.flatMap((s) =>
+      s.exercises.flatMap((pe) => {
+        const to = adjustedFor(info?.adjusted, pe.exerciseId, program.equipment);
+        return to === undefined ? [] : [{ from: getExercise(pe.exerciseId).name, to: to ? getExercise(to).name : null }];
+      }),
+    ),
+  ).filter((x) => !ownKeys.has(x.from));
   if (!own.length && !extra.length) return null;
   const line = (x: { from: string; to: string | null }) => `${x.from} → ${x.to ?? 'left out'}`;
   return (

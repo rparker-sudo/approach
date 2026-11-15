@@ -14,7 +14,7 @@ const ORDER: DayType[] = ['off', 'practice', 'game', 'tournament'];
 export function WeekEditor({ value, onChange }: { value: DayType[]; onChange: (w: DayType[]) => void }) {
   return (
     <View style={{ gap: 8 }}>
-      <View style={{ flexDirection: 'row', gap: 6 }}>
+      <View style={{ flexDirection: 'row', gap: 2 }}>
         {WEEKDAYS.map((d, i) => {
           const t = value[i];
           const meta = DAY_TYPES.find((x) => x.id === t)!;
@@ -84,7 +84,7 @@ export function LiftDayPicker({
     .filter((w) => w.text && /Match/.test(w.text));
   return (
     <View style={{ gap: 10 }}>
-      <View style={{ flexDirection: 'row', gap: 6 }}>
+      <View style={{ flexDirection: 'row', gap: 2 }}>
         {WEEKDAYS.map((d, i) => {
           const on = value.includes(i);
           const t = week[i];

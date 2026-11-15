@@ -6,16 +6,19 @@
 export const BOARD_BG = '#0B0B0C';
 export const DEFAULT_ACCENT = '#C9CDD2';
 
-export const PRESETS: { name: string; hex: string }[] = [
-  { name: 'Approach silver', hex: '#C9CDD2' },
-  { name: 'Blue', hex: '#4DA3FF' },
-  { name: 'Green', hex: '#3DDC84' },
-  { name: 'Gold', hex: '#FFC53D' },
-  { name: 'Red', hex: '#FF6B6B' },
-  { name: 'Purple', hex: '#B78CFF' },
-  { name: 'Orange', hex: '#FF9F43' },
-  { name: 'Teal', hex: '#2EC4B6' },
-];
+/** Board color presets (brand guide v0.3 §7). Existing teams keep their saved hex. */
+export const BOARD_PRESETS = [
+  { id: 'silver', name: 'Silver', hex: '#C9CDD2', isDefault: true },
+  { id: 'red', name: 'Red', hex: '#F2555C' },
+  { id: 'orange', name: 'Orange', hex: '#FF8A3D' },
+  { id: 'gold', name: 'Gold', hex: '#FFC53D' },
+  { id: 'green', name: 'Green', hex: '#3DDC84' },
+  { id: 'teal', name: 'Teal', hex: '#2EC4B6' },
+  { id: 'blue', name: 'Blue', hex: '#4C8DF6' },
+  { id: 'purple', name: 'Purple', hex: '#B78CFF' },
+] as const;
+
+export const PRESETS: { name: string; hex: string }[] = BOARD_PRESETS.map(({ name, hex }) => ({ name, hex }));
 
 export const isHex = (s: string) => /^#[0-9A-Fa-f]{6}$/.test(s.trim());
 

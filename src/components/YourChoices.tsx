@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 import { normalizePerms, Perms } from '../lib/backend';
-import { Button, colors, Text } from './ui';
+import { Button, colors, Text, Toggle } from './ui';
 
 export type Choices = Omit<Perms, 'participation'>;
 
@@ -44,19 +44,11 @@ export default function YourChoices({
               <Text style={{ fontSize: 15, fontWeight: '600' }}>{r.title}</Text>
               <Text style={{ fontSize: 13, color: colors.muted }}>{r.line}</Text>
             </View>
-            <Switch
-              accessibilityLabel={r.title}
-              value={c[r.key]}
-              disabled={disabled}
-              onValueChange={(v) => set(r.key, v)}
-              trackColor={{ true: colors.ink, false: colors.line }}
-              thumbColor={c[r.key] ? colors.bg : colors.muted}
-              {...({ activeThumbColor: colors.bg } as object)}
-            />
+            <Toggle accessibilityLabel={r.title} value={c[r.key]} disabled={disabled} onValueChange={(v) => set(r.key, v)} />
           </View>
         );
       })}
-      {error ? <Text style={{ color: colors.error, fontSize: 13 }}>{error}</Text> : null}
+      {error ? <Text style={{ color: colors.errorText, fontSize: 13 }}>{error}</Text> : null}
       <Button
         title={busy ? 'Saving…' : saveLabel}
         disabled={busy}

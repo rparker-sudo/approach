@@ -1,8 +1,11 @@
-# Approach
+# Approach Strength
 
 **Build it under the bar. Use it above the net.**
 
-An iPhone app (plus a mobile browser version) for volleyball athletes and coaches: weight training, fuel and planning built around the volleyball schedule. App Store name: **Approach: Volleyball Fitness** (set in App Store Connect; the home-screen name stays **Approach**).
+An iPhone app (plus a mobile browser version) for volleyball athletes and coaches: weight training, fuel and planning built around the volleyball schedule. The product name is **Approach Strength** (since 2.2.1; the home-screen short name is **Approach**).
+
+- **The app:** https://app.approachstrength.com (this repo, GitHub Pages). Join links, QR invites and the coach board live here.
+- **The website:** https://approachstrength.com (repo `rparker-sudo/approachstrength-site`): home page, `/privacy`, `/terms`, `/consent`. Built by `scripts/build-site.py` from this repo; legal pages come only from `docs/legal/`.
 
 The app has four tabs: **Lift** (today's training), **Fuel** (meals and hydration), **Plan** (season, week and match days) and **Progress** (touch height and strength). Coaches also get a **Team** tab.
 
@@ -87,24 +90,50 @@ Each file runs as one transaction (if anything fails, nothing changes) and is sa
 
 **Check query (optional):** `select count(*) filter (where column_name = 'level') as level_col, count(*) filter (where column_name = 'accent_color') as accent from information_schema.columns where table_schema = 'public' and table_name in ('team_members', 'teams');` should return 1 and 1, and `select to_regclass('public.station_runs'), to_regclass('public.consent_archive');` should return both names.
 
-What is stored online: name, email, role, position, birth year and whether the person is under 18, how they appear on boards, team membership and group, their level on each team (and whether the coach confirmed it), which team's lifting program they follow, their rack on a team, the six permissions (and which coach recorded them, when, and on which form version), posted team workouts and calendar, the workouts athletes log for a team (with how long they took and whether there was a personal best), live sets-done progress (deleted after a day), daily check-ins (sleep, soreness, energy, pain yes/no), attendance, and testing-day results with the coach's supervision record, each only with the matching permission. A minimal proof record of each parent consent and each supervised testing day (no workouts, check-ins or results) is kept for 5 years after an account or team is deleted, then purged; nobody can read it from the app. Home equipment stays on the phone. Athletes and their current coach see an athlete's data; teammates see only the boards (board name, progress, effort ranks). Body weight, personal notes and solo-mode data stay on the phone. Coaches see only their own teams; athletes see only their team's workout and their coach's name. Athletes must be 13 or older, and athletes under 18 need a signed parent consent form (`public/consent.html`) recorded by their coach. See `docs/compliance.md`.
+What is stored online: name, email, role, position, birth year and whether the person is under 18, how they appear on boards, team membership and group, their level on each team (and whether the coach confirmed it), which team's lifting program they follow, their rack on a team, the six permissions (and which coach recorded them, when, and on which form version), posted team workouts and calendar, the workouts athletes log for a team (with how long they took and whether there was a personal best), live sets-done progress (deleted after a day), daily check-ins (sleep, soreness, energy, pain yes/no), attendance, and testing-day results with the coach's supervision record, each only with the matching permission. A minimal proof record of each parent consent and each supervised testing day (no workouts, check-ins or results) is kept for 5 years after an account or team is deleted, then purged; nobody can read it from the app. Home equipment stays on the phone. Athletes and their current coach see an athlete's data; teammates see only the boards (board name, progress, effort ranks). Body weight, personal notes and solo-mode data stay on the phone. Coaches see only their own teams; athletes see only their team's workout and their coach's name. Athletes must be 13 or older, and athletes under 18 need a signed parent consent form (https://approachstrength.com/consent) recorded by their coach. Coaches accept the Coach Terms (Terms §4) before recording consent or starting strength checks; the version and time are stored on their profile. See `docs/compliance.md`.
 
 The claude.ai preview link can't reach Supabase, so it always runs in demo mode. Use the app in Expo Go or the GitHub Pages site for live sync.
 
+### Upgrading from 2.2.0 (to 2.2.1)
+Do these in order. Every change is recorded in `build-snapshot.md`.
+
+1. **Database:** in Supabase → SQL Editor, run `supabase/migrations/008_approach_2_2_1.sql` (safe to run twice). It adds the Coach Terms fields (`profiles.coach_terms_version`, `profiles.coach_terms_accepted_at`), requires them for recording consent and confirming supervision, and stops sending another team's level (`member_levels`) and the `ranked` flag (`team_effort`).
+2. **Website first:** push the site repo (`scripts/build-site.py`), turn on its Pages, and set its custom domain to `approachstrength.com` only after step 3 frees the apex, so `/privacy`, `/terms` and `/consent` never go dark.
+3. **App domain:** repository variables `APP_URL = https://app.approachstrength.com`, `BASE_PATH = /`, `SITE_URL = https://approachstrength.com`; Settings → Pages → Custom domain `app.approachstrength.com`; wait for the DNS check; **Enforce HTTPS**.
+4. **Supabase Auth → URL Configuration:** Site URL `https://app.approachstrength.com`; Redirect URLs `https://app.approachstrength.com/**` and `http://localhost:*/**`. Remove the old GitHub Pages project address and the apex entries only after the live tests pass.
+5. **Supabase Auth → Email Templates and SMTP:** subject lines and sender name say "Approach Strength".
+6. Deploy 2.2.1 (push to `main`).
+
+**Check query (optional):** `select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name like 'coach_terms_%';` should return 2.
+
 ## Browser version on GitHub Pages
 
-The repository includes `.github/workflows/deploy-web.yml`, which builds the browser version and publishes it every time you push to `main`. Team QR codes point at this site.
+The repository includes `.github/workflows/deploy-web.yml`, which builds the browser version and publishes it every time you push to `main`. Team QR codes and join links point at it.
 
-1. Create a free GitHub account and a new repository (for example `approach`), and push this project to it.
-2. In the repository: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-3. **Settings → Secrets and variables → Actions → New repository secret**: add `SUPABASE_URL` and `SUPABASE_ANON_KEY` (same values as your `.env`). Skip this to publish in demo mode.
-4. Push to `main` (or open **Actions → Deploy web app → Run workflow**). The site appears at `https://<your-username>.github.io/approach/`.
-5. Put that address in `.env` as `EXPO_PUBLIC_APP_URL` (and in the EAS build settings) so QR codes in the iPhone app point to it. The GitHub build sets it automatically.
+1. In the repository: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+2. **Settings → Secrets and variables → Actions → Secrets**: add `SUPABASE_URL` and `SUPABASE_ANON_KEY` (same values as your `.env`). Skip this to publish in demo mode.
+3. **Settings → Secrets and variables → Actions → Variables**: `APP_URL` = `https://app.approachstrength.com`, `SITE_URL` = `https://approachstrength.com`, `BASE_PATH` = `/`. (The workflow uses these same values if the variables are missing.)
+4. **Settings → Pages → Custom domain**: `app.approachstrength.com`, then **Enforce HTTPS**.
+5. Push to `main` (or open **Actions → Deploy web app → Run workflow**).
 6. After the App Store launch, add a repository **variable** `APP_STORE_ID` (the number in your App Store link) so Safari shows a "Get the app" banner on the site.
 
-**Using your own domain** (for example `https://lift.example.com`): add the domain under Settings → Pages, then add two repository variables: `APP_URL` set to the full address, and `BASE_PATH` set to `/`.
+The old GitHub Pages project address forwards to `https://app.approachstrength.com/…`, keeping the path (GitHub does this for a project site with a custom domain). The app's old `privacy.html`, `terms.html` and `consent.html` are redirect pages to the website.
 
-To build the site yourself: `EXPO_BASE_URL=/approach npm run build:web`, then upload `dist/`.
+To build the site yourself: `EXPO_PUBLIC_APP_URL=https://app.approachstrength.com EXPO_PUBLIC_SITE_URL=https://approachstrength.com npm run build:web`, then upload `dist/`.
+
+### DNS (Cloudflare, DNS only; done 11/14)
+| Record | Value |
+|---|---|
+| `app` CNAME | `rparker-sudo.github.io` |
+| apex `approachstrength.com` A | `185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153` |
+| apex `approachstrength.com` AAAA | `2606:50c0:8000::153`, `2606:50c0:8001::153`, `2606:50c0:8002::153`, `2606:50c0:8003::153` |
+| `www` CNAME | `rparker-sudo.github.io` |
+| TXT | GitHub domain verification (from Settings → Pages) |
+
+Mail records (MX, SPF, DKIM, DMARC) come from Zoho. Don't change them.
+
+### The website (`rparker-sudo/approachstrength-site`)
+`python3 scripts/build-site.py --out ../approachstrength-site` writes the whole site (placeholder home page, `/privacy`, `/terms`, `/consent`, `404.html`, `robots.txt`, `CNAME`, self-hosted fonts, outlined logos). Then commit and push in that repo. Its Pages settings: **Source: Deploy from a branch → `main` / root**, custom domain `approachstrength.com`, **Enforce HTTPS**. Plain HTML and CSS: no scripts, analytics, cookies, forms, or third-party requests.
 
 ---
 
@@ -182,10 +211,10 @@ As you edit the code, the app on your phone refreshes on its own.
 
 6. **Test it with TestFlight.** The build appears in TestFlight in App Store Connect (https://appstoreconnect.apple.com). Install it on your phone and invite athletes to test it before the public release.
 7. **Fill out the App Store listing** in App Store Connect:
-   - App name: **Approach: Volleyball Fitness** (when you create the app in App Store Connect under **Apps → +**)
+   - App name: **Approach Strength** (when you create the app in App Store Connect under **Apps → +**)
    - Screenshots from a 6.9" or 6.7" iPhone (take them on your phone from the TestFlight build)
    - Description, keywords and support URL
-   - **Privacy policy URL** (required): the site's `privacy.html`, for example `https://<your-username>.github.io/approach/privacy.html`
+   - **Privacy policy URL** (required): `https://approachstrength.com/privacy`
    - **App Privacy:** App Privacy must list what's collected when team sync is on (see docs/compliance.md). Don't choose 'Data Not Collected.'
    - **Age rating questionnaire**
 8. Click **Submit for Review**. Apple usually responds within 1–3 days.

@@ -70,12 +70,14 @@ function ThemeStack() {
           headerBackButtonDisplayMode: 'minimal',
           // Always a back button, even after a browser refresh (no history): see HeaderBack.
           headerLeft: () => <HeaderBack />,
-          // The Approach mark on every page goes home.
+          // The Approach Strength mark on every page goes home.
           headerRight: () => <HomeLogo />,
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+        <Stack.Screen name="reset-password" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="builder" options={{ title: 'Build a program', presentation: 'modal' }} />
         <Stack.Screen name="program/[id]" options={{ title: 'Plan' }} />
         <Stack.Screen name="session" options={{ title: 'Edit session' }} />

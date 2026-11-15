@@ -1,8 +1,20 @@
-# Approach versions
+# Approach Strength versions
 
 Version numbers: whole numbers (1.0, 2.0) for big changes, decimals (1.1, 1.2) for smaller features and fixes.
 The number is in `app.json` (`expo.version`, written as 1.1.0 for 1.1) and shows in the app under Settings.
 Each version has a matching GitHub tag (`v1.0`, `v1.1`, …) and download (`approach-1.0.zip`).
+
+## 2.2.1 — app.approachstrength.com, Approach Strength, Coach Terms, Log in
+Built from `docs/specs/v2.2.1.md` v1.1. Supabase migration `008` (run once, after 007). Acceptance report: `reports/v2.2.1-acceptance.md`.
+
+- **New addresses:** the app moves to **https://app.approachstrength.com**; **https://approachstrength.com** becomes the website (new repo `rparker-sudo/approachstrength-site`, built by `scripts/build-site.py`) with a placeholder home page and the Privacy Notice, Terms and parent consent form at the same URLs as before. Every link comes from `APP_URL` / `SITE_URL`; the app's old legal pages redirect to the website.
+- **Renamed to Approach Strength:** app name and title, onboarding, Settings, share texts, the board's "Powered by Approach Strength" (bottom-right, Steel). New outlined wordmark and lockups (`assets/brand/source/`). Board color presets from the brand guide (Silver default; existing teams keep their color).
+- **Welcome, Log in, Create an account:** the first screen offers Log in or Create an account. Logging in never asks the age question or role (pre-2.1 accounts answer the age question once). The age question comes first only when creating an account or a solo profile. `sign-in?role=coach|athlete` opens Log in. "Forgot password?" sends a reset link. Log out returns to Welcome; an expired session goes to Log in.
+- **Coach Terms:** coaches tick a separate "I agree to the Coach Terms (Terms §4)" box at sign-up; existing coaches see it once. Until accepted, recording parent consent and starting a strength check are blocked (in the app and on the server). Stores the version and time on the coach's profile.
+- **Set level** shows Training's level descriptions and a read-only "See the full checklist".
+- **Accessibility:** error and warning text use darker text colors on light screens (≥ 4.5:1); every tap target is at least 44 pt, and in-workout actions 56 pt.
+- **Privacy:** coaches no longer receive another team's level number (only the adjusted exercises), and teammates' effort boards no longer get a `ranked` flag or athletes ranked on another team.
+- **Housekeeping:** legal pages are built only from `docs/legal/` (no find-and-replace); `scripts/checks/run-all.sh` fails when a check can't run; new `v221-check.ts`, `legal-pages-match.py`, `supabase/tests/rls-2.2.1.sql`.
 
 ## 2.2.0 — levels, boards and racks, home workouts and stations
 One release, built in three passes (`docs/specs/v2.2.md`). Supabase migrations `005`, `006`, `007` (run once each, in order, after 004).

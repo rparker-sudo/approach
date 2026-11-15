@@ -100,11 +100,11 @@ export default function StationControls({ team }: { team: Team }) {
         {run?.endedAt ? <Text style={{ fontSize: 13, color: colors.muted }}>Stations ended.</Text> : null}
         {missing.length ? (
           <>
-            <Text style={{ fontSize: 14, color: colors.warning }}>{`${missing.length} athlete${missing.length === 1 ? " isn't" : "s aren't"} on a rack.`}</Text>
+            <Text style={{ fontSize: 14, color: colors.warningText }}>{`${missing.length} athlete${missing.length === 1 ? " isn't" : "s aren't"} on a rack.`}</Text>
             <Button kind="secondary" title="Add the rest to racks (balanced)" disabled={busy} onPress={fillRacks} />
           </>
         ) : null}
-        {tooManyRacks ? <Text style={{ fontSize: 13, color: colors.error }}>{`${racks.filter((r) => r.userIds.length).length} racks, ${stations.length} stations. Add a station or merge two racks.`}</Text> : null}
+        {tooManyRacks ? <Text style={{ fontSize: 13, color: colors.errorText }}>{`${racks.filter((r) => r.userIds.length).length} racks, ${stations.length} stations. Add a station or merge two racks.`}</Text> : null}
         <Button
           title="Start stations"
           disabled={busy || missing.length > 0 || tooManyRacks}

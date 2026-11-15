@@ -3,8 +3,8 @@
 \set VERBOSITY terse
 \pset footer off
 insert into auth.users (id, raw_user_meta_data) values
- ('00000000-0000-0000-0000-0000000000ca', '{"name":"Coach Alpha","role":"coach","birth_year":"1985","is_minor":"false"}'),
- ('00000000-0000-0000-0000-0000000000cb', '{"name":"Coach Bravo","role":"coach","birth_year":"1980","is_minor":"false"}'),
+ ('00000000-0000-0000-0000-0000000000ca', '{"name":"Coach Alpha","role":"coach","birth_year":"1985","is_minor":"false","coach_terms_version":"2026-11-14"}'),
+ ('00000000-0000-0000-0000-0000000000cb', '{"name":"Coach Bravo","role":"coach","birth_year":"1980","is_minor":"false","coach_terms_version":"2026-11-14"}'),
  ('00000000-0000-0000-0000-0000000000a1', '{"name":"Jordan Miller","role":"athlete","birth_year":"2010","is_minor":"true"}'),
  ('00000000-0000-0000-0000-0000000000a2', '{"name":"Ava Reed","role":"athlete","birth_year":"2010","is_minor":"true"}'),
  ('00000000-0000-0000-0000-0000000000b1', '{"name":"Taylor Smith","role":"athlete","birth_year":"2000","is_minor":"false"}');
@@ -44,7 +44,7 @@ select pg_temp.u(:'V'); insert into live_progress (team_id, day, sets_done, sets
 \echo == D1 D-027: T follows School (first team); Club board and ranks leave T out; School keeps T
 select pg_temp.u(:'T'); select set_my_choices(true, true, true, true, true);
 select pg_temp.u(:'CB'); select count(*) as club_board_has_taylor from board_members(:'B') where user_id = :'T';
-select ranked as club_ranks_taylor from team_effort(:'B', current_date - 30) where user_id = :'T';
+select (:'T'::uuid in (select members_following_other(:'B'))) as club_marks_taylor_following_other;
 select pg_temp.u(:'CA'); select count(*) as school_board_has_taylor from board_members(:'A') where user_id = :'T';
 \echo == E1 extra recovery log kind; effort logs carry kind and no weights
 select pg_temp.u(:'J');

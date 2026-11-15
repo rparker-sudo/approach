@@ -1,82 +1,54 @@
 #!/usr/bin/env python3
-"""Builds public/privacy.html, terms.html and consent.html from docs/legal/ (spec P8).
+"""Builds privacy.html, terms.html and consent.html for the website from docs/legal/ (2.2.1 §2, §7.1).
 
-    python3 scripts/build-legal-pages.py
+    python3 scripts/build-legal-pages.py [--out ../approachstrength-site]
 
-Plain HTML with the brand colors: no scripts, no external fonts, no trackers.
-Internal notes (owner lines, "Notes for the attorney", "Attorney to finalize") are left out.
-Contact email and publish date come from the settings below (docs/legal keeps its placeholders);
-an empty setting leaves the visible placeholder.
-The v2.2 docs still name the old club address (Ryan@thehbcvbc.com); the build swaps it for CONTACT_EMAIL (TM-10).
+The pages are published on https://approachstrength.com/privacy, /terms and /consent (the site repo
+rparker-sudo/approachstrength-site). The app's own public/privacy.html etc. are redirects to them.
+
+Rules (Legal; docs/legal/soft-launch-notice.md): the build publishes Legal's text exactly. There is
+no find-and-replace on legal wording here. The script only:
+  - converts the Markdown to HTML (headings, lists, tables, bold, italics, signature lines),
+  - picks the published sections (Part A, Part B, the printable form) and leaves out Legal's
+    drafting notes and the "(Attorney to ...)" review markers, which are internal notes,
+  - fills the "[publish date]" placeholder,
+  - adds an id="coach-terms" anchor on Terms §4 (markup only) for the in-app Coach Terms link.
+It stops if the sources fail the 2.2.1 stop rules (contact email and the "Approach Strength" name).
+Plain HTML and CSS: no scripts, no third-party requests, self-hosted fonts.
 """
+import argparse
 import html
 import re
+import sys
 from pathlib import Path
 
-# Owner-supplied (founder checklist): personal or business, never a district address.
-CONTACT_EMAIL = 'ryan@approachstrength.com'
-PUBLISH_DATE = 'November 14, 2026'
+PUBLISH_DATE = 'November 15, 2026'
+CONTACT = 'ryan@approachstrength.com'
 
 ROOT = Path(__file__).resolve().parent.parent
 NOTICE = (ROOT / 'docs/legal/soft-launch-notice.md').read_text()
 FORM = (ROOT / 'docs/legal/parent-consent-form.md').read_text()
 
-CSS = """    :root { --bg:#0B0B0C; --surface:#1C1D20; --border:#3A3D42; --text:#FFFFFF; --muted:#A7ABB2; --warn:#E2A336; }
-    @media (prefers-color-scheme: light) { :root { --bg:#FFFFFF; --surface:#F1F2F4; --border:#C9CDD2; --text:#0B0B0C; --muted:#3A3D42; } }
-    * { box-sizing: border-box; }
-    body { margin:0; background:var(--bg); color:var(--text); font: 16px/1.55 Inter, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif; }
-    main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
-    header { display:flex; align-items:center; gap:12px; margin-bottom: 24px; }
-    header img { width:40px; height:40px; border-radius:10px; }
-    .brand { font-weight:600; letter-spacing:.18em; text-transform:uppercase; font-size:14px; }
-    h1 { font-size:26px; line-height:1.25; margin:0 0 4px; }
-    h2 { font-size:18px; margin:32px 0 8px; letter-spacing:.06em; text-transform:uppercase; }
-    h3 { font-size:16px; margin:24px 0 6px; }
-    .muted { color:var(--muted); font-size:14px; }
-    ul, ol { padding-left: 22px; }
-    li { margin: 6px 0; }
-    a { color:inherit; }
-    table { width:100%; border-collapse: collapse; margin: 12px 0; font-size:14px; }
-    th, td { border:1px solid var(--border); padding:8px; text-align:left; vertical-align: top; }
-    th { background: var(--surface); }
-    .table-wrap { overflow-x:auto; }
-    .placeholder { background: var(--surface); border:1px dashed var(--warn); padding: 0 4px; border-radius:4px; }
-    .box { border:1px solid var(--border); border-radius:12px; padding:12px 16px; margin:12px 0; background:var(--surface); display:flex; gap:12px; align-items:flex-start; }
-    .box .sq { flex:none; width:20px; height:20px; border:2px solid var(--text); border-radius:3px; margin-top:3px; }
-    .box p { margin:0; }
-    .line { display:inline-block; min-width: 200px; border-bottom:1px solid var(--muted); height: 1.2em; vertical-align: bottom; }
-    .print { font-size:14px; color:var(--muted); }
-    nav { margin-top: 40px; font-size:14px; color:var(--muted); }
-    nav a { margin-right: 16px; }
-    @media print {
-      :root { --bg:#FFFFFF; --surface:#FFFFFF; --border:#000000; --text:#000000; --muted:#333333; }
-      body { font-size: 11pt; }
-      main { padding: 0; max-width: none; }
-      nav, .print { display:none; }
-      .placeholder { border: none; padding: 0; }
-      h2 { margin-top: 16px; }
-    }
-"""
+
+def stop(msg: str) -> None:
+    print('STOP: ' + msg, file=sys.stderr)
+    sys.exit(2)
 
 
 def inline(text: str) -> str:
     t = html.escape(text, quote=False)
-    # Fill-ins (internal notes inside the placeholders are dropped); empty settings stay visible placeholders.
-    email = f'<a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a>' if CONTACT_EMAIL else '<span class="placeholder">[CONTACT EMAIL]</span>'
-    t = re.sub(r'\[CONTACT EMAIL[^\]]*\]', email, t)
-    if CONTACT_EMAIL:
-        t = re.sub(r'ryan@thehbcvbc\.com', email, t, flags=re.IGNORECASE)
-    t = re.sub(r'\[publish date\]', PUBLISH_DATE or '<span class="placeholder">[publish date]</span>', t)
+    t = t.replace('[publish date]', PUBLISH_DATE)
     t = re.sub(r'_{4,}', '<span class="line"></span>', t)
     t = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', t)
     t = re.sub(r'(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?!\w)', r'<em>\1</em>', t)
     t = re.sub(r'`([^`]+)`', r'\1', t)
-    # Link the Terms and Privacy Notice mentioned in the consent form.
-    t = t.replace('Approach Terms and Privacy Notice', 'Approach <a href="terms.html">Terms</a> and <a href="privacy.html">Privacy Notice</a>')
     return t
 
 
-def md_to_html(md: str) -> str:
+ITEM = re.compile(r'^(\d+)\.\s+(.*)$')
+
+
+def md_to_html(md: str, indent: str = '    ') -> str:
     out: list[str] = []
     lines = md.strip('\n').split('\n')
     i = 0
@@ -84,7 +56,7 @@ def md_to_html(md: str) -> str:
 
     def flush():
         if para:
-            out.append('    <p>' + '<br />'.join(inline(x) for x in para) + '</p>')
+            out.append(indent + '<p>' + '<br />'.join(inline(x) for x in para) + '</p>')
             para.clear()
 
     while i < len(lines):
@@ -97,7 +69,7 @@ def md_to_html(md: str) -> str:
         if s.startswith('#'):
             flush()
             level = len(s) - len(s.lstrip('#'))
-            out.append(f'    <h{level}>{inline(s[level:].strip())}</h{level}>')
+            out.append(f'{indent}<h{level}>{inline(s[level:].strip())}</h{level}>')
             i += 1
             continue
         if s.startswith('|'):
@@ -109,41 +81,62 @@ def md_to_html(md: str) -> str:
                     rows.append(cells)
                 i += 1
             head, body = rows[0], rows[1:]
-            out.append('    <div class="table-wrap"><table>')
-            out.append('      <tr>' + ''.join(f'<th>{inline(c)}</th>' for c in head) + '</tr>')
+            out.append(f'{indent}<div class="table-wrap"><table>')
+            out.append(f'{indent}  <tr>' + ''.join(f'<th>{inline(c)}</th>' for c in head) + '</tr>')
             for r in body:
-                out.append('      <tr>' + ''.join(f'<td>{inline(c)}</td>' for c in r) + '</tr>')
-            out.append('    </table></div>')
+                out.append(f'{indent}  <tr>' + ''.join(f'<td>{inline(c)}</td>' for c in r) + '</tr>')
+            out.append(f'{indent}</table></div>')
             continue
         if s.startswith('☐'):
             flush()
-            out.append(f'    <div class="box"><span class="sq"></span><p>{inline(s[1:].strip())}</p></div>')
+            out.append(f'{indent}<div class="box"><span class="sq"></span><p>{inline(s[1:].strip())}</p></div>')
             i += 1
             continue
-        m = re.match(r'^(\d+)\.\s+(.*)$', s)
-        if m or s.startswith('- '):
+        if ITEM.match(s) or s.startswith('- '):
             flush()
-            ordered = bool(m)
+            ordered = bool(ITEM.match(s))
             tag = 'ol' if ordered else 'ul'
-            out.append(f'    <{tag}>')
+            out.append(f'{indent}<{tag}>')
             while i < len(lines):
                 cur = lines[i]
                 cs = cur.strip()
-                mm = re.match(r'^(\d+)\.\s+(.*)$', cs) if ordered else None
-                if (ordered and mm and not cur.startswith(' ')) or (not ordered and cs.startswith('- ') and not cur.startswith(' ')):
-                    item = mm.group(2) if ordered else cs[2:]
-                    sub = []
-                    i += 1
-                    while i < len(lines) and lines[i].startswith('   ') and lines[i].strip().startswith('- '):
-                        sub.append(lines[i].strip()[2:])
-                        i += 1
-                    li = f'      <li>{inline(item)}'
-                    if sub:
-                        li += '<ul>' + ''.join(f'<li>{inline(x)}</li>' for x in sub) + '</ul>'
-                    out.append(li + '</li>')
-                else:
+                top = not cur.startswith(' ')
+                mm = ITEM.match(cs) if ordered else None
+                if not (top and ((ordered and mm) or (not ordered and cs.startswith('- ')))):
                     break
-            out.append(f'    </{tag}>')
+                item = mm.group(2) if ordered else cs[2:]
+                i += 1
+                # Indented lines (and blank lines followed by indented lines) belong to this item.
+                nested: list[str] = []
+                while i < len(lines):
+                    nxt = lines[i]
+                    if nxt.startswith('   '):
+                        nested.append(nxt[3:])
+                        i += 1
+                    elif not nxt.strip():
+                        j = i
+                        while j < len(lines) and not lines[j].strip():
+                            j += 1
+                        if j < len(lines) and lines[j].startswith('   '):
+                            nested.extend([''] * (j - i))
+                            i = j
+                        else:
+                            break
+                    else:
+                        break
+                # Anchor for in-app links (2.2.1 §8). Markup only; the item's wording is untouched.
+                anchor = ' id="coach-terms"' if item.startswith('**Coach Terms.**') else ''
+                li = f'{indent}  <li{anchor}>{inline(item)}'
+                if nested:
+                    li += '\n' + md_to_html('\n'.join(nested), indent + '    ') + '\n' + indent + '  '
+                out.append(li + '</li>')
+                # A blank line between items keeps the same list.
+                j = i
+                while j < len(lines) and not lines[j].strip():
+                    j += 1
+                if j < len(lines) and not lines[j].startswith(' ') and (ITEM.match(lines[j].strip()) if ordered else lines[j].strip().startswith('- ')):
+                    i = j
+            out.append(f'{indent}</{tag}>')
             continue
         para.append(s)
         i += 1
@@ -151,31 +144,12 @@ def md_to_html(md: str) -> str:
     return '\n'.join(out)
 
 
+# Legal's internal review markers, e.g. "*(Attorney to finalize.)*" (not published; see the docstring).
+ATTORNEY_NOTE = re.compile(r'\s*\*\(Attorney to [^)]*\)\*')
+
+
 def strip_internal(md: str) -> str:
-    md = re.sub(r'\s*\*\(Attorney to finalize\.\)\*', '', md)
-    return md
-
-
-def page(title: str, body: str) -> str:
-    return f"""<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="robots" content="noindex" />
-  <title>{title} · Approach</title>
-  <style>
-{CSS}  </style>
-</head>
-<body>
-  <main>
-    <header><img src="icon-192.png" alt="" /><span class="brand">Approach</span></header>
-{body}
-    <nav><a href="privacy.html">Privacy Notice</a><a href="terms.html">Terms</a><a href="consent.html">Parent consent form</a></nav>
-  </main>
-</body>
-</html>
-"""
+    return ATTORNEY_NOTE.sub('', md)
 
 
 def section(md: str, start: str, end: str | None) -> str:
@@ -184,26 +158,86 @@ def section(md: str, start: str, end: str | None) -> str:
     return md[a:b]
 
 
-# Privacy Notice: Part A. Terms: Part B.
-part_a = section(NOTICE, '## Part A: Privacy Notice', '## Part B')
-part_b = section(NOTICE, '## Part B: Terms (Soft Launch)', None)
-part_a = part_a.replace('## Part A: Privacy Notice', '# Privacy Notice', 1)
-part_b = part_b.replace('## Part B: Terms (Soft Launch)', '# Terms (Soft Launch)', 1)
+HEADER = """    <header class="site-header">
+      <a href="/" class="lockup" aria-label="Approach Strength home">
+        <picture>
+          <source srcset="/assets/lockup-plain-on-light.svg" media="(prefers-color-scheme: light)" />
+          <img src="/assets/lockup-plain-on-dark.svg" alt="Approach Strength" width="200" height="40" />
+        </picture>
+      </a>
+    </header>"""
 
-# Consent form: the printable form, without the attorney notes.
-form = section(FORM, '## Approach: Volleyball Fitness', '## Notes for the attorney')
-form = form.replace('## Approach: Volleyball Fitness\n', '', 1).replace('### Parent/Guardian Consent', '# Parent/Guardian Consent', 1)
-form_html = md_to_html(strip_internal(form))
-form_html = (
-    '    <p class="print">Print this page (or save it as a PDF), have a parent or guardian check the boxes and sign, and give it to the coach.</p>\n'
-    '    <p class="muted">Approach: Volleyball Fitness</p>\n' + form_html
-)
+FOOTER = """    <footer class="site-footer">
+      <nav><a href="/">Home</a><a href="/privacy">Privacy Notice</a><a href="/terms">Terms</a><a href="/consent">Parent consent form</a><a href="mailto:{email}">{email}</a></nav>
+    </footer>""".format(email=CONTACT)
 
-pages = {
-    'privacy.html': page('Privacy Notice', md_to_html(strip_internal(part_a))),
-    'terms.html': page('Terms', md_to_html(strip_internal(part_b))),
-    'consent.html': page('Parent consent form', form_html),
-}
-for name, text in pages.items():
-    (ROOT / 'public' / name).write_text(text)
-    print('wrote public/' + name)
+
+def page(title: str, body: str, cls: str = 'legal') -> str:
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark light" />
+  <title>{title} · Approach Strength</title>
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/site.css" />
+</head>
+<body>
+  <main class="{cls}">
+{HEADER}
+{body}
+{FOOTER}
+  </main>
+</body>
+</html>
+"""
+
+
+def build() -> dict[str, str]:
+    # Stop rules (2.2.1 process rule 5; CLAUDE.md hard stops).
+    compliance = (ROOT / 'docs/compliance.md').read_text()
+    if CONTACT not in compliance:
+        stop('docs/compliance.md does not name ' + CONTACT)
+    for name, src in (('soft-launch-notice.md', NOTICE), ('parent-consent-form.md', FORM)):
+        if 'Approach Strength' not in src:
+            stop(f'docs/legal/{name} does not say "Approach Strength"')
+
+    part_a = section(NOTICE, '## Part A: Privacy Notice', '## Part B')
+    part_b = section(NOTICE, '## Part B: Terms (Soft Launch)', '### Drafting notes')
+    part_a = '# Privacy Notice' + part_a[len('## Part A: Privacy Notice'):]
+    part_b = '# Terms (Soft Launch)' + part_b[len('## Part B: Terms (Soft Launch)'):]
+
+    # Consent form: the printable form, without the attorney notes. Its "## <name>: Volleyball Fitness" line
+    # becomes the small line above the H1.
+    m = re.search(r'^## (.+: Volleyball Fitness)\n', FORM, re.M)
+    if not m:
+        stop('consent form heading not found')
+    form = section(FORM, m.group(0), '## Notes for the attorney')[len(m.group(0)):]
+    form = re.sub(r'^### (Parent/Guardian Consent)', r'# \1', form, count=1, flags=re.M)
+    form_html = (
+        '    <p class="print">Print this page (or save it as a PDF), have a parent or guardian check the boxes and sign, and give it to the coach.</p>\n'
+        f'    <p class="muted">{inline(m.group(1))}</p>\n' + md_to_html(strip_internal(form))
+    )
+    pages = {
+        'privacy.html': page('Privacy Notice', md_to_html(strip_internal(part_a))),
+        'terms.html': page('Terms', md_to_html(strip_internal(part_b))),
+        'consent.html': page('Parent consent form', form_html),
+    }
+    for name, text in pages.items():
+        if 'thehbcvbc' in text.lower():
+            stop(f'{name} contains the old club address')
+        if CONTACT not in text:
+            stop(f'{name} does not contain {CONTACT}')
+    return pages
+
+
+if __name__ == '__main__':
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--out', default=str(ROOT.parent / 'approachstrength-site'), help='the site repo folder')
+    args = ap.parse_args()
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    for name, text in build().items():
+        (out / name).write_text(text)
+        print(f'wrote {out / name}')

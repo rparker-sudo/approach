@@ -29,7 +29,7 @@ import {
 import { dateKey, today } from './calendar';
 import { LEVEL_OF } from './athlete';
 import { isLow } from './readiness';
-import { effortProblem } from './resolve';
+import { effortProblem, levelTable } from './resolve';
 import { blocksOf, clockProblem, CLOCK_REASON } from './groups';
 import { mustBePart1, PART1_REASON } from './stations';
 import { useStore } from './store';
@@ -83,6 +83,8 @@ export function summarizeReadiness(list: Readiness[], roster: number): Readiness
 type TeamState = {
   account: Account | null;
   checked: boolean;
+  /** The session couldn't be checked (offline): not the same as signed out. */
+  accountUnknown: boolean;
   teams: Team[];
   members: Record<string, Member[]>;
   groups: Record<string, Group[]>;
@@ -95,7 +97,12 @@ type TeamState = {
   refresh: () => Promise<void>;
   signUp: (input: SignUpInput) => Promise<Account>;
   signIn: (email: string, password: string) => Promise<Account>;
+  /** Log out: back to Welcome (2.2.1 §9). Removes this device's profile; on-device history stays. */
   signOut: () => Promise<void>;
+  /** Accept the current Coach Terms (2.2.1 §8). */
+  acceptCoachTerms: () => Promise<void>;
+  /** Signed in another way (a password-reset link). */
+  setSignedIn: (a: Account) => void;
   createTeam: (name: string) => Promise<Team>;
   renameTeam: (teamId: string, name: string) => Promise<void>;
   deleteTeam: (teamId: string) => Promise<void>;
@@ -282,12 +289,17 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const { mutate, data } = store;
   const [account, setAccount] = useState<Account | null>(null);
   const [checked, setChecked] = useState(false);
+  const [accountUnknown, setAccountUnknown] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [members, setMembers] = useState<Record<string, Member[]>>({});
   const [groups, setGroups] = useState<Record<string, Group[]>>({});
   const [logs, setLogs] = useState<Record<string, TeamLog[]>>({});
   const [readiness, setReadiness] = useState<Record<string, Readiness[]>>({});
   const [posted, setPosted] = useState<Record<string, TeamProgram>>({});
+  const postedRef = useRef(posted);
+  useEffect(() => {
+    postedRef.current = posted;
+  }, [posted]);
   const [attendance, setAttendance] = useState<Record<string, Attendance[]>>({});
   const [testSessions, setTestSessions] = useState<Record<string, TestSession | undefined>>({});
   const [testResults, setTestResults] = useState<Record<string, TestResult[]>>({});
@@ -397,7 +409,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         const extras = await Promise.all(
           ids.map(async (id): Promise<CoachExtras> => {
             const [lv, fo, ret, el] = await Promise.all([
-              backend.memberLevels(id),
+              backend.memberLevels(id, levelTable(tps.filter((p) => p.teamId === id).map((p) => p.program))),
               backend.membersFollowingOther(id),
               backend.membersReturning(id),
               backend.testingEligibility(id, day),
@@ -427,7 +439,10 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     backend
       .getAccount()
       .then((a) => setAccount(a))
-      .catch(() => setAccount(null))
+      .catch(() => {
+        setAccount(null);
+        setAccountUnknown(true);
+      })
       .finally(() => setChecked(true));
   }, []);
 
@@ -437,10 +452,11 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     const age = account.birthYear != null ? { birthYear: account.birthYear, isMinor: account.isMinor ?? true } : {};
     mutate((d) =>
       d.profile &&
-      (d.profile.role !== account.role ||
+      (!d.profile.hasAccount ||
+        d.profile.role !== account.role ||
         (account.name && d.profile.name !== account.name) ||
         (account.birthYear != null && (d.profile.birthYear !== account.birthYear || d.profile.isMinor !== (account.isMinor ?? true))))
-        ? { ...d, profile: { ...d.profile, role: account.role, name: account.name || d.profile.name, ...age } }
+        ? { ...d, profile: { ...d.profile, role: account.role, name: account.name || d.profile.name, hasAccount: true, ...age } }
         : d,
     );
     // Accounts from before 2.1: send the age answered on this device once.
@@ -519,6 +535,12 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         programs: d.programs.map((p) => (p.id === local.id ? { ...p, unposted: false, postedAt: tp.updatedAt } : p)),
       }));
       setPosted((s) => ({ ...s, [postedKey(teamId, groupKey)]: tp }));
+      // The new program may have exercises the level table didn't cover (2.2.1 J1): refresh this team's adjustments.
+      const progs = [tp.program, ...Object.values(postedRef.current).filter((p) => p.teamId === teamId && p.groupKey !== groupKey).map((p) => p.program)];
+      backend
+        .memberLevels(teamId, levelTable(progs))
+        .then((lv) => setCoachExtras((cur) => (cur[teamId] ? { ...cur, [teamId]: { ...cur[teamId], levels: Object.fromEntries(lv.map((x) => [x.userId, x])) } } : cur)))
+        .catch(() => {});
     },
     [mutate],
   );
@@ -570,6 +592,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     () => ({
       account,
       checked,
+      accountUnknown,
       teams,
       members,
       groups,
@@ -586,12 +609,22 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       },
       async signIn(email, password) {
         const a = await backend.signIn(email, password);
+        setAccountUnknown(false);
         setAccount(a);
         return a;
       },
       async signOut() {
         await backend.signOut();
         clearTeamState();
+        mutate((d) => ({ ...d, profile: null }));
+      },
+      async acceptCoachTerms() {
+        const a = await backend.acceptCoachTerms();
+        setAccount(a);
+      },
+      setSignedIn(a) {
+        setAccountUnknown(false);
+        setAccount(a);
       },
       async deleteAccount() {
         await backend.deleteMyAccount();
@@ -746,7 +779,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         }));
       },
     }),
-    [account, checked, teams, members, groups, logs, readiness, posted, attendance, testSessions, testResults, coachExtras, syncing, lastError, refresh, mutate, data, postCalendarIfNeeded, postProgram, writeCalendar, clearTeamState],
+    [account, checked, accountUnknown, teams, members, groups, logs, readiness, posted, attendance, testSessions, testResults, coachExtras, syncing, lastError, refresh, mutate, data, postCalendarIfNeeded, postProgram, writeCalendar, clearTeamState],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

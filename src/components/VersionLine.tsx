@@ -36,7 +36,7 @@ export default function VersionLine({ exerciseId, teamExerciseId, teamId }: { ex
       {open ? (
         <Sheet title="Why is this different?" onClose={() => setOpen(false)}>
           <Body>
-            {`Your coach's plan is for the whole team. Approach gives you the version that fits your level on ${teamName}. Your sets, reps, and rest stay the same.`}
+            {`Your coach's plan is for the whole team. Approach Strength gives you the version that fits your level on ${teamName}. Your sets, reps, and rest stay the same.`}
           </Body>
           {tl ? <Body muted>{levelLine(teamName, tl.level ?? ownLevel(data), tl.confirmed)}</Body> : null}
           <Button title="Got it" onPress={() => setOpen(false)} />

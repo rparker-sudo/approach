@@ -52,7 +52,7 @@ export function suggestTestDates(program: Program, from: Date = todayDate()): Su
       else push(liftDaysIn(program, addDays(bs, 7)).find((d) => dateKey(d) >= fromKey_), 'week 2');
     }
   } else if (program.phase === 'pre') {
-    // No prior block in Approach: last lift day of preseason week 1. Then the last lift day of each deload week.
+    // No prior block in Approach Strength: last lift day of preseason week 1. Then the last lift day of each deload week.
     const firstBlock = program.blockStart == null || program.blockStart === program.createdAt.slice(0, 10);
     if (firstBlock) {
       const w1 = liftDaysIn(program, start);

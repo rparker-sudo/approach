@@ -177,7 +177,7 @@ export default function RacksScreen() {
               {r.userIds.map((u) => {
                 const m = roster.find((x) => x.userId === u);
                 return (
-                  <Pressable key={u} accessibilityRole="button" onPress={() => setMoving(moving === u ? null : u)} style={{ minHeight: 40, justifyContent: 'center' }}>
+                  <Pressable key={u} accessibilityRole="button" onPress={() => setMoving(moving === u ? null : u)} style={{ minHeight: 44, justifyContent: 'center' }}>
                     <Row style={{ gap: 8 }}>
                       <Text style={{ flex: 1, fontWeight: moving === u ? '700' : '400' }}>{nameOf(u)}</Text>
                       {/* Coach only: small level and position chips. */}
@@ -195,7 +195,7 @@ export default function RacksScreen() {
             {unassigned.length ? (
               unassigned.map((m) => (
                 <View key={m.userId} style={{ gap: 4 }}>
-                  <Pressable accessibilityRole="button" onPress={() => setMoving(moving === m.userId ? null : m.userId)} style={{ minHeight: 40, justifyContent: 'center' }}>
+                  <Pressable accessibilityRole="button" onPress={() => setMoving(moving === m.userId ? null : m.userId)} style={{ minHeight: 44, justifyContent: 'center' }}>
                     <Text style={{ fontWeight: moving === m.userId ? '700' : '400' }}>{m.name}</Text>
                   </Pressable>
                   {/* R6: someone who joined after the racks were set. */}
@@ -206,7 +206,7 @@ export default function RacksScreen() {
                         const k = suggestRack(draft);
                         setDraft(draft.map((x, j) => (j === k ? { ...x, userIds: [...x.userIds, m.userId] } : x)));
                       }}
-                      style={{ fontSize: 13, textDecorationLine: 'underline' }}
+                      style={{ fontSize: 13, textDecorationLine: 'underline', paddingVertical: 14 }}
                     >
                       {`Add ${m.name.split(' ')[0]} to a rack? Suggested: ${draft[suggestRack(draft)].name}`}
                     </Text>

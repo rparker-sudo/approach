@@ -8,6 +8,7 @@ import {
   Image,
   Modal,
   Pressable,
+  Switch,
   Text as RNText,
   TextInput as RNTextInput,
   ScrollView,
@@ -73,6 +74,9 @@ export function TextInput(props: TextInputProps) {
 const MARK = { dark: require('../../assets/brand/mark-dark.png'), light: require('../../assets/brand/mark-light.png') };
 const BADGE = { dark: require('../../assets/brand/badge-dark.png'), light: require('../../assets/brand/badge-light.png') };
 const NET_TAPE = require('../../assets/brand/net-tape.png');
+/** Outlined wordmark (APPROACH over STRENGTH), from assets/brand/source/wordmark-on-*.svg (2.2.1 §3). */
+const WORDMARK = { dark: require('../../assets/brand/wordmark-dark.png'), light: require('../../assets/brand/wordmark-light.png') };
+const WORDMARK_RATIO = 360.07 / 69.6;
 
 /** Barbell + chevron, no ball. For small sizes (headers). */
 export function BrandMark({ size = 32 }: { size?: number }) {
@@ -84,12 +88,16 @@ export function BrandBadge({ size = 120 }: { size?: number }) {
   return <Image source={BADGE[colors.mode]} style={{ width: size, height: size }} accessibilityLabel={BRAND.name} />;
 }
 
-/** "APPROACH" in the display style. */
-export function Wordmark({ size = 24 }: { size?: number }) {
+/** The Approach Strength wordmark. Brand guide §5: at least 96 px wide (use the mark alone below that). */
+export function Wordmark({ width = 180 }: { width?: number }) {
+  const w = Math.max(96, width);
   return (
-    <Text style={display(size)} accessibilityLabel={BRAND.name}>
-      APPROACH
-    </Text>
+    <Image
+      source={WORDMARK[colors.mode]}
+      style={{ width: w, height: w / WORDMARK_RATIO }}
+      accessibilityRole="image"
+      accessibilityLabel={BRAND.name}
+    />
   );
 }
 
@@ -97,7 +105,7 @@ export function Lockup({ badge = 120 }: { badge?: number }) {
   return (
     <View style={{ alignItems: 'center', gap: 14 }}>
       <BrandBadge size={badge} />
-      <Wordmark size={24} />
+      <Wordmark width={180} />
       <Text style={{ color: colors.muted, fontSize: 13, textAlign: 'center' }}>{BRAND.tagline}</Text>
     </View>
   );
@@ -216,6 +224,7 @@ export function Button({
   icon,
   disabled,
   small,
+  large,
 }: {
   title: string;
   onPress: () => void;
@@ -223,9 +232,11 @@ export function Button({
   icon?: SFSymbol;
   disabled?: boolean;
   small?: boolean;
+  /** 56 pt: in-workout primary actions and the Welcome buttons (F-7). Every button is at least 44 pt. */
+  large?: boolean;
 }) {
   const bg = kind === 'primary' ? colors.primaryBg : kind === 'secondary' ? colors.raised : 'transparent';
-  const fg = kind === 'primary' ? colors.primaryText : kind === 'danger' ? colors.error : colors.ink;
+  const fg = kind === 'primary' ? colors.primaryText : kind === 'danger' ? colors.errorText : colors.ink;
   const border = kind === 'primary' ? colors.primaryBg : kind === 'danger' ? colors.error : colors.line;
   return (
     <Pressable
@@ -238,6 +249,8 @@ export function Button({
           alignItems: 'center',
           justifyContent: 'center',
           gap: 8,
+          minHeight: large ? 56 : 44,
+          minWidth: large ? 56 : 44,
           paddingVertical: small ? 8 : 14,
           paddingHorizontal: small ? 12 : 18,
           borderRadius: BRAND.radius.md,
@@ -262,6 +275,8 @@ export function Chip({ label, selected, onPress }: { label: string; selected: bo
       aria-selected={selected}
       onPress={onPress}
       style={{
+        minHeight: 44,
+        justifyContent: 'center',
         paddingHorizontal: 14,
         paddingVertical: 8,
         borderRadius: BRAND.radius.pill,
@@ -271,6 +286,73 @@ export function Chip({ label, selected, onPress }: { label: string; selected: bo
       }}
     >
       <Text style={{ fontSize: 13, fontWeight: '500', color: selected ? colors.primaryText : colors.ink }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/**
+ * On/off switch with a 44 pt tap area (F-7). The whole area is the control; the switch inside is only the look
+ * (a plain Switch is 40 × 20 on the web).
+ */
+export function Toggle({ value, onValueChange, disabled, accessibilityLabel }: { value: boolean; onValueChange: (v: boolean) => void; disabled?: boolean; accessibilityLabel: string }) {
+  return (
+    <Pressable
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value, disabled: !!disabled }}
+      aria-checked={value}
+      accessibilityLabel={accessibilityLabel}
+      disabled={disabled}
+      onPress={() => onValueChange(!value)}
+      style={{ minWidth: 56, minHeight: 44, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : 1 }}
+    >
+      <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
+        <Switch
+          value={value}
+          disabled={disabled}
+          trackColor={{ true: colors.ink, false: colors.line }}
+          thumbColor={value ? colors.bg : colors.muted}
+          {...({ activeThumbColor: colors.bg, tabIndex: -1 } as object)}
+        />
+      </View>
+    </Pressable>
+  );
+}
+
+/** Inline text link with a 44 pt tap area (F-7). */
+export function TextLink({ title, onPress, style }: { title: string; onPress: () => void; style?: StyleProp<TextStyle> }) {
+  return (
+    <Pressable accessibilityRole="link" onPress={onPress} style={{ minHeight: 44, minWidth: 44, justifyContent: 'center', alignSelf: 'flex-start' }}>
+      <Text style={[{ fontSize: 15, textDecorationLine: 'underline' }, style]}>{title}</Text>
+    </Pressable>
+  );
+}
+
+/** Unchecked-by-default checkbox row (44 pt). `children` is the label (may hold links). */
+export function Checkbox({ checked, onChange, children, label }: { checked: boolean; onChange: (v: boolean) => void; children: ReactNode; label: string }) {
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked }}
+      aria-checked={checked}
+      accessibilityLabel={label}
+      onPress={() => onChange(!checked)}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44 }}
+    >
+      <View
+        style={{
+          width: 24,
+          height: 24,
+          borderRadius: 4,
+          borderWidth: 2,
+          borderColor: colors.ink,
+          backgroundColor: checked ? colors.ink : 'transparent',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {checked ? <Icon name="checkmark" size={16} color={colors.bg} /> : null}
+      </View>
+      <View style={{ flex: 1 }}>{children}</View>
     </Pressable>
   );
 }
@@ -372,7 +454,7 @@ export function StatusChip({ label, tone = 'muted' }: { label: string; tone?: 'w
         alignSelf: 'flex-start',
       }}
     >
-      <Text style={{ fontSize: 12, fontWeight: '600', color: warn ? colors.warning : colors.muted }}>{label}</Text>
+      <Text style={{ fontSize: 12, fontWeight: '600', color: warn ? colors.warningText : colors.muted }}>{label}</Text>
     </View>
   );
 }
@@ -456,8 +538,8 @@ export function Field(props: TextInputProps & { label?: string }) {
 
 export function Stepper({ value, onChange, min = 0, max = 99 }: { value: number; onChange: (n: number) => void; min?: number; max?: number }) {
   const btn = {
-    width: 34,
-    height: 34,
+    width: 44,
+    height: 44,
     borderRadius: BRAND.radius.sm,
     backgroundColor: colors.raised,
     borderWidth: 1,
@@ -525,6 +607,7 @@ function inputStyle(): TextStyle {
     borderRadius: BRAND.radius.sm,
     paddingHorizontal: 12,
     paddingVertical: 11,
+    minHeight: 44,
     fontSize: 16,
     color: colors.ink,
     backgroundColor: colors.card,

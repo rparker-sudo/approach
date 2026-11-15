@@ -1,8 +1,8 @@
-// Finishes the mobile-browser build of Approach.
+// Finishes the mobile-browser build of Approach Strength.
 //
 // Run after `expo export --platform web` (or just `npm run build:web`).
 //  1. dist/            → a normal website folder for GitHub Pages (or any static host).
-//                         Set EXPO_BASE_URL (e.g. /approach) when the site lives in a sub-folder.
+//                         Set EXPO_BASE_URL when the app lives in a sub-folder (it doesn't: app.approachstrength.com).
 //  2. dist-single/approach.html
 //                       → the whole app in ONE file (scripts, fonts and images
 //                         inlined). Handy for previews and places that only take one file.
@@ -16,13 +16,15 @@ const dist = path.join(root, 'dist');
 const singleDir = path.join(root, 'dist-single');
 const base = (process.env.EXPO_BASE_URL || '').replace(/\/+$/, '');
 const appStoreId = process.env.EXPO_PUBLIC_APP_STORE_ID || '';
+const siteUrl = (process.env.EXPO_PUBLIC_SITE_URL || '').trim().replace(/\/+$/, '');
 
 const HEAD_TAGS = `
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Approach" />
-    <meta name="application-name" content="Approach" />
+    <meta name="application-name" content="Approach Strength" />
+    <meta name="robots" content="noindex" />
     <meta name="color-scheme" content="dark light" />
     <link rel="apple-touch-icon" href="${base}/apple-touch-icon.png" />
     <link rel="manifest" href="${base}/manifest.webmanifest" />${
@@ -74,6 +76,20 @@ fs.writeFileSync(indexPath, html);
 // GitHub Pages: serve the app for any path (e.g. /join?code=…) and don't hide the _expo folder.
 fs.writeFileSync(path.join(dist, '404.html'), html);
 fs.writeFileSync(path.join(dist, '.nojekyll'), '');
+// The legal pages live on the website (2.2.1 App. A). Old links to the app's privacy.html, terms.html and
+// consent.html forward there (a plain redirect page: no scripts).
+for (const page of ['privacy', 'terms', 'consent']) {
+  const file = path.join(dist, `${page}.html`);
+  if (!siteUrl) {
+    fs.rmSync(file, { force: true });
+    continue;
+  }
+  const to = `${siteUrl}/${page}`;
+  fs.writeFileSync(
+    file,
+    `<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="robots" content="noindex" /><meta http-equiv="refresh" content="0; url=${to}" /><link rel="canonical" href="${to}" /><title>Approach Strength</title></head><body><p><a href="${to}">${to}</a></p></body></html>\n`,
+  );
+}
 // The home-screen manifest needs the sub-folder too.
 {
   const mPath = path.join(dist, 'manifest.webmanifest');
@@ -130,7 +146,7 @@ console.log(`✓ dist-single/approach.html (${mb} MB)`);
 {
   const head = single.match(/<head>([\s\S]*?)<\/head>/)[1].replace(/<meta name="viewport"[^>]*>/, '');
   const body = single.match(/<body>([\s\S]*?)<\/body>/)[1];
-  const embed = `<title>Approach</title>\n${head.replace(/<title>[^<]*<\/title>/, '')}\n<style>:root{color-scheme:dark}</style>\n${body}`;
+  const embed = `<title>Approach Strength</title>\n${head.replace(/<title>[^<]*<\/title>/, '')}\n<style>:root{color-scheme:dark}</style>\n${body}`;
   const embedOut = path.join(singleDir, 'approach-embed.html');
   fs.writeFileSync(embedOut, embed);
   console.log(`✓ dist-single/approach-embed.html (${(fs.statSync(embedOut).size / 1024 / 1024).toFixed(1)} MB)`);

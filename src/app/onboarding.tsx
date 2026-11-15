@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import JoinTeamForm from '../components/JoinTeamForm';
 import { LiftDayPicker, WeekEditor } from '../components/week';
 import type { Team } from '../lib/backend';
 import { backend } from '../lib/backend';
+import { roleParam } from '../lib/signin';
 import { useTeams } from '../lib/team';
 import EquipmentPicker from '../components/EquipmentPicker';
 import { ALL_EQUIPMENT } from '../lib/exercises';
@@ -31,16 +32,24 @@ function useOnboardingAccount() {
 // Practices only. Matches and tournaments go on the season calendar by date, since they change week to week.
 const DEFAULT_WEEK: DayType[] = ['practice', 'practice', 'practice', 'practice', 'practice', 'off', 'off'];
 
-type Step = 'age' | 'role' | 'account' | 'join' | 'name' | 'position' | 'level' | 'week';
+type Step = 'welcome' | 'age' | 'role' | 'account' | 'join' | 'name' | 'position' | 'level' | 'week';
 
+/**
+ * Welcome → Log in (its own screen) or Create an account (2.2.1 §9, UX F1 v3.2). The age question is asked only on the
+ * Create path, before any email, name or role; logging in never asks it.
+ */
 export default function Onboarding() {
-  const { setProfile, saveProgram, block } = useStore();
+  const { data, setProfile, saveProgram, block } = useStore();
   const [age, setAge] = useState<AgeAnswer | null>(null);
   const { account, updatePosition } = useOnboardingAccount();
   const [stepIndex, setStepIndex] = useState(0);
-  const { code: linkCode } = useLocalSearchParams<{ code?: string }>();
-  // Opened from a team QR code/link: they're an athlete joining that team.
-  const [role, setRole] = useState<Role | null>(linkCode ? 'athlete' : null);
+  const params = useLocalSearchParams<{ code?: string; role?: string; create?: string }>();
+  const linkCode = typeof params.code === 'string' && params.code ? params.code : undefined;
+  // From Log in's "New here? Create an account": straight to the age question.
+  const startCreate = params.create === '1';
+  // Opened from a team QR code/link: they're an athlete joining that team. From the website, `role` preselects the role
+  // card, after the age question (unknown values are ignored).
+  const [role, setRole] = useState<Role | null>(linkCode ? 'athlete' : roleParam(params.role));
   const [team, setTeam] = useState<Team | null>(null);
   const [name, setName] = useState('');
   const [position, setPosition] = useState<Position | null>(null);
@@ -60,10 +69,12 @@ export default function Onboarding() {
   };
 
   const effectiveRole: Role | null = account?.role ?? role;
+  const intro: Step[] = startCreate ? [] : ['welcome'];
   const steps: Step[] =
     effectiveRole === 'coach'
-      ? ['age', 'role', 'account']
+      ? [...intro, 'age', 'role', 'account']
       : [
+          ...intro,
           'age',
           'role',
           'account',
@@ -94,6 +105,7 @@ export default function Onboarding() {
       equipment,
       // Birth year and under-18 only; the month isn't kept. A signed-in account's own values win (team sync copies them).
       ...(age ? { birthYear: account?.birthYear ?? age.birthYear, isMinor: account?.isMinor ?? age.isMinor } : {}),
+      hasAccount: !!account || roleOverride === 'coach',
     };
     setProfile(profile);
     if (r === 'athlete') {
@@ -109,6 +121,9 @@ export default function Onboarding() {
     router.replace('/');
   }
 
+  // A signed-in user (or a device set up without an account) never sees Welcome again.
+  if (data.profile && (account || !data.profile.hasAccount)) return <Redirect href="/" />;
+
   const canNext =
     (step === 'role' && !!role) ||
     (step === 'name' && name.trim().length > 0) ||
@@ -120,6 +135,16 @@ export default function Onboarding() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'bottom']}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Screen>
+          {step === 'welcome' && (
+            <View style={{ gap: 16, marginTop: 48 }}>
+              <Lockup badge={132} />
+              <View style={{ gap: 12, marginTop: 24 }}>
+                <Button large title="Log in" onPress={() => router.push({ pathname: '/sign-in', params: linkCode ? { code: linkCode } : {} })} />
+                <Button large kind="secondary" title="Create an account" onPress={next} />
+              </View>
+            </View>
+          )}
+
           {step === 'age' && (
             <AgeQuestion
               onAnswer={(a) => {
@@ -134,6 +159,7 @@ export default function Onboarding() {
               }}
             />
           )}
+          {step === 'age' && stepIndex > 0 ? <Button kind="ghost" title="Back" onPress={back} /> : null}
 
           {step === 'role' && (
             <>
@@ -176,6 +202,7 @@ export default function Onboarding() {
               <AccountForm
                 role={role ?? 'athlete'}
                 age={age}
+                loginParams={linkCode ? { code: linkCode } : undefined}
                 onDone={(a) => {
                   if (a.role === 'coach') finish('coach', a.name);
                   else next();
@@ -265,7 +292,7 @@ export default function Onboarding() {
           )}
 
 
-          {step === 'age' ? null : step === 'account' || step === 'join' ? (
+          {step === 'age' || step === 'welcome' ? null : step === 'account' || step === 'join' ? (
             stepIndex > 0 ? <Button kind="ghost" title="Back" onPress={back} /> : null
           ) : (
             <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>

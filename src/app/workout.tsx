@@ -499,7 +499,7 @@ export default function Workout() {
         options={{
           title: session.name,
           headerLeft: () => (
-            <Pressable onPress={() => leave()} hitSlop={10} style={{ paddingHorizontal: Platform.OS === 'web' ? 16 : 0 }}>
+            <Pressable accessibilityRole="button" onPress={() => leave()} style={{ minHeight: 44, minWidth: 44, justifyContent: 'center', paddingHorizontal: Platform.OS === 'web' ? 16 : 0 }}>
               <Text style={{ fontSize: 16, fontWeight: '600' }}>Close</Text>
             </Pressable>
           ),
@@ -517,10 +517,10 @@ export default function Workout() {
             <ExerciseCard {...cardProps(idx)} pe={plan[idx]} teamId={program.teamId} entry={entries[idx]} suggestion={suggestions[idx]} ei={idx} big setSet={setSet} toggleDone={toggleDone} />
             <Row>
               <View style={{ flex: 1 }}>
-                <Button kind="ghost" title="Previous" disabled={idx === 0} onPress={() => update({ index: idx - 1 })} />
+                <Button large kind="ghost" title="Previous" disabled={idx === 0} onPress={() => update({ index: idx - 1 })} />
               </View>
               <View style={{ flex: 1 }}>
-                <Button kind="secondary" title="Next" disabled={idx >= plan.length - 1} onPress={() => update({ index: idx + 1 })} />
+                <Button large kind="secondary" title="Next" disabled={idx >= plan.length - 1} onPress={() => update({ index: idx + 1 })} />
               </View>
             </Row>
             {idx < plan.length - 1 ? (
@@ -545,7 +545,7 @@ export default function Workout() {
               value={draft.note}
               onChangeText={(t) => update({ note: t })}
             />
-            <Button title="Finish workout" icon="checkmark" onPress={finish} />
+            <Button large title="Finish workout" icon="checkmark" onPress={finish} />
           </>
         ) : null}
       </ScrollView>
@@ -573,9 +573,9 @@ export default function Workout() {
                 <Text style={{ fontSize: 32, fontWeight: '600' }}>{clock(left)}</Text>
               </View>
               <Row style={{ gap: 6 }}>
-                <Button small kind="ghost" title="−15s" onPress={() => setRest((r) => (r ? adjustRest(r, -15) : r))} />
-                <Button small kind="ghost" title="+15s" onPress={() => setRest((r) => (r ? adjustRest(r, 15) : r))} />
-                <Button small title="Skip" onPress={() => setRest(null)} />
+                <Button large kind="ghost" title="−15s" onPress={() => setRest((r) => (r ? adjustRest(r, -15) : r))} />
+                <Button large kind="ghost" title="+15s" onPress={() => setRest((r) => (r ? adjustRest(r, 15) : r))} />
+                <Button large title="Skip" onPress={() => setRest(null)} />
               </Row>
             </Row>
           ) : (
@@ -633,7 +633,7 @@ function ExerciseCard({
       {label ? <Text style={{ fontSize: 28, fontWeight: '800' }}>{label}</Text> : null}
       <Text style={[display(12), { color: colors.muted }]}>{CATEGORY_LABEL[info.category]}</Text>
       {pe.afterCircuit ? <Text style={{ fontSize: 13, color: colors.muted }}>Done on its own after the circuit.</Text> : null}
-      <Pressable accessibilityRole="link" onPress={() => router.push(`/exercise/${info.id}`)}>
+      <Pressable accessibilityRole="link" onPress={() => router.push(`/exercise/${info.id}`)} style={{ minHeight: 44, justifyContent: 'center' }}>
         <Row style={{ gap: 6 }}>
           <Text style={{ fontSize: big ? 24 : 20, fontWeight: '600', flexShrink: 1 }}>{info.name}</Text>
           <Icon name="chevron.right" size={14} color={colors.faint} />
@@ -698,8 +698,9 @@ function ExerciseCard({
             accessibilityLabel={`Set ${si + 1} done`}
             onPress={() => toggleDone(ei, si)}
             style={{
-              width: big ? 72 : 44,
-              height: big ? 48 : 40,
+              // F-7: logging a set is an in-workout primary action (≥ 56 pt).
+              width: big ? 72 : 56,
+              height: 56,
               borderRadius: BRAND.radius.md,
               alignItems: 'center',
               justifyContent: 'center',

@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
+import { COACH_TERMS_VERSION } from '../coachTerms';
+import { APP_URL } from '../links';
 import type { CalendarEvent, Position, Program, Role, WorkoutLog } from '../types';
 import {
   Account,
@@ -117,7 +119,7 @@ function fail(error: { message: string } | null, fallback?: string): never {
       'Your database needs the 2.1 update. In Supabase, run the files in supabase/migrations you haven\'t run yet (see "Upgrading" in the README).',
     );
   }
-  if (/invalid login credentials/i.test(msg)) throw new BackendError("Email or password doesn't match.");
+  if (/invalid login credentials/i.test(msg)) throw new BackendError("That email and password don't match. Try again.");
   if (/already registered/i.test(msg)) throw new BackendError('That email already has an account. Sign in instead.');
   if (/email not confirmed/i.test(msg)) throw new BackendError('Check your email and tap the confirm link, then sign in.');
   if (/invalid path specified/i.test(msg)) {
@@ -211,8 +213,21 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
     return data;
   }
 
+  /** Coach accounts: whether the current Coach Terms are accepted (2.2.1 §8). Other users can't read these columns. */
+  async function coachTermsAccepted(): Promise<boolean> {
+    const { data, error } = await sb.rpc('my_coach_terms');
+    if (isMissing(error)) {
+      missingUpdate = true;
+      return false;
+    }
+    if (error) return false;
+    const row = (Array.isArray(data) ? data[0] : data) as { version: string | null; accepted_at: string | null; current_version: string } | undefined;
+    return !!row && !!row.accepted_at && row.version === row.current_version;
+  }
+
   async function account(id: string, email: string): Promise<Account> {
     const data = await profile(id);
+    const terms = data.role === 'coach' ? await coachTermsAccepted() : undefined;
     return {
       id,
       email,
@@ -222,6 +237,7 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
       birthYear: data.birth_year ?? null,
       isMinor: data.is_minor ?? null,
       boardNameMode: data.board_name_mode ?? 'short',
+      ...(terms === undefined ? {} : { coachTermsAccepted: terms }),
     };
   }
 
@@ -249,22 +265,33 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
     needsUpdate: () => missingUpdate,
 
     async getAccount() {
-      const { data } = await sb.auth.getSession();
+      const { data, error } = await sb.auth.getSession();
       const u = data.session?.user;
-      if (!u) return null;
-      try {
-        return await account(u.id, u.email ?? '');
-      } catch {
-        return null;
+      // Offline (the token couldn't refresh): unknown, not signed out, so the app doesn't send them to Log in.
+      if (!u && error && (error.name === 'AuthRetryableFetchError' || (error as { status?: number }).status === 0)) {
+        throw new BackendError("Can't reach the team server.");
       }
+      if (!u) return null;
+      return account(u.id, u.email ?? '');
     },
 
-    async signUp({ email, password, name, role, position, birthYear, isMinor }) {
+    async signUp({ email, password, name, role, position, birthYear, isMinor, coachTermsVersion }) {
       const { data, error } = await sb.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
         // Birth year and under-18 only (never a full date); handle_new_user copies them to profiles.
-        options: { data: { name: name.trim(), role, position: position ?? null, birth_year: birthYear, is_minor: isMinor } },
+        // Coach sign-up: the Coach Terms version the coach ticked; handle_new_user records it with the time (2.2.1 §8).
+        options: {
+          ...(APP_URL ? { emailRedirectTo: APP_URL } : {}),
+          data: {
+            name: name.trim(),
+            role,
+            position: position ?? null,
+            birth_year: birthYear,
+            is_minor: isMinor,
+            ...(role === 'coach' && coachTermsVersion ? { coach_terms_version: coachTermsVersion } : {}),
+          },
+        },
       });
       if (error) fail(error);
       if (!data.session || !data.user) {
@@ -281,6 +308,46 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
 
     async signOut() {
       await sb.auth.signOut();
+    },
+
+    async requestPasswordReset(email) {
+      if (!APP_URL) throw new BackendError('Set EXPO_PUBLIC_APP_URL (see the README) so reset links open the app.');
+      const { error } = await sb.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: `${APP_URL}/reset-password` });
+      if (error) fail(error);
+    },
+
+    async consumeAuthLink() {
+      if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
+      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      const query = new URLSearchParams(window.location.search);
+      const clear = () => window.history.replaceState(null, '', window.location.pathname);
+      const err = hash.get('error_description') ?? query.get('error_description');
+      if (err) {
+        clear();
+        throw new BackendError('That link has expired or was already used. Ask for a new one.');
+      }
+      const access = hash.get('access_token');
+      const refresh = hash.get('refresh_token');
+      if (!access || !refresh) return null;
+      clear();
+      const { error } = await sb.auth.setSession({ access_token: access, refresh_token: refresh });
+      if (error) fail(error);
+      return { type: hash.get('type') ?? 'signup' };
+    },
+
+    async updatePassword(password) {
+      if (password.length < 6) throw new BackendError('Use a password with at least 6 characters.');
+      const { error } = await sb.auth.updateUser({ password });
+      if (error) fail(error);
+    },
+
+    async acceptCoachTerms() {
+      const id = await userId();
+      const { error } = await sb.rpc('accept_coach_terms', { v: COACH_TERMS_VERSION });
+      if (isMissing(error)) throw new BackendError('The team database needs the 2.2.1 update first (README: Upgrading from 2.2.0).');
+      if (error) fail(error);
+      const { data } = await sb.auth.getSession();
+      return account(id, data.session?.user.email ?? '');
     },
 
     async updateAccount(patch) {
@@ -450,16 +517,17 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
       if (error) fail(error);
     },
 
-    async memberLevels(teamId) {
-      const { data, error } = await sb.rpc('member_levels', { t: teamId });
+    async memberLevels(teamId, table = {}) {
+      // 2.2.1 J1: the server returns only the adjusted exercises from this table, never another team's level.
+      const { data, error } = await sb.rpc('member_levels', { t: teamId, ex: table });
       if (isMissing(error)) return [];
       if (error) fail(error);
-      return (data as { user_id: string; team_level: number | null; confirmed: boolean; set_at: string | null; swap_level: number | null }[]).map((r) => ({
+      return (data as { user_id: string; team_level: number | null; confirmed: boolean; set_at: string | null; adjusted: Record<string, string | null> | null }[]).map((r) => ({
         userId: r.user_id,
         teamLevel: r.team_level,
         confirmed: r.confirmed,
         setAt: r.set_at,
-        swapLevel: r.swap_level,
+        adjusted: r.adjusted ?? {},
       }));
     },
 
@@ -641,16 +709,24 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
     },
 
     async teamEffort(teamId, since) {
-      const { data, error } = await sb.rpc('team_effort', { t: teamId, since });
+      const [{ data, error }, following, mine] = await Promise.all([
+        sb.rpc('team_effort', { t: teamId, since }),
+        // Coach only (empty for everyone else): members who follow another team's lift program.
+        sb.rpc('members_following_other', { t: teamId }),
+        sb.rpc('my_lift_program'),
+      ]);
       if (isMissing(error)) return [];
       if (error) fail(error);
+      // 2.2.1 J3: the server sends no `ranked` flag. Teammates only receive ranked athletes; the coach marks athletes who
+      // follow another team's program, and the viewer's own row uses their own lift program.
+      const other = new Set(((following.data ?? []) as (string | { members_following_other: string })[]).map((x) => (typeof x === 'string' ? x : x.members_following_other)));
+      const myProgram = typeof mine.data === 'string' ? mine.data : null;
       return (
         data as {
           user_id: string;
           board_name: string;
           group_id: string | null;
           is_me: boolean;
-          ranked?: boolean | null;
           logs: EffortInput['logs'] | null;
           attendance: EffortInput['attendance'];
           jump_gain?: number | string | null;
@@ -660,7 +736,7 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
         boardName: r.board_name,
         groupId: r.group_id,
         isMe: r.is_me,
-        ranked: r.ranked ?? true,
+        ranked: r.is_me ? myProgram == null || myProgram === teamId : !other.has(r.user_id),
         logs: r.logs ?? [],
         attendance: r.attendance,
         // Before migration 006 the function returned a % ("improvement"); FA-4 never shows %, so it's dropped.

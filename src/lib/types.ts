@@ -224,6 +224,8 @@ export type Profile = {
   birthYear?: number;
   /** Under 18 when they answered the age question. */
   isMinor?: boolean;
+  /** This device has been signed in to an account (2.2.1 §9: an expired session goes straight to Log in). */
+  hasAccount?: boolean;
 };
 
 export type LoggedSet = { weight: string; reps: string; done: boolean };
@@ -270,6 +272,8 @@ export type AppData = {
   athletes: Athlete[];
   /** Appearance. Dark is the brand default. */
   theme?: 'dark' | 'light';
+  /** Account ids already shown the one-time Coach Terms sheet on this device (2.2.1 §8). */
+  coachTermsPrompted?: string[];
   /** Approach touch measurements, newest last. Inches. */
   touchLogs?: TouchLog[];
   /** Net height used for "Above the net", in inches. */

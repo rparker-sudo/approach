@@ -65,7 +65,7 @@ export default function TeamHome() {
           {isDemoMode ? (
             <Note>Demo mode: teams live on this device only. Connect Supabase to sync with athletes&apos; phones.</Note>
           ) : null}
-          {lastError ? <Text style={{ color: colors.error, fontSize: 13 }}>{lastError}</Text> : null}
+          {lastError ? <Text style={{ color: colors.errorText, fontSize: 13 }}>{lastError}</Text> : null}
           {backend.needsUpdate?.() ? (
             <Note>
               Your database needs the 2.0 update for groups, the team calendar and check-ins. In Supabase → SQL Editor, run
@@ -120,7 +120,7 @@ export default function TeamHome() {
             <Card>
               <H2>New team</H2>
               <Field placeholder="Team name, e.g. Varsity" value={name} onChangeText={setName} autoFocus maxLength={60} />
-              {error ? <Text style={{ color: colors.error, fontSize: 13 }}>{error}</Text> : null}
+              {error ? <Text style={{ color: colors.errorText, fontSize: 13 }}>{error}</Text> : null}
               <Row>
                 <View style={{ flex: 1 }}>
                   <Button kind="ghost" title="Cancel" onPress={() => setAdding(false)} />

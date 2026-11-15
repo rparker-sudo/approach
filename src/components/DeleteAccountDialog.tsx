@@ -59,7 +59,7 @@ export default function DeleteAccountDialog({
             autoCorrect={false}
             editable={!busy}
           />
-          {error ? <Text style={{ color: colors.error, fontSize: 13 }}>{error}</Text> : null}
+          {error ? <Text style={{ color: colors.errorText, fontSize: 13 }}>{error}</Text> : null}
           <Button kind="danger" title={busy ? 'Deleting…' : 'Delete my account'} disabled={typed !== 'DELETE' || busy} onPress={confirm} />
           <Button kind="ghost" title="Cancel" disabled={busy} onPress={close} />
         </Pressable>

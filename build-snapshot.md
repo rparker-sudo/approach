@@ -1,14 +1,25 @@
-# Approach — build snapshot
+# Approach Strength — build snapshot
 
-*As of November 14, 2026 (v2.2.0: passes 1, 2 and 3, built in one session). Facts only. Items marked **(unverified)** could not be confirmed from the code or from the owner.*
+*As of November 15, 2026 (v2.2.1, built on branch `v2.2.1` from `docs/specs/v2.2.1.md` v1.1). Facts only. Items marked **(unverified)** could not be confirmed from the code or from the owner. **(pending)** = waits for the owner's dashboard step or the live test.*
 
-**What it is:** a weight-training, nutrition and planning app for volleyball athletes and coaches. App Store name (planned): "Approach: Volleyball Fitness". Home-screen name: "Approach".
+**What it is:** a weight-training, nutrition and planning app for volleyball athletes and coaches. Product name **Approach Strength** (since 2.2.1, D-035). Home-screen short name: "Approach". App: https://app.approachstrength.com. Website: https://approachstrength.com.
 
 ---
 
 ## 1. Version and changes
 
-**Current version:** 2.2.0 (`app.json`, `package.json`).
+**Current version:** 2.2.1 (`app.json`, `package.json`). Branch `v2.2.1` from the hand-off commit `e2bde34` (docs of Sat Nov 14, 2026). Acceptance report: `reports/v2.2.1-acceptance.md`. **Not deployed yet (pending the owner's approval).**
+
+**2.2.1 in short** (details in §3a):
+- The app moves to `app.approachstrength.com`; a placeholder website (new repo `rparker-sudo/approachstrength-site`) takes the apex with `/privacy`, `/terms`, `/consent` at the same URLs.
+- Renamed to Approach Strength: outlined wordmark/lockups built to brand guide v0.3 §5 (Branding's zip wasn't supplied), board presets from §7, "Powered by Approach Strength" on the board.
+- Coach Terms checkbox (sign-up and a one-time sheet), enforced on the server. New fields `profiles.coach_terms_version`, `profiles.coach_terms_accepted_at` (Legal approved).
+- Welcome → Log in / Create an account; the age question only on the Create path; `sign-in?role=`; password reset.
+- Level card text and the full checklist; F-2 text tokens; F-7 tap targets; J1 and J3 privacy fixes.
+- Legal pages built only from `docs/legal/` (the email find-and-replace is gone); `run-all.sh` fails when a check can't run.
+- Migration `008_approach_2_2_1.sql`.
+
+**2.2.0:**
 - Built on branch `v2.2` from the hand-off commit (`d9fa6ec`, docs of Fri Nov 13, 2026), following `docs/specs/v2.2.md` v1.3 (pass 1 → 2 → 3).
 - **Deployed November 14, 2026:** the owner ran migrations 005–007 on the live project and approved the merge. `v2.2` was fast-forwarded into `main`, and the GitHub Pages deploy succeeded. The `v2.2` tag was made locally; the owner pushes it from the Mac.
   - C13 is done: `public/privacy.html`, `terms.html` and `consent.html` were regenerated from the v2.2 legal docs with the new contact email **ryan@approachstrength.com** (owner, TM-10), dated November 14, 2026.
@@ -34,6 +45,7 @@
   - Migration `004`.
   - Touch-height exception, as decided with the owner.
 - **2.2.0:** see §3. Migrations `005`, `006`, `007`.
+- **2.2.1:** see §3a. Migration `008`.
 - Git tags `v1.0`, `v2.0`, `v2.1` were made locally. Tag pushes from the cloud are blocked, so the owner pushes them from the Mac.
 
 ## 2. Platforms and tech stack
@@ -45,8 +57,8 @@
 | Backend / database | Supabase: Postgres, REST API, Realtime (`live_progress`, `test_sessions`, `test_results`, `rack_groups`, `rack_group_members`, `station_runs`), row-level security, security-definer RPCs, `pg_cron` for the monthly archive purge. |
 | Auth | Supabase Auth, email + password ("Confirm email" on). |
 | On-device storage | AsyncStorage (`localStorage` in browsers). |
-| Hosting | GitHub Pages via GitHub Actions on push to `main`. Repository is public. |
-| Dev tooling | TypeScript, ESLint, the Python legal-page builder, logic checks in `scripts/checks/` (run with `sh scripts/checks/run-all.sh`), SQL tests in `supabase/tests/`. None of it ships in the app. |
+| Hosting | App: GitHub Pages via GitHub Actions on push to `main` (custom domain `app.approachstrength.com`). Website: GitHub Pages from `main` of `rparker-sudo/approachstrength-site` (custom domain `approachstrength.com`). Both repositories are public. |
+| Dev tooling | TypeScript, ESLint, the Python site and legal-page builders (`scripts/build-site.py`, `scripts/build-legal-pages.py`), the brand SVG builder (`scripts/build-brand-svgs.py`, fontTools), logic checks in `scripts/checks/` (run with `sh scripts/checks/run-all.sh`), SQL tests in `supabase/tests/`. None of it ships in the app. |
 
 ---
 
@@ -131,11 +143,30 @@
 
 ---
 
+## 3a. What 2.2.1 changed (user-facing)
+
+- **Addresses (§1, §2):** the app at `https://app.approachstrength.com` (base path `/`). All links come from `EXPO_PUBLIC_APP_URL` / `EXPO_PUBLIC_SITE_URL` (`src/lib/links.ts`; no github.io fallback). Settings → Legal, the sign-up agreement line, "Print parent consent form" and the Coach Terms link open `SITE_URL/privacy`, `/terms`, `/consent`, `/terms#coach-terms`. QR invites and join links use `APP_URL/join?code=…`. The app's old `privacy.html`, `terms.html`, `consent.html` are generated redirect pages (meta refresh, no script). The app sends `noindex`.
+- **Website (placeholder until the marketing site):** `/` (name, "Strength training for volleyball athletes and their coaches.", **Log in** → app, links to Privacy, Terms, Parent consent form, the email), `/privacy`, `/terms`, `/consent`, `404.html`, `robots.txt` (allows indexing), `CNAME`. Plain HTML/CSS, self-hosted Inter / Inter Tight (subset woff2, OFL), outlined logos, no scripts, cookies, forms or third-party requests.
+- **Rename (§3):** app name, web title, manifest ("Approach Strength" / "Approach"), onboarding, Settings, share texts, board signature, README, `brand-tokens.json`. Bundle ID, repo and database names, and the tagline are unchanged. iOS `CFBundleDisplayName` stays "Approach" (the short home-screen name).
+- **Brand assets:** `assets/brand/source/` now has `wordmark-on-dark|light.svg`, `lockup-plain-on-dark|light.svg`, `lockup-stacked-on-dark|light.svg`, `lockup-on-dark|light.svg` (badge + wordmark + tagline, rebuilt) and `powered-by-on-board.svg`, all text converted to outlines (Inter Tight from `@expo-google-fonts`). The app uses PNG renders: `assets/brand/wordmark-dark|light.png`, `powered-by-board.png`.
+- **Board:** presets Silver (default), Red, Orange, Gold, Green, Teal, Blue, Purple (brand guide §7); existing teams keep their saved hex; "Done" pill text is Carbon on every preset. "Powered by Approach Strength" (plain mark + 14 px text, Steel) bottom-right in the footer row with the ticker, 24 px from the edges.
+- **Level cards (§4):** Training's three descriptions in Set level; "See the full checklist" opens Appendix B read-only (`src/lib/levelChecklist.ts`).
+- **F-2:** tokens `errorText` / `warningText` (dark = `error` / `warning`; light `#C42B30` / `#8A5A00`) for all error/warning text and icons (StatusChip "Consent needed", forms, builder checks). `error` / `warning` stay for borders and fills.
+- **F-7:** buttons, chips, links, checkboxes, switches (new 44 pt `Toggle` wrapper), steppers and inputs ≥ 44 px; in-workout set check, Previous/Next, rest −15s/+15s/Skip and Finish ≥ 56 px. Audit: 29 screens, 0 targets under 44 (inline links inside sentences exempt).
+- **J1:** `member_levels` returns only `adjusted` (program exercise → the exercise this athlete gets) for athletes whose exercises resolve lower because of another team. No level value, team, coach or reason. The coach app sends the table of what each of its program's exercises becomes at levels 1/2/3.
+- **J3:** `team_effort` no longer returns `ranked`. Teammates don't receive athletes who follow another team's program (they still get their own row); the coach gets every row and marks them with `members_following_other`.
+- **Coach Terms (§8):** separate unchecked checkbox "I agree to the Coach Terms (Terms §4)" on coach sign-up (sign-up blocked until checked). Existing coaches see a one-time sheet; until they accept, "Record parent consent" (and the consent sheet's Save/Clear) and "Start strength check" are blocked with "Accept the Coach Terms first." (tap it to open the sheet). The server rejects `record_consent` and supervision confirmation without the current version (`2026-11-14`).
+- **Welcome / Log in (§9):** Welcome (lockup, tagline, **Log in** and **Create an account**, 56 pt). Log in: email + password, "Signing in…", inline error "That email and password don't match. Try again.", "Forgot password?", "New here? Create an account". Create path: age → role (coach card off under 18; the `role` param preselects after the age question) → sign-up form (+ Coach Terms for coaches; "Already have an account? Log in.") → athlete steps as before; "Train solo" only after the age question. Pre-2.1 accounts answer the age question once after log in (under 13 → deletion request + block). The block screen hides Log in. Log out → Welcome; an expired session → Log in. `autoComplete` email / current-password / new-password.
+- **Password reset (new, needed for "Forgot password?"):** sends a Supabase reset link to `APP_URL/reset-password`; that screen sets the new password. Demo mode says it can't send email.
+
 ## 4. Data model
 
 Flags: **AGE** · **HEALTH/WELLNESS** · **BODY METRICS** · **LOCATION** · **PHOTO/VIDEO** · **CREDENTIALS** · **FREE TEXT**.
 
-### Stored on the server (Supabase), after migrations 002–007
+### Stored on the server (Supabase), after migrations 002–008
+
+**2.2.1 (migration 008):** `profiles` adds **`coach_terms_version`** (text, `2026-11-14`) and **`coach_terms_accepted_at`** (timestamptz): written only by `accept_coach_terms` (own row, coach accounts) or at coach sign-up from the checkbox (`handle_new_user`); not in the column select grant (others can't read them; the user reads them with `my_coach_terms`); a trigger stops anyone clearing them. New RPCs `current_coach_terms`, `coach_terms_ok`, `my_coach_terms`, `accept_coach_terms`. Changed: `record_consent` and the `test_sessions` insert policy need the current Coach Terms; `member_levels(t, ex)` returns `adjusted` instead of `swap_level`; `team_effort` drops `ranked`. No other new tables or fields.
+
 
 | Table | Fields (new in 2.2 in **bold**) | Who can read | Flags |
 |---|---|---|---|
@@ -166,20 +197,38 @@ Flags: **AGE** · **HEALTH/WELLNESS** · **BODY METRICS** · **LOCATION** · **P
 |---|---|---|
 | `volley-strength/data/v1` | profile, programs, logs (now with `kind`, `location`, per-exercise `stationId`), body weight, touch log, readiness log, last known permissions, strength estimates, solo jump tests, theme; **new:** last known level per team, lift-program team, home equipment, harder-version answers, testing checklist read (coach, per team), last rack name, leave notice, home hint seen | BODY METRICS, HEALTH/WELLNESS, AGE, FREE TEXT |
 | `approach/not-eligible/v1`, `approach/workout-draft/…`, Supabase session | as in 2.1 | — / FREE TEXT / CREDENTIALS |
+| `volley-strength/data/v1` (2.2.1 additions) | `profile.hasAccount` (this device was signed in, so an expired session goes to Log in), `coachTermsPrompted` (account ids shown the one-time Coach Terms sheet) | — |
 | `load-and-launch/demo-server/v1` (demo only) | demo server, now also levels, lift program, racks, station runs | CREDENTIALS, HEALTH/WELLNESS, AGE |
 
 ---
 
 ## 5. Third-party services
 
-Supabase and GitHub (Pages, Actions) only. `pg_cron` is a built-in Supabase extension, not a new vendor. No new services in 2.2, and no analytics, ads, trackers, external fonts, or in-app AI.
+Supabase and GitHub (Pages, Actions) only. `pg_cron` is a built-in Supabase extension, not a new vendor. No new services in 2.2 or 2.2.1, and no analytics, ads, trackers, external fonts, or in-app AI. The website is a second GitHub Pages site (same vendor) with self-hosted fonts. Zoho Mail (the owner's email) is listed in the Privacy Notice; the app doesn't call it.
 
 ---
 
 ## 6. Deployment and usage
 
-- **Website:** https://approachstrength.com (custom domain on GitHub Pages since November 14, 2026; the old https://rparker-sudo.github.io/approach/ address forwards there). Deploys from `main`; 2.2.0 deployed November 14, 2026.
-- **Supabase:** live, Free plan. 002–007 applied (005–007 on November 14, 2026, with pg_cron enabled, per the owner).
+- **App:** https://app.approachstrength.com once the owner moves the Pages custom domain **(pending)**. Until then it is still served on the apex (2.2.0, deployed November 14, 2026). Deploys from `main`.
+- **Website:** https://approachstrength.com from `rparker-sudo/approachstrength-site` **(pending: the owner creates the repo; Claude Code pushes the generated site)**.
+- **Supabase:** live, Free plan. 002–007 applied (005–007 on November 14, 2026, with pg_cron enabled, per the owner). 008 **(pending)**.
+
+### Settings changes (old → new), 2.2.1 §1–§3, §8
+Every change listed in the spec, made by the owner in a dashboard. Filled in as each step is done.
+
+| Where | Setting | Old | New | Done |
+|---|---|---|---|---|
+| `rparker-sudo/approach` → Actions variables | `APP_URL` | (owner to read off; 2.2.0 workflow default `https://approachstrength.com`) | `https://app.approachstrength.com` | pending |
+| same | `BASE_PATH` | (owner to read off; workflow default `/`) | `/` | pending |
+| same | `SITE_URL` | (none) | `https://approachstrength.com` | pending |
+| `rparker-sudo/approach` → Pages | Custom domain | `approachstrength.com` | `app.approachstrength.com` (Enforce HTTPS) | pending |
+| `rparker-sudo/approachstrength-site` → Pages | Source / custom domain | (repo doesn't exist) | `main` / root; `approachstrength.com` (Enforce HTTPS); `www` redirects | pending |
+| Supabase → Auth → URL Configuration | Site URL | (owner to read off) | `https://app.approachstrength.com` | pending |
+| same | Redirect URLs | (owner to read off) | `https://app.approachstrength.com/**`, `http://localhost:*/**` (github.io and apex entries removed after the live tests) | pending |
+| Supabase → Auth → Email templates / SMTP | Subjects, sender name | (owner to read off) | "Approach Strength" | pending |
+| Supabase → SQL | Migration | 002–007 | + `008_approach_2_2_1.sql` | pending |
+| Cloudflare DNS | `app` CNAME, apex A/AAAA, `www` CNAME, GitHub TXT | done by the owner 11/14 | unchanged; to be verified (the sandbox can't resolve DNS) | pending |
 - **Users:** the owner plus fewer than 10 others, all 18+, per the owner **(unverified count)**.
 
 ---
@@ -192,12 +241,27 @@ $0 now. Future: Apple Developer Program $99/year; Supabase Pro about $25/month i
 
 ## 8. Known gaps, judgment calls and checks
 
-**Judgment calls (for the planning team / Legal):**
+**2.2.1 judgment calls (for the planning team / Legal):**
+- **Legal pages:** published from `docs/legal/` with no wording changes. The script leaves out Legal's drafting notes (after "### Drafting notes") and the two italic review markers "(Attorney to finalize.)" and "(Attorney to review; see the drafting note below.)", as 2.2.0 did for the first. It fills "[publish date]" with November 15, 2026 and adds `id="coach-terms"` to Terms §4. `scripts/checks/legal-pages-match.py` compares every published word with the docs (whitespace normalized). **Legal to confirm that leaving out the review markers is right.**
+- **Emails on the legal pages** are plain text, not mailto links (a link would need a pattern match on legal wording). The site footer has a mailto link.
+- **Wordmark (D3):** Branding's zip wasn't supplied, so `scripts/build-brand-svgs.py` builds the SVGs to brand guide §5: STRENGTH caps are 40% of APPROACH's, and STRENGTH is tracked so its ink is exactly as wide. The existing `lockup-on-*.svg` files (badge + wordmark + tagline) were rebuilt in place rather than deleted, because the brand guide still lists them.
+- **Welcome lockup:** the app's existing badge lockup (badge, wordmark, tagline). The brand guide suggests the plain lockup for "app sign-in"; easy to swap.
+- **New copy not in the docs (please review):**
+  - Coach Terms sheet: title "Coach Terms", buttons "Continue" and "Not now".
+  - Password reset: "Reset your password", "Enter your account email. We'll send a link to set a new password.", "Send link", "If that email has an account, a link is on its way. Open it on this device.", "Set a new password", "Save password", expired-link line.
+  - Demo note "Demo mode: accounts are saved on this device only."
+  - Settings "Sign out" renamed "Log out".
+- **Log out** removes this device's profile (so Welcome shows) but keeps on-device history (programs, logs, body weight). Logging in again rebuilds the profile from the account. On a shared device, the next person's log-in replaces the profile but the history remains: **known gap**.
+- **Log in on a new device** sets experience to beginner on the device profile (the server doesn't store experience). It only matters if they later join a team with no level set (self-reported beginner, coach confirms).
+- **Expired session vs offline:** only a session that is gone (no error) sends the user to Log in. An offline token refresh keeps them in the app with on-device data.
+- **Sign-up confirmation link** opens the app (`emailRedirectTo` = `APP_URL`); the user then logs in (the app doesn't sign in from that link automatically). Reset links do sign in, on `/reset-password` only.
+- **F-2 dark theme:** dark `errorText` keeps the existing `#E5484D`, which is 4.31:1 on Graphite and 3.77:1 on raised surfaces (≥ 4.5 on the background). The spec says dark = existing; noted for design-system F-1 (2.2.2).
+- **F-7 week editor:** day cells are 44+ px by tightening the gap to 2 px; the in-workout primaries use the new `large` button size (56).
+
+**2.2.0 judgment calls (still true unless noted):**
 - **Self-reported level:** the server doesn't know an athlete's experience, so there's no server backfill. Each athlete's app fills `team_members.level` once from onboarding experience (`set_my_self_level`, only while it's empty). Existing athletes get a level the next time they open 2.2.
-- **Q-7 data:**
-  - `member_levels` gives the coach a numeric `swap_level` only when another team's level is lower. The coach app uses it only to list the swaps under "Adjusted for this athlete" and never shows it.
-  - The UI and API never return a team or coach name. But the number tells the coach that a lower level exists elsewhere. **Legal to confirm this meets copy review §4.1**; the alternative is to drop the swap list.
-- **`team_effort.ranked`:** a boolean that tells teammates whether an athlete follows this team's program. It's needed to leave them off Overall, Sessions and similar tabs (D-027).
+- **Q-7 / J1 (2.2.1):** `member_levels` no longer sends a level number. It returns only the adjusted exercises, computed from a table the coach app sends (what each of its program's exercises becomes at levels 1, 2 and 3). The adjusted exercise itself still hints at a lower level elsewhere (as "Adjusted for this athlete" always did), and a coach could send a crafted table to narrow it down. The resolution rules live in the app, not the database, so this was the smallest change that keeps the numeric value off the wire. **Legal to confirm.**
+- **J3 (2.2.1):** teammates no longer get a `ranked` flag or any athlete who follows another team's program. Such athletes still get their own row (so they see their attendance, hours and jump gains). Side effect: teammates no longer see those athletes on the Attendance, Hours or Jump-gains tabs either (the spec asks for the rows to be omitted).
 - **`station_runs`:** a new team-level table for the shared rotation timer. Athletes without board consent also need the timer, so it can't live in `live_progress`. It holds no athlete data. Listed for Legal (G-5) because the spec named only `live_progress.station_id` and `rotate_at`.
 - **Rack partner names flag:** SQL function `rack_partner_names()` returns false. Replacing it with `true` turns on names without an app build (B5).
 - **Breaks:** `CalendarEvent.type 'break'` with `endDate`. Other teams' breaks show only as a band. Other teams' testing days aren't copied into the athlete's combined schedule.
@@ -206,7 +270,7 @@ $0 now. Future: Apple Developer Program $99/year; Supabase Pro about $25/month i
   - "In-season" spans the team's first to last match on the calendar.
   - Preseason "no prior block in Approach" means the block start is the program's creation day.
   - In-season with no matches on the calendar shows "No good date in this phase."
-- **Board "Up first":** the athlete's resolved first exercise, worked out from the coach-side level numbers. Never labeled.
+- **Board "Up first":** the athlete's resolved first exercise, from this team's level plus the server's adjusted list (2.2.1 J1). Never labeled.
 - **Board paging** pages whole rack lines in rack mode, so a section is never cut.
 - **Home-day exclusion on the live board** is per group program, not per athlete.
 - **"Add the rest to racks (balanced)"** places only the unassigned athletes (balanced auto-assign) into the existing racks, instead of reshuffling everyone.
@@ -224,7 +288,8 @@ $0 now. Future: Apple Developer Program $99/year; Supabase Pro about $25/month i
 **Left out (conflict with spec 3.1):** F23 "At home 4" count and home-day ticker lines.
 
 **Not built / partial (honest list):**
-- **Contact email in the source docs:** `docs/compliance.md`, `docs/legal/soft-launch-notice.md` and `docs/legal/parent-consent-form.md` still name the old club address. `scripts/build-legal-pages.py` swaps it for ryan@approachstrength.com in the published pages. **The planning team should update their source docs.**
+- ~~Contact email in the source docs~~: fixed in the 11/14 docs; the find-and-replace is removed (2.2.1 §7.1).
+- **Live checks (2.2.1)** wait for the owner's dashboard steps: HTTPS on `app.`, the github.io redirect, auth emails, the apex and `www`, and the two-device board test on `app.` **(pending)**.
 - **F19b week grid:** no drag-to-move and no "Switch to home / weight room" per day. The coach builds school + home weeks from Week setup and edits sessions.
 - **F28e:** "Run jump tests as stations" isn't built (load tests correctly can't be stations).
 - **F27c/F27d:** no "Timed" work toggle or work timer for tier C/D rows. Reps and holds are typed as text.
@@ -234,7 +299,12 @@ $0 now. Future: Apple Developer Program $99/year; Supabase Pro about $25/month i
 - **Demo mode** still stores passwords in plain text (C16, out of scope).
 - **iOS in Expo Go** not tested.
 
-**Testing done (all on branch `v2.2`):**
+**Testing done for 2.2.1 (branch `v2.2.1`):** see `reports/v2.2.1-acceptance.md` for each criterion.
+- `tsc`, `expo lint`, `build:web` pass; `run-all.sh` 13 checks pass (new: `v221-check.ts`, `legal-pages-match.py`) and fails when a runner breaks.
+- SQL: upgrade path v1 → 002 … 008 (008 run twice) and fresh `schema.sql`; `rls-2.2-pass1/2/3.sql` give the expected 7/7/1 errors (coach fixtures now accept the Coach Terms at sign-up; the old `swap_level`/`ranked` lines use the new shape); new `rls-2.2.1.sql` gives the expected 7.
+- Browser (demo mode): new `test-v221` (Welcome, Create path, Log in, pre-2.1 age, under 13, `role` param, Coach Terms, level sheet), the tap-target audit, and the v2.2 suites (pass 1/2/3, 2.1 regression) with their sign-in helpers updated for the new Log in screen.
+
+**Testing done for 2.2.0 (branch `v2.2`):**
 - `tsc`, `expo lint` (`EXPO_OFFLINE=1`) and `build:web` pass.
 - **SQL**, on local Postgres 16 with a stand-in Supabase auth schema:
   - Upgrade path 1.x → 002 → 003 → 004 → 005 → 006 → 007, each migration run twice with no errors. A fresh `schema.sql` gives 0 errors.

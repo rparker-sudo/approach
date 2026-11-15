@@ -4,6 +4,7 @@ import { BEGINNER_EFFORT, homeAllowed, pickExercise, restSecFor } from './genera
 import { blockRests, blocksOf } from './groups';
 import { BlockInfo, sessionForDate } from './progression';
 import { estimateMinutes } from './rest';
+import type { LevelTable } from './backend/types';
 import type { Equipment, Exercise, Phase, Program, ProgramExercise, Session, WorkoutLog } from './types';
 
 /**
@@ -226,6 +227,40 @@ export function swapsFor(program: Program, session: Session, level: Level): { fr
     else if (r.id !== ex.id) out.push({ from: ex.name, to: r.name });
   }
   return out;
+}
+
+/* ---------- 2.2.1 J1: the coach app's level table for member_levels ---------- */
+const equipKey = (equipment?: Equipment[]) => (equipment?.length ? [...equipment].sort().join(',') : 'all');
+
+/** Key for one program exercise in the level table (exercise + the program's equipment). */
+export const levelKey = (exerciseId: string, equipment?: Equipment[]) => `${exerciseId}@${equipKey(equipment)}`;
+
+/**
+ * For each exercise in these programs: what it resolves to at levels 1, 2 and 3 (null = left out). The server uses it to
+ * return only the adjusted exercises for each athlete, never another team's level (2.2.1 §6 J1).
+ */
+export function levelTable(programs: (Program | undefined)[]): LevelTable {
+  const out: LevelTable = {};
+  for (const program of programs) {
+    if (!program) continue;
+    const equipment = program.equipment?.length ? program.equipment : ALL_EQUIPMENT;
+    for (const session of program.sessions) {
+      for (const pe of session.exercises) {
+        const k = levelKey(pe.exerciseId, program.equipment);
+        if (out[k]) continue;
+        const ex = getExercise(pe.exerciseId);
+        out[k] = ([1, 2, 3] as Level[]).map((l) => resolveExercise(ex, l, equipment)?.id ?? null) as LevelTable[string];
+      }
+    }
+  }
+  return out;
+}
+
+/** What this athlete gets for a program exercise, given member_levels' `adjusted` map (undefined = not adjusted). */
+export function adjustedFor(adjusted: Record<string, string | null> | undefined, exerciseId: string, equipment?: Equipment[]): string | null | undefined {
+  if (!adjusted) return undefined;
+  const k = levelKey(exerciseId, equipment);
+  return k in adjusted ? adjusted[k] : undefined;
 }
 
 /* ---------- 1.6 Coach effort clamp (builder, D-028) ---------- */

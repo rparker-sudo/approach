@@ -1,5 +1,6 @@
 {
-  "name": "Approach",
+  "name": "Approach Strength",
+  "shortName": "Approach",
   "tagline": "Build it under the bar. Use it above the net.",
   "color": {
     "palette": {
@@ -43,7 +44,10 @@
     "status": {
       "_note": "Monochrome brand. Use these only for genuine errors/warnings, never decoration.",
       "error": "#E5484D",
-      "warning": "#E2A336"
+      "warning": "#E2A336",
+      "_textNote": "F-2 (2.2.1): use errorText / warningText for text and icons; error / warning stay for borders, bars and fills.",
+      "errorText": { "dark": "#E5484D", "light": "#C42B30" },
+      "warningText": { "dark": "#E2A336", "light": "#8A5A00" }
     }
   },
   "typography": {

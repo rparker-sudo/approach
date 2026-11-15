@@ -1,4 +1,4 @@
-# Builds the browser version of Approach and publishes it to GitHub Pages
+# Builds the browser version of Approach Strength and publishes it to GitHub Pages
 # on every push to main. Setup steps are in the README ("Browser version on GitHub Pages").
 name: Deploy web app
 
@@ -20,10 +20,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # The site lives at the root of the custom domain https://approachstrength.com (set under Settings → Pages;
-      # the old github.io address forwards there). The APP_URL and BASE_PATH repository variables still override these.
+      # The app lives at the root of its custom domain https://app.approachstrength.com (Settings → Pages).
+      # The website with the legal pages is https://approachstrength.com (repo rparker-sudo/approachstrength-site).
+      # The APP_URL, SITE_URL and BASE_PATH repository variables set these (2.2.1 §1); the defaults match them.
       EXPO_BASE_URL: ${{ vars.BASE_PATH != '' && vars.BASE_PATH || '/' }}
-      EXPO_PUBLIC_APP_URL: ${{ vars.APP_URL != '' && vars.APP_URL || 'https://approachstrength.com' }}
+      EXPO_PUBLIC_APP_URL: ${{ vars.APP_URL != '' && vars.APP_URL || 'https://app.approachstrength.com' }}
+      EXPO_PUBLIC_SITE_URL: ${{ vars.SITE_URL != '' && vars.SITE_URL || 'https://approachstrength.com' }}
       EXPO_PUBLIC_APP_STORE_ID: ${{ vars.APP_STORE_ID }}
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}

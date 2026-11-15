@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Program, TestBattery, WorkoutLog } from '../types';
+import { COACH_TERMS_REASON, COACH_TERMS_VERSION } from '../coachTerms';
 import { uid } from '../util';
 import { easingFor } from '../resolve';
 import {
@@ -47,7 +48,8 @@ import {
 const KEY = 'load-and-launch/demo-server/v1';
 
 type DB = {
-  users: (Account & { password: string })[];
+  /** 2.2.1 §8: coachTermsVersion / coachTermsAcceptedAt mirror profiles.coach_terms_* (only the user writes them). */
+  users: (Account & { password: string; coachTermsVersion?: string | null; coachTermsAcceptedAt?: string | null })[];
   teams: Team[];
   members: {
     teamId: string;
@@ -134,9 +136,11 @@ async function save(db: DB) {
 
 const listeners = new Set<() => void>();
 
+const coachTermsOk = (u?: DB['users'][number]) => !!u && u.coachTermsVersion === COACH_TERMS_VERSION && !!u.coachTermsAcceptedAt;
+
 function publicAccount(u: DB['users'][number]): Account {
-  const { password: _pw, ...rest } = u;
-  return rest;
+  const { password: _pw, coachTermsVersion: _v, coachTermsAcceptedAt: _at, ...rest } = u;
+  return { ...rest, ...(u.role === 'coach' ? { coachTermsAccepted: coachTermsOk(u) } : {}) };
 }
 
 async function me(db?: DB) {
@@ -266,16 +270,20 @@ export const localBackend: Backend = {
     if (db.users.some((u) => u.email === email)) throw new BackendError('That email already has an account. Sign in instead.');
     if (thisYear() - input.birthYear < 13) throw new BackendError('Not eligible.');
     const isMinor = minorFrom(input.birthYear, input.isMinor);
+    const role = input.role === 'coach' && !isMinor ? input.role : ('athlete' as const);
+    const terms = role === 'coach' && input.coachTermsVersion === COACH_TERMS_VERSION;
     const user = {
       id: uid(),
       email,
       name: input.name.trim(),
       // Coach accounts are for adults 18 and older.
-      role: input.role === 'coach' && !isMinor ? input.role : ('athlete' as const),
+      role,
       position: input.position ?? null,
       birthYear: input.birthYear,
       isMinor,
       password: input.password,
+      coachTermsVersion: terms ? COACH_TERMS_VERSION : null,
+      coachTermsAcceptedAt: terms ? new Date().toISOString() : null,
     };
     db.users.push(user);
     db.sessionUserId = user.id;
@@ -286,8 +294,33 @@ export const localBackend: Backend = {
   async signIn(email, password) {
     const db = await load();
     const u = db.users.find((x) => x.email === email.trim().toLowerCase());
-    if (!u || u.password !== password) throw new BackendError("Email or password doesn't match.");
+    if (!u || u.password !== password) throw new BackendError("That email and password don't match. Try again.");
     db.sessionUserId = u.id;
+    await save(db);
+    return publicAccount(u);
+  },
+
+  async requestPasswordReset() {
+    throw new BackendError("Demo mode can't send email. Accounts here are saved on this device only.");
+  },
+
+  async consumeAuthLink() {
+    return null;
+  },
+
+  async updatePassword(password) {
+    const { db, user } = await me();
+    if (password.length < 6) throw new BackendError('Use a password with at least 6 characters.');
+    user.password = password;
+    await save(db);
+  },
+
+  async acceptCoachTerms() {
+    const { db, user } = await me();
+    if (user.role !== 'coach') throw new BackendError('The Coach Terms are for coach accounts.');
+    const u = user as DB['users'][number];
+    if (!(u.coachTermsVersion === COACH_TERMS_VERSION && u.coachTermsAcceptedAt)) u.coachTermsAcceptedAt = new Date().toISOString();
+    u.coachTermsVersion = COACH_TERMS_VERSION;
     await save(db);
     return publicAccount(u);
   },
@@ -476,18 +509,22 @@ export const localBackend: Backend = {
     await save(db);
   },
 
-  async memberLevels(teamId) {
+  async memberLevels(teamId, table = {}) {
     const { db, user } = await me();
     if (!isCoach(db, teamId, user.id)) return [];
+    // 2.2.1 J1 (same as member_levels): only the adjusted exercises, never another team's level.
     return db.members
       .filter((m) => m.teamId === teamId)
-      .map((m) => ({
-        userId: m.userId,
-        teamLevel: m.level ?? null,
-        confirmed: !!m.levelSetBy,
-        setAt: m.levelSetAt ?? null,
-        swapLevel: m.level != null && (resolveLevelOf(db, m.userId) ?? m.level) < m.level ? resolveLevelOf(db, m.userId) : null,
-      }));
+      .map((m) => {
+        const lvl = resolveLevelOf(db, m.userId);
+        const adjusted: Record<string, string | null> = {};
+        if (m.level != null && lvl != null && lvl < m.level) {
+          for (const [k, row] of Object.entries(table)) {
+            if (Array.isArray(row) && row.length === 3 && row[lvl - 1] !== row[m.level - 1]) adjusted[k] = row[lvl - 1];
+          }
+        }
+        return { userId: m.userId, teamLevel: m.level ?? null, confirmed: !!m.levelSetBy, setAt: m.levelSetAt ?? null, adjusted };
+      });
   },
 
   async setLiftProgram(teamId) {
@@ -525,6 +562,7 @@ export const localBackend: Backend = {
   async recordConsent(teamId, userId, perms) {
     const { db, user } = await me();
     if (!isCoach(db, teamId, user.id)) throw new BackendError('Only the team coach can record consent.');
+    if (!coachTermsOk(user as DB['users'][number])) throw new BackendError(COACH_TERMS_REASON);
     if (db.users.find((u) => u.id === userId)?.isMinor === false) throw new BackendError('Adults choose these themselves.');
     const m = db.members.find((x) => x.teamId === teamId && x.userId === userId);
     if (!m) throw new BackendError("That athlete isn't on the team.");
@@ -590,6 +628,8 @@ export const localBackend: Backend = {
     if (!coach && !(db.members.some((m) => m.teamId === teamId && m.userId === viewer) && (team?.settings?.effortBoard ?? true))) return [];
     return db.members
       .filter((m) => m.teamId === teamId && (onBoards(db, teamId, m.userId) || m.userId === viewer))
+      // 2.2.1 J3 (same as team_effort): teammates only get athletes ranked on this team, plus their own row.
+      .filter((m) => coach || m.userId === viewer || liftTeamOf(db, m.userId) === teamId)
       .map((m): EffortInput => {
         const u = db.users.find((x) => x.id === m.userId);
         const me = m.userId === viewer;
@@ -727,6 +767,7 @@ export const localBackend: Backend = {
   async confirmSupervision(teamId, day, battery: TestBattery) {
     const { db, user } = await me();
     coachOf(db, teamId, user.id);
+    if (!coachTermsOk(user as DB['users'][number])) throw new BackendError(COACH_TERMS_REASON);
     const existing = db.testSessions.find((x) => x.teamId === teamId && x.day === day && x.groupKey === 'all');
     if (existing) return existing;
     const row: TestSession = { teamId, groupKey: 'all', day, coachId: user.id, confirmedAt: new Date().toISOString(), battery };

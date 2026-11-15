@@ -19,6 +19,9 @@ export type Account = {
   isMinor?: boolean | null;
   /** How they appear on team boards (P2). */
   boardNameMode?: BoardNameMode;
+  /** Coach accounts: accepted the current Coach Terms (2.2.1 §8). Until then, recording consent and starting a strength
+   *  check are blocked. */
+  coachTermsAccepted?: boolean;
 };
 
 export type BoardNameMode = 'short' | 'initials' | 'hidden';
@@ -69,7 +72,7 @@ export type TeamSettings = {
   /** Season target of team sessions; null = suggested default. */
   teamGoal: number | null;
   medBallLb: number;
-  /** v2.2 board accent color (#RRGGBB); null = Approach default. The coach's original choice (adjusted at render time). */
+  /** v2.2 board accent color (#RRGGBB); null = the default (Silver). The coach's original choice (adjusted at render time). */
   accentColor: string | null;
 };
 export const DEFAULT_TEAM_SETTINGS: TeamSettings = {
@@ -150,7 +153,17 @@ export type Member = {
 };
 
 /** Coach view of an athlete's levels (v2.2). resolveLevel can be lower than teamLevel because of another team; never named. */
-export type MemberLevel = { userId: string; teamLevel: number | null; confirmed: boolean; setAt: string | null; /** Lower level exercises resolve to because of another team (null when not lower). Never shown as a name. */ swapLevel: number | null };
+export type MemberLevel = {
+  userId: string;
+  teamLevel: number | null;
+  confirmed: boolean;
+  setAt: string | null;
+  /** 2.2.1 J1: exercises this athlete gets instead (key from the coach app's table → exercise id, null = left out),
+   *  only where they differ from this team's level. No level, team or reason. */
+  adjusted: Record<string, string | null>;
+};
+/** The coach app's resolution table for member_levels: key → [exercise at level 1, 2, 3] (null = left out). */
+export type LevelTable = Record<string, [string | null, string | null, string | null]>;
 
 export type TeamProgram = {
   teamId: string;
@@ -228,7 +241,9 @@ export type EffortInput = {
   boardName: string;
   groupId: string | null;
   isMe: boolean;
-  /** v2.2 (D-027): follows this team's lift program. Otherwise left off Overall, Sessions, Extra recovery, Consistency, Streak. */
+  /** v2.2 (D-027): follows this team's lift program. Otherwise left off Overall, Sessions, Extra recovery, Consistency, Streak.
+   *  2.2.1 J3: the server doesn't send this. Teammates only receive ranked athletes; the app works it out for the coach
+   *  (members_following_other) and for the viewer's own row (their lift program). */
   ranked: boolean;
   logs: { at: string; session: string; minutes: number | null; kind?: LogKind }[];
   /** Null when the member hasn't allowed attendance. */
@@ -268,6 +283,8 @@ export type SignUpInput = {
   position?: Position | null;
   birthYear: number;
   isMinor: boolean;
+  /** Coach sign-up only: the Coach Terms version the coach ticked (2.2.1 §8). */
+  coachTermsVersion?: string;
 };
 
 export interface Backend {
@@ -278,6 +295,14 @@ export interface Backend {
   getAccount(): Promise<Account | null>;
   signUp(input: SignUpInput): Promise<Account>;
   signIn(email: string, password: string): Promise<Account>;
+  /** Log in: "Forgot password?" sends a reset link to app.approachstrength.com/reset-password (2.2.1 §1, §9). */
+  requestPasswordReset(email: string): Promise<void>;
+  /** Web: signs in from an email link (password reset or sign-up confirmation) in the address bar. Null when none. */
+  consumeAuthLink(): Promise<{ type: string } | null>;
+  /** After a reset link: set a new password for the signed-in account. */
+  updatePassword(password: string): Promise<void>;
+  /** Accept the current Coach Terms (coach accounts; own account only). */
+  acceptCoachTerms(): Promise<Account>;
   signOut(): Promise<void>;
   updateAccount(patch: Partial<Pick<Account, 'name' | 'position'>>): Promise<Account>;
   /** Accounts from before 2.1 answer the age question once. Throws BackendError('Not eligible.') under 13. */
@@ -299,7 +324,7 @@ export interface Backend {
   /** v2.2 level (compliance § Level): the athlete fills in their self-reported level once; the coach sets or confirms it. */
   setMySelfLevel(teamId: string, level: number): Promise<void>;
   setMemberLevel(teamId: string, userId: string, level: number): Promise<void>;
-  memberLevels(teamId: string): Promise<MemberLevel[]>;
+  memberLevels(teamId: string, table?: LevelTable): Promise<MemberLevel[]>;
   /** v2.2 multiple teams: follow one team's lift program (null = personal program). */
   setLiftProgram(teamId: string | null): Promise<void>;
   /** Coach: members who follow another team's lift program (no team named). */

@@ -99,7 +99,7 @@ export default function Settings() {
 
       <Card>
         <H2>Account</H2>
-        <Text style={{ fontSize: 13, color: isDemoMode ? colors.warning : colors.muted }}>
+        <Text style={{ fontSize: 13, color: isDemoMode ? colors.warningText : colors.muted }}>
           {syncConfigProblem
             ? `Team sync: Off (${syncConfigProblem})`
             : isDemoMode
@@ -138,7 +138,8 @@ export default function Settings() {
                 </View>
               ))
             ) : null}
-            <Button kind="ghost" title="Sign out" onPress={() => signOut().then(() => goBack())} />
+            {/* 2.2.1 §9: Log out → Welcome, with Log in first. */}
+            <Button kind="ghost" title="Log out" onPress={() => signOut().then(() => router.replace('/onboarding'))} />
             <Button kind="danger" title="Delete my account" onPress={() => setDeleting(true)} />
             <DeleteAccountDialog
               visible={deleting}

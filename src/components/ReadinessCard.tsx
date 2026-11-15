@@ -87,7 +87,7 @@ export default function ReadinessCard() {
                   onPress={() => setScores((s) => ({ ...s, [sc.key]: n }))}
                   style={{
                     flex: 1,
-                    height: 40,
+                    height: 44,
                     borderRadius: 8,
                     alignItems: 'center',
                     justifyContent: 'center',

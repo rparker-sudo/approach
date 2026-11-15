@@ -1,11 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Body, Button, Card, Chip, ChipRow, Field, H2, Label, Screen , Row, Stepper, Text, colors } from '../components/ui';
+import { Body, Button, Card, Chip, ChipRow, Field, H2, Label, Screen , Row, Stepper, Text, Toggle, colors } from '../components/ui';
 import { LiftDayPicker, WeekEditor } from '../components/week';
 import EquipmentPicker from '../components/EquipmentPicker';
 import { ALL_EQUIPMENT } from '../lib/exercises';
 import { generateProgram, liftDayCap, pickLiftDays, recommendedTotal, weekSummary } from '../lib/generator';
-import { Switch } from 'react-native';
 import { LEVEL_NAME } from '../lib/athlete';
 import { WEEKDAYS , EXPERIENCE, PHASES, POSITIONS } from '../lib/types';
 import { useStore } from '../lib/store';
@@ -203,7 +202,7 @@ function BuilderForm() {
           {total > cap ? <Text style={{ fontSize: 13, color: colors.muted }}>{`Max ${cap} full lift days for this level and time of year.`}</Text> : null}
           <Row style={{ justifyContent: 'space-between', minHeight: 44 }}>
             <Text style={{ fontSize: 15, flex: 1 }}>Jumps at home</Text>
-            <Switch accessibilityLabel="Jumps at home" disabled={!jumpsAllowed} value={homeJumps && jumpsAllowed} onValueChange={setHomeJumps} />
+            <Toggle accessibilityLabel="Jumps at home" disabled={!jumpsAllowed} value={homeJumps && jumpsAllowed} onValueChange={setHomeJumps} />
           </Row>
           <Text style={{ fontSize: 13, color: colors.muted }}>
             {jumpsAllowed
@@ -214,7 +213,7 @@ function BuilderForm() {
           </Text>
           <Row style={{ justifyContent: 'space-between', minHeight: 44 }}>
             <Text style={{ fontSize: 15, flex: 1 }}>Save time with supersets</Text>
-            <Switch accessibilityLabel="Save time with supersets" value={supersetsOn} onValueChange={(v) => setSupersets(v)} />
+            <Toggle accessibilityLabel="Save time with supersets" value={supersetsOn} onValueChange={(v) => setSupersets(v)} />
           </Row>
           <Text style={{ fontSize: 13, color: colors.muted }}>
             {`Pairs exercises only until the session fits about ${phase === 'off' ? 60 : phase === 'pre' ? 50 : phase === 'in' ? 40 : 45} min (home: 30).`}

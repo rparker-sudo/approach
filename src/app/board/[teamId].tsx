@@ -1,14 +1,14 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { Image, Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { useEffort, useTeamProgramFor } from '../../components/EffortBoard';
 import { Text } from '../../components/ui';
 import { boardAccent, textOn } from '../../lib/accent';
 import { backend, BoardMember, BoardTest, LiveProgress, Rack } from '../../lib/backend';
 import { addDays, breakOn, dateKey, formatKey, mondayOf, planForDate, today } from '../../lib/calendar';
 import { defaultTeamGoal, EffortMetric, formatMetric, liftDaysOf, METRICS, POINTS_LINE, rank, seasonStart, weeksRemaining } from '../../lib/effort';
-import { getExercise } from '../../lib/exercises';
-import { Level, resolveExercise } from '../../lib/resolve';
+import { ALL_EQUIPMENT, getExercise } from '../../lib/exercises';
+import { adjustedFor, Level, resolveExercise } from '../../lib/resolve';
 import { runState, stationFor, StationRun } from '../../lib/stations';
 import { BATTERY_LABEL } from '../../lib/testing';
 import { ALL, useTeams } from '../../lib/team';
@@ -26,6 +26,9 @@ import type { Program, TestBattery } from '../../lib/types';
 const P = { bg: '#0B0B0C', tile: '#1C1D20', line: '#3A3D42', ink: '#FFFFFF', muted: '#C9CDD2' };
 const PAGE_MS = 15000;
 const GAP = 12;
+/** Board signature (brand guide §8): plain mark + "Powered by Approach Strength" in Steel, never the team accent. */
+const POWERED_BY = require('../../../assets/brand/powered-by-board.png');
+const POWERED_BY_RATIO = 680 / 72;
 
 type TileState = 'lifting' | 'resting' | 'not_started' | 'done';
 type Tile = { member: BoardMember; live?: LiveProgress; prs: number; test?: BoardTest; state: TileState; upFirst?: string };
@@ -201,8 +204,11 @@ function Board({ teamId }: { teamId: string }) {
     const first = entry?.session?.exercises[0];
     if (!entry || !first) return undefined;
     const info = extras?.levels[m.userId];
-    const lvl = (Math.min(info?.teamLevel ?? 2, info?.swapLevel ?? 3) || 2) as Level;
-    const r = resolveExercise(getExercise(first.exerciseId), lvl, entry.prog.equipment ?? []);
+    // 2.2.1 J1: an exercise adjusted because of another team comes from the server's list (no level is sent).
+    const adj = adjustedFor(info?.adjusted, first.exerciseId, entry.prog.equipment);
+    if (adj !== undefined) return adj ? getExercise(adj).name : undefined;
+    const lvl = (info?.teamLevel ?? 2) as Level;
+    const r = resolveExercise(getExercise(first.exerciseId), lvl, entry.prog.equipment?.length ? entry.prog.equipment : ALL_EQUIPMENT);
     return r?.name;
   };
 
@@ -396,18 +402,22 @@ function Board({ teamId }: { teamId: string }) {
         {body}
       </View>
 
-      {/* Ticker (live view only) */}
-      {view === 'live' ? (
-        <View style={{ minHeight: 64, borderTopWidth: 1, borderTopColor: P.line, paddingHorizontal: 32, paddingVertical: 12, flexDirection: 'row', gap: 32, alignItems: 'center', flexWrap: 'wrap' }}>
-          {ticker.map((m, i) => (
-            <Text key={`${m.at}-${i}`} style={{ color: P.ink, fontSize: big(22) }}>
-              {m.text} <Text style={{ color: P.muted, fontSize: big(18) }}>{ago(m.at, now)}</Text>
-            </Text>
-          ))}
-          {pages > 1 ? <Text style={{ color: P.muted, fontSize: big(18), marginLeft: 'auto' }}>{`${pageIndex + 1} / ${pages}`}</Text> : null}
-        </View>
-      ) : null}
-      <Text style={{ position: 'absolute', bottom: 6, right: 12, color: P.muted, fontSize: 12 }}>Powered by Approach</Text>
+      {/* Footer: ticker (live view only) and the signature, bottom-right, 24 px from the edges at 1920 × 1080 (never over tiles). */}
+      <View style={{ minHeight: view === 'live' ? 64 : 0, borderTopWidth: view === 'live' ? 1 : 0, borderTopColor: P.line, paddingLeft: 32, paddingRight: big(24), paddingTop: 12, paddingBottom: big(24), flexDirection: 'row', gap: 32, alignItems: 'center', alignContent: 'flex-end', flexWrap: 'wrap' }}>
+        {view === 'live'
+          ? ticker.map((m, i) => (
+              <Text key={`${m.at}-${i}`} style={{ color: P.ink, fontSize: big(22) }}>
+                {m.text} <Text style={{ color: P.muted, fontSize: big(18) }}>{ago(m.at, now)}</Text>
+              </Text>
+            ))
+          : null}
+        {view === 'live' && pages > 1 ? <Text style={{ color: P.muted, fontSize: big(18), marginLeft: 'auto' }}>{`${pageIndex + 1} / ${pages}`}</Text> : null}
+        <Image
+          source={POWERED_BY}
+          accessibilityLabel="Powered by Approach Strength"
+          style={{ marginLeft: view === 'live' && pages > 1 ? 0 : 'auto', alignSelf: 'flex-end', height: 24, width: 24 * POWERED_BY_RATIO }}
+        />
+      </View>
 
       {/* Controls */}
       {controls ? (

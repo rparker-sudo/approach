@@ -126,7 +126,7 @@ export default function EffortBoard({ teamId, viewer }: { teamId: string; viewer
         </Text>
       ) : null}
       <Card style={{ gap: 0, paddingVertical: 4 }}>
-        {error ? <Text style={{ color: colors.error, fontSize: 13, paddingVertical: 12 }}>Couldn&apos;t load the board. Pull to refresh.</Text> : null}
+        {error ? <Text style={{ color: colors.errorText, fontSize: 13, paddingVertical: 12 }}>Couldn&apos;t load the board. Pull to refresh.</Text> : null}
         {!stats && !error ? <Text style={{ fontSize: 14, color: colors.muted, paddingVertical: 12 }}>Loading…</Text> : null}
         {empty || (stats && !list.length) ? (
           <Text style={{ fontSize: 14, color: colors.muted, paddingVertical: 12 }}>No sessions logged yet. The board fills in after the first workout.</Text>

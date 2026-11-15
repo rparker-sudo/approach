@@ -51,7 +51,7 @@ export default function SessionScreen() {
           return (
             <Card key={`${e.exerciseId}-${i}`} style={{ gap: 6 }}>
               <Text style={[display(12), { color: colors.muted }]}>{CATEGORY_LABEL[info.category]}</Text>
-              <Pressable accessibilityRole="link" onPress={() => router.push(`/exercise/${info.id}`)}>
+              <Pressable accessibilityRole="link" onPress={() => router.push(`/exercise/${info.id}`)} style={{ minHeight: 44, justifyContent: 'center' }}>
                 <H2>{info.name}</H2>
               </Pressable>
               <VersionLine exerciseId={e.exerciseId} teamExerciseId={e.teamExerciseId} teamId={program.teamId} />
@@ -201,7 +201,7 @@ export default function SessionScreen() {
                     accessibilityState={{ checked: selected.includes(i) }}
                     accessibilityLabel={`Select ${info.name}`}
                     onPress={() => toggleSelect(i)}
-                    hitSlop={8}
+                    style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
                   >
                     <Text style={{ fontSize: 18 }}>{selected.includes(i) ? '☑' : '☐'}</Text>
                   </Pressable>
@@ -213,11 +213,11 @@ export default function SessionScreen() {
                   </Text>
                   {e.filler ? <Text style={{ fontSize: 12, color: colors.muted }}>During rest</Text> : null}
                 </Row>
-                <Pressable accessibilityRole="link" onPress={() => router.push(`/exercise/${info.id}`)}>
+                <Pressable accessibilityRole="link" onPress={() => router.push(`/exercise/${info.id}`)} style={{ minHeight: 44, justifyContent: 'center' }}>
                   <H2>{info.name}</H2>
                 </Pressable>
                 <Body muted style={{ fontSize: 13 }}>{info.cue}</Body>
-                {!fits(info, gym) ? <Text style={{ fontSize: 12, color: colors.warning }}>Needs equipment this program doesn&apos;t have.</Text> : null}
+                {!fits(info, gym) ? <Text style={{ fontSize: 12, color: colors.warningText }}>Needs equipment this program doesn&apos;t have.</Text> : null}
               </View>
               <View style={{ gap: 2 }}>
                 <Pressable accessibilityLabel="Move up" onPress={() => move(i, -1)} hitSlop={6}>
@@ -248,12 +248,12 @@ export default function SessionScreen() {
               </View>
             </Row>
             {problem ? (
-              <Text accessibilityRole="alert" style={{ fontSize: 13, color: problem.block ? colors.error : colors.warning }}>
+              <Text accessibilityRole="alert" style={{ fontSize: 13, color: problem.block ? colors.errorText : colors.warningText }}>
                 {problem.block ? problem.message : `${problem.message} This team is all adults, so you can still post it.`}
               </Text>
             ) : null}
             {clock ? (
-              <Text accessibilityRole="alert" style={{ fontSize: 13, color: hasMinor ? colors.error : colors.warning }}>{CLOCK_REASON}</Text>
+              <Text accessibilityRole="alert" style={{ fontSize: 13, color: hasMinor ? colors.errorText : colors.warningText }}>{CLOCK_REASON}</Text>
             ) : null}
             <Row style={{ justifyContent: 'space-between' }}>
               <Label>Rest</Label>
@@ -303,12 +303,12 @@ export default function SessionScreen() {
       {selected.length >= 2 ? (
         <Card>
           <Button title={selected.length === 2 ? 'Pair as superset' : 'Group as circuit'} onPress={groupSelected} />
-          {groupMsg ? <Text accessibilityRole="alert" style={{ fontSize: 13, color: colors.error }}>{groupMsg}</Text> : null}
+          {groupMsg ? <Text accessibilityRole="alert" style={{ fontSize: 13, color: colors.errorText }}>{groupMsg}</Text> : null}
           <Button small kind="ghost" title="Clear selection" onPress={() => setSelected([])} />
         </Card>
       ) : null}
 
-      <Text style={{ fontSize: 14, fontWeight: '600', color: minutes > target ? colors.warning : colors.ink }}>
+      <Text style={{ fontSize: 14, fontWeight: '600', color: minutes > target ? colors.warningText : colors.ink }}>
         {`${formatMinutes(minutes)} · target ${target}${minutes > target ? ' ●' : ''}`}
       </Text>
 

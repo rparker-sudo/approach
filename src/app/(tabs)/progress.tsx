@@ -13,12 +13,15 @@ import { Body, Button, Card, colors, Field, H2, Label, Row, Screen, Text } from 
 import { getExercise } from '../../lib/exercises';
 import { useStore } from '../../lib/store';
 import { estimateStrength, formatDate, parseNum } from '../../lib/util';
+import { useGeneralView } from '../../lib/useGeneral';
 
 type LiftPoint = { date: string; e1rm: number; best: string };
 
 export default function Progress() {
   const { data, addBodyLog, deleteLog } = useStore();
   const [bw, setBw] = useState('');
+  // 2.3.0 F34: general teams show sessions, streak, private bests and history; no touch, jumps, estimates or body weight.
+  const general = useGeneralView();
 
   const lifts = useMemo(() => {
     const map = new Map<string, LiftPoint[]>();
@@ -53,10 +56,10 @@ export default function Progress() {
 
   return (
     <Screen tab>
-      <ScreenHeader title="Progress" subtitle="Touch height and strength" />
-      <AboveTheNet />
+      <ScreenHeader title="Progress" subtitle={general ? 'Sessions and personal bests' : 'Touch height and strength'} />
+      {general ? null : <AboveTheNet />}
       <TeamEffortCards />
-      <Button kind="secondary" title="Jump test" onPress={() => router.push({ pathname: '/testing', params: { solo: '1' } })} />
+      {general ? null : <Button kind="secondary" title="Jump test" onPress={() => router.push({ pathname: '/testing', params: { solo: '1' } })} />}
       {(data.readinessLog ?? []).length ? (
         <Card>
           <H2>Check-ins</H2>
@@ -76,6 +79,26 @@ export default function Progress() {
         <Big label="Last 4 weeks" value={String(last28)} />
       </Row>
 
+      {general ? (
+        <Card>
+          <H2>Personal bests</H2>
+          {lifts.length === 0 ? (
+            <Body muted>Log a session with weights. Your best sets show up here.</Body>
+          ) : (
+            lifts.map(([id, points]) => {
+              const best = [...points].sort((a, b) => b.e1rm - a.e1rm)[0];
+              return (
+                <Row key={id} style={{ justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 14, flex: 1 }}>{getExercise(id).name}</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600' }}>{best.best}</Text>
+                </Row>
+              );
+            })
+          )}
+          <Body muted style={{ fontSize: 12 }}>Only you and your trainer see these.</Body>
+        </Card>
+      ) : null}
+      {general ? null : (
       <Card>
         <H2>Strength</H2>
         {lifts.length === 0 ? (
@@ -87,7 +110,9 @@ export default function Progress() {
           Estimated strength comes from your best set. It&apos;s an estimate; no need to test it.
         </Body>
       </Card>
+      )}
 
+      {general ? null : (
       <Card>
         <H2>Body weight</H2>
         <Row>
@@ -110,6 +135,7 @@ export default function Progress() {
           <Body muted style={{ fontSize: 13 }}>Optional. Stays on this phone.</Body>
         )}
       </Card>
+      )}
 
       <Label>History</Label>
       {data.logs.length === 0 ? <Body muted>No workouts logged yet.</Body> : null}

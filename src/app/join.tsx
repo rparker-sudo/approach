@@ -31,8 +31,8 @@ export default function JoinScreen() {
     if (router.canGoBack()) router.back();
     else router.replace('/');
   };
-  const done = (teamName: string, coachName?: string) => {
-    showAlert(`You're on ${teamName}`, coachName ? `Coach ${coachName} posts your workouts.` : undefined);
+  const done = (teamName: string, coachName?: string, general?: boolean) => {
+    showAlert(`You're on ${teamName}`, coachName ? (general ? `Trainer ${coachName} posts your programs.` : `Coach ${coachName} posts your workouts.`) : undefined);
     finish();
   };
   const current = teams.find((t) => t.isLiftProgram) ?? teams[0];
@@ -107,7 +107,7 @@ export default function JoinScreen() {
             // Ask the server: a join link can open the app before the team list has loaded.
             const mine = await backend.listMyTeams().catch(() => teams);
             if (mine.some((t) => t.id !== team.id)) setChoose({ joined: team.id, coachName: team.coachName });
-            else done(team.name, team.coachName);
+            else done(team.name, team.coachName, team.kind === 'general');
           }} />
         </>
       )}

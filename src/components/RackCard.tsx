@@ -11,7 +11,7 @@ import { Card, colors, H2, Text } from './ui';
  */
 export default function RackCard({ teamId }: { teamId: string }) {
   const { data, mutate } = useStore();
-  const { syncing } = useTeams();
+  const { syncing, teams } = useTeams();
   const [rack, setRack] = useState<MyRack | null>(null);
   useEffect(() => {
     if (syncing) return;
@@ -32,14 +32,15 @@ export default function RackCard({ teamId }: { teamId: string }) {
     return () => clearTimeout(t);
   }, [rack, last, teamId, mutate]);
   if (!rack) return null;
+  const general = teams.find((x) => x.id === teamId)?.kind === 'general';
   const names = rack.partnerNames;
   const n = rack.partners;
   let partners: string;
   if (names && names.length) {
     const more = rack.others ?? 0;
     const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0];
-    partners = `with ${list}${more ? ` and ${more} more teammate${more === 1 ? '' : 's'}` : ''}`;
-  } else partners = n ? `with ${n} teammate${n === 1 ? '' : 's'}` : 'Just you for now';
+    partners = `with ${list}${more ? ` and ${more} more ${general ? 'other client' : 'teammate'}${more === 1 ? '' : 's'}` : ''}`;
+  } else partners = n ? (general ? `with ${n} other client${n === 1 ? '' : 's'}` : `with ${n} teammate${n === 1 ? '' : 's'}`) : 'Just you for now';
   return (
     <Card>
       <H2>{`You're on ${rack.rackName}`}</H2>

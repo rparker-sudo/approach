@@ -5,16 +5,18 @@ import { useState } from 'react';
 
 import Constants from 'expo-constants';
 import { PERM_LABELS } from '../components/Consent';
-import YourChoices, { DEFAULT_CHOICES } from '../components/YourChoices';
+import YourChoices, { DEFAULT_CHOICES, GENERAL_CHOICES } from '../components/YourChoices';
+import { HEAD_INJURY_TRAINER } from '../lib/general';
+import { useGeneralView } from '../lib/useGeneral';
 import DeleteAccountDialog from '../components/DeleteAccountDialog';
-import { Body, Button, Card, Chip, ChipRow, colors, Field, H2, Label, Lockup, Row, Screen, StatusChip, Text } from '../components/ui';
+import { Body, Button, Card, Chip, ChipRow, colors, Field, H2, Label, Lockup, Row, Screen, StatusChip, Text, TextInput } from '../components/ui';
 import { BoardNameMode, boardName, isDemoMode, PERM_KEYS, syncConfigProblem } from '../lib/backend';
 import { LEGAL_TITLES, LegalPage, openLegal } from '../lib/legal';
 import { useStore } from '../lib/store';
 import { useTeams } from '../lib/team';
 import { POSITIONS } from '../lib/types';
 import { NUTRITION_DISCLAIMER } from '../lib/nutrition';
-import { followsLowerLevel, ownLevel } from '../lib/athlete';
+import { followsLowerLevel, LEVEL_NAME, ownLevel } from '../lib/athlete';
 import { possessive } from '../lib/util';
 import { levelLine } from '../components/VersionLine';
 import HomeEquipmentSheet from '../components/HomeEquipmentSheet';
@@ -27,7 +29,11 @@ const HEAD_INJURY_LINE =
 
 export default function Settings() {
   const { data, setProfile, resetAll, setTheme, mutate } = useStore();
-  const { account, teams, signOut, leaveTeam, deleteAccount, consentFor, setMyChoices, setBoardNameMode, setLiftProgram } = useTeams();
+  const { account, teams, signOut, leaveTeam, deleteAccount, consentFor, setMyChoices, setBoardNameMode, setLiftProgram, deleteMyCheckins } = useTeams();
+  // 2.3.0: a general (trainer) team in view: Trainer/Client wording, the T5 choices, Delete my check-ins.
+  const general = useGeneralView();
+  const [deleteCheckins, setDeleteCheckins] = useState(false);
+  const [typed, setTyped] = useState('');
   const [savedChoices, setSavedChoices] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [homeSheet, setHomeSheet] = useState(false);
@@ -125,7 +131,7 @@ export default function Settings() {
                       kind="ghost"
                       title="Leave"
                       onPress={() =>
-                        showAlert(`Leave ${t.name}?`, "You'll stop getting this team's workouts.", [
+                        showAlert(`Leave ${t.name}?`, t.kind === 'general' ? "You'll stop getting your trainer's programs." : "You'll stop getting this team's workouts.", [
                           { text: 'Cancel', style: 'cancel' },
                           { text: 'Leave', style: 'destructive', onPress: () => leave(t.id) },
                         ])
@@ -166,11 +172,13 @@ export default function Settings() {
           <H2>Program</H2>
           {teams.map((t) => (
             <Text key={t.id} style={{ fontSize: 14 }}>
-              {levelLine(t.name, t.myLevel ?? ownLevel(data), !!t.myLevelConfirmed)}
+              {t.kind === 'general'
+                ? `Your level with ${t.name}: ${LEVEL_NAME[t.myLevel ?? ownLevel(data)]} (${t.myLevelConfirmed ? 'set by your trainer' : 'not confirmed yet'})`
+                : levelLine(t.name, t.myLevel ?? ownLevel(data), !!t.myLevelConfirmed)}
             </Text>
           ))}
           {followsLowerLevel(data) ? <Text style={{ fontSize: 14 }}>Your exercises follow the lower of your teams&apos; levels.</Text> : null}
-          <Text style={{ fontSize: 13, color: colors.muted }}>Only your coach can change your level.</Text>
+          <Text style={{ fontSize: 13, color: colors.muted }}>{general ? 'Only your trainer can change your level.' : 'Only your coach can change your level.'}</Text>
         </Card>
       ) : null}
 
@@ -211,10 +219,13 @@ export default function Settings() {
               <Label>Your choices</Label>
               <YourChoices
                 key={JSON.stringify(consentFor(teams[0].id))}
+                general={general}
                 initial={
                   consentFor(teams[0].id)?.participation && teams[0].myConsentVersion === 2
                     ? (({ participation: _p, ...rest }) => rest)(consentFor(teams[0].id)!)
-                    : DEFAULT_CHOICES
+                    : general
+                      ? GENERAL_CHOICES
+                      : DEFAULT_CHOICES
                 }
                 saveLabel={savedChoices ? 'Saved' : 'Save choices'}
                 onSave={async (c) => {
@@ -242,15 +253,59 @@ export default function Settings() {
                     {account.isMinor === false ? `Your choices${teams.length > 1 ? ` · ${t.name}` : ''}` : `Parent consent${teams.length > 1 ? ` · ${t.name}` : ''}`}
                   </Text>
                   {account.isMinor !== false && !p.participation ? <Text style={{ fontSize: 14 }}>Waiting for your parent&apos;s form.</Text> : null}
-                  {PERM_KEYS.map((k) => (
-                    <Text key={k} style={{ fontSize: 14 }}>
-                      {`${PERM_LABELS[k]}: ${p[k] ? 'on' : 'off'}`}
-                    </Text>
-                  ))}
+                  {t.kind === 'general'
+                    ? ([
+                        ['Check-ins', p.checkins],
+                        ['Share my check-ins with my trainer', p.shareCheckins],
+                        ['Class board', p.boards],
+                      ] as const).map(([label, on]) => (
+                        <Text key={label} style={{ fontSize: 14 }}>
+                          {`${label}: ${on ? 'on' : 'off'}`}
+                        </Text>
+                      ))
+                    : PERM_KEYS.map((k) => (
+                        <Text key={k} style={{ fontSize: 14 }}>
+                          {`${PERM_LABELS[k]}: ${p[k] ? 'on' : 'off'}`}
+                        </Text>
+                      ))}
                 </View>
               );
             })
           : null}
+        {general && !coach && account ? (
+          <>
+            {/* F43 / compliance T5: delete all check-ins (server and this phone). Type DELETE to confirm (F5 pattern). */}
+            {deleteCheckins ? (
+              <View style={{ gap: 8 }}>
+                <Text style={{ fontSize: 15, fontWeight: '600' }}>Delete all your check-ins? This can&apos;t be undone.</Text>
+                <TextInput value={typed} onChangeText={setTyped} placeholder="Type DELETE" autoCapitalize="characters" accessibilityLabel="Type DELETE to confirm" />
+                <Row>
+                  <View style={{ flex: 1 }}>
+                    <Button kind="ghost" title="Cancel" onPress={() => (setDeleteCheckins(false), setTyped(''))} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Button
+                      kind="danger"
+                      title="Delete"
+                      disabled={typed.trim() !== 'DELETE'}
+                      onPress={() =>
+                        deleteMyCheckins()
+                          .then(() => {
+                            setDeleteCheckins(false);
+                            setTyped('');
+                            showAlert('Check-ins deleted.');
+                          })
+                          .catch(() => showAlert("Couldn't delete your check-ins. Try again."))
+                      }
+                    />
+                  </View>
+                </Row>
+              </View>
+            ) : (
+              <Button kind="danger" title="Delete my check-ins" onPress={() => setDeleteCheckins(true)} />
+            )}
+          </>
+        ) : null}
         <Button
           kind="danger"
           title="Erase all data"
@@ -279,7 +334,7 @@ export default function Settings() {
               ? HOME_EQUIPMENT.filter((e) => data.homeEquipment!.includes(e.id)).map((e) => e.label).join(', ')
               : 'Bodyweight only'}
           </Text>
-          <Text style={{ fontSize: 13, color: colors.muted }}>This stays on your phone. Your coach doesn&apos;t see it.</Text>
+          <Text style={{ fontSize: 13, color: colors.muted }}>{general ? "This stays on your phone. Your trainer doesn't see it." : "This stays on your phone. Your coach doesn't see it."}</Text>
           <Button small kind="secondary" title="Change home equipment" onPress={() => setHomeSheet(true)} />
           {homeSheet ? <HomeEquipmentSheet onClose={() => setHomeSheet(false)} /> : null}
         </Card>
@@ -287,15 +342,19 @@ export default function Settings() {
 
       <Card>
         <H2>Safety</H2>
-        <Body>{HEAD_INJURY_LINE}</Body>
+        {/* G4: general teams use HEAD_INJURY_TRAINER (pending Legal, one constant); volleyball keeps the approved line. */}
+        <Body>{general ? HEAD_INJURY_TRAINER : HEAD_INJURY_LINE}</Body>
         <Body muted style={{ fontSize: 13 }}>
-          Training guidance is general education for healthy athletes. Learn new lifts with a qualified coach, and stop if anything hurts.
+          {general
+            ? 'Training guidance is general education for healthy adults. Learn new lifts with your trainer, and stop if anything hurts.'
+            : 'Training guidance is general education for healthy athletes. Learn new lifts with a qualified coach, and stop if anything hurts.'}
         </Body>
       </Card>
 
       <Card>
         <H2>Legal</H2>
-        {(['privacy', 'terms', 'consent'] as LegalPage[]).map((p) => (
+        {/* F34: no parent consent in general teams. */}
+        {((general ? ['privacy', 'terms'] : ['privacy', 'terms', 'consent']) as LegalPage[]).map((p) => (
           <Button key={p} kind="ghost" title={LEGAL_TITLES[p]} onPress={() => openLegal(p)} />
         ))}
       </Card>

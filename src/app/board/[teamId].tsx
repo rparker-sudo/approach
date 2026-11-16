@@ -12,6 +12,7 @@ import { adjustedFor, Level, resolveExercise } from '../../lib/resolve';
 import { runState, stationFor, StationRun } from '../../lib/stations';
 import { BATTERY_LABEL } from '../../lib/testing';
 import { ALL, useTeams } from '../../lib/team';
+import { isGeneral } from '../../lib/general';
 import type { Program, TestBattery } from '../../lib/types';
 
 /**
@@ -45,7 +46,7 @@ export default function CoachBoard() {
       <View style={{ flex: 1, backgroundColor: P.bg, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 }}>
         <Stack.Screen options={{ headerShown: false }} />
         <Text style={{ color: P.ink, fontSize: 24, textAlign: 'center' }}>
-          {t.syncing ? 'Loading…' : "This board is only for this team's coach."}
+          {t.syncing ? 'Loading…' : team && isGeneral(team) ? 'This board is only for the trainer.' : "This board is only for this team's coach."}
         </Text>
         {!t.syncing ? <BoardButton label="Sign in" onPress={() => router.push('/account')} /> : null}
       </View>
@@ -65,6 +66,8 @@ const ago = (at: number, now: number) => {
 function Board({ teamId }: { teamId: string }) {
   const t = useTeams();
   const team = t.teams.find((x) => x.id === teamId)!;
+  // 2.3.0 F44: in a general team this is the "Class board" and says clients (board-safe data only, as built).
+  const g = isGeneral(team);
   const groups = useMemo(() => t.groups[teamId] ?? [], [t.groups, teamId]);
   const programFor = useTeamProgramFor(teamId);
   const { width } = useWindowDimensions();
@@ -254,10 +257,10 @@ function Board({ teamId }: { teamId: string }) {
           .filter((r) => r.userIds.length)
           .map((r) => {
             const tiles = shown.filter((x) => r.userIds.includes(x.member.userId));
-            return { title: tiles.length ? `${r.name} · ${tiles.length} athlete${tiles.length === 1 ? '' : 's'}` : r.name, tiles };
+            return { title: tiles.length ? `${r.name} · ${tiles.length} ${g ? 'client' : 'athlete'}${tiles.length === 1 ? '' : 's'}` : r.name, tiles };
           }),
         // [UX proposal] F9b: athletes on the board who aren't on a rack.
-        ...(shown.some((x) => !rackOf(x.member.userId)) ? [{ title: 'Other athletes', tiles: shown.filter((x) => !rackOf(x.member.userId)) }] : []),
+        ...(shown.some((x) => !rackOf(x.member.userId)) ? [{ title: g ? 'Other clients' : 'Other athletes', tiles: shown.filter((x) => !rackOf(x.member.userId)) }] : []),
       ]
     : [{ title: null, tiles: shown }];
 
@@ -333,9 +336,9 @@ function Board({ teamId }: { teamId: string }) {
         ))}
       </View>
     );
-  else if (today_.onBreak && !live.length) body = <Empty text="Break week. No team lifting today." onSeason={() => setView('season')} />;
+  else if (today_.onBreak && !live.length) body = <Empty text={g ? 'Break. No sessions today.' : 'Break week. No team lifting today.'} onSeason={() => setView('season')} />;
   else if (!today_.lifting.length && !today_.test && !live.length) body = <Empty text="Rest day. See you tomorrow." onSeason={() => setView('season')} />;
-  else if (!members.length) body = <Empty text="No athletes to show yet. Athletes appear once their board permission is on." />;
+  else if (!members.length) body = <Empty text={g ? 'No clients to show yet. Clients appear once they allow the class board.' : 'No athletes to show yet. Athletes appear once their board permission is on.'} />;
   else
     body = (
       <View style={{ flexDirection: arrange ? 'row' : 'column', flexWrap: 'wrap', columnGap: 28, rowGap: 10 }}>
@@ -372,7 +375,7 @@ function Board({ teamId }: { teamId: string }) {
       {/* Header */}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 32, paddingVertical: 16, gap: 24, flexWrap: 'wrap' }}>
         <View style={{ flex: 1, minWidth: 280, gap: 4 }}>
-          <Text style={{ color: P.ink, fontSize: big(48), fontWeight: '700' }}>{team.name}</Text>
+          <Text style={{ color: P.ink, fontSize: big(48), fontWeight: '700' }}>{g ? `${team.name} · Class board` : team.name}</Text>
           <Text style={{ color: P.muted, fontSize: big(24) }}>
             {new Date(now).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })} ·{' '}
             {new Date(now).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
@@ -387,7 +390,7 @@ function Board({ teamId }: { teamId: string }) {
         {view === 'live' ? (
           <View style={{ flexDirection: 'row', gap: 28, flexWrap: 'wrap' }}>
             {!today_.test ? <Stat label="Sets today" value={`${stats.setsDone} / ${stats.setsTotal}`} size={big} /> : null}
-            <Stat label="Team done" value={`${stats.done} / ${all.length}`} size={big} />
+            <Stat label={g ? 'Done' : 'Team done'} value={`${stats.done} / ${all.length}`} size={big} />
             <Stat label="Working now" value={String(stats.working)} size={big} />
             {!today_.test ? <Stat label="PRs today" value={String(stats.prs)} size={big} /> : null}
           </View>

@@ -80,7 +80,7 @@ export function LevelChecklistSheet({ onClose }: { onClose: () => void }) {
 }
 
 /** F24b: set level sheet. Saving the same level as the self-reported one still confirms it. */
-export function SetLevelSheet({ member, onClose, onSave }: { member: Member; onClose: () => void; onSave: (level: number) => Promise<void> }) {
+export function SetLevelSheet({ member, onClose, onSave, general }: { member: Member; onClose: () => void; onSave: (level: number) => Promise<void>; general?: boolean }) {
   const [choice, setChoice] = useState<number | null>(member.level ?? null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -94,7 +94,9 @@ export function SetLevelSheet({ member, onClose, onSave }: { member: Member; onC
       ))}
       <TextLink title="See the full checklist" onPress={() => setChecklist(true)} />
       <Text style={{ fontSize: 13, color: colors.muted }}>
-        {`Sets which version of each exercise ${first} gets. Athletes under 18 need intermediate or advanced, set by you, for strength checks.`}
+        {general
+          ? `Sets which version of each exercise ${first} gets.`
+          : `Sets which version of each exercise ${first} gets. Athletes under 18 need intermediate or advanced, set by you, for strength checks.`}
       </Text>
       {!member.levelConfirmed && member.level ? (
         <Text style={{ fontSize: 13, color: colors.muted }}>{`${first} said: ${LEVEL_NAME[member.level]} (not confirmed).`}</Text>
@@ -153,7 +155,7 @@ export function LevelSwaps({ program, member, info }: { program?: Program; membe
       {open ? own.map((x) => <Text key={line(x)} style={{ fontSize: 13, color: colors.muted }}>{line(x)}</Text>) : null}
       {extra.length ? (
         <>
-          <Text style={{ fontSize: 13, fontWeight: '600' }}>Adjusted for this athlete</Text>
+          <Text style={{ fontSize: 13, fontWeight: '600' }}>{program.general ? 'Adjusted for this client' : 'Adjusted for this athlete'}</Text>
           {extra.map((x) => (
             <Text key={line(x)} style={{ fontSize: 13, color: colors.muted }}>{line(x)}</Text>
           ))}

@@ -1,4 +1,4 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,7 +27,8 @@ import {
 } from '../lib/calendar';
 import { showAlert } from '../lib/dialog';
 import { useStore } from '../lib/store';
-import { useTeams } from '../lib/team';
+import { isDraftKey, useTeams } from '../lib/team';
+import { scheduleFor, weekIndex } from '../lib/general';
 import type { CalendarEvent, DayType, Program, TestBattery } from '../lib/types';
 import { BATTERY_LABEL } from '../lib/testing';
 import { BREAK_MESSAGE, NO_DATE_MESSAGE, spacingNote, suggestTestDates } from '../lib/testingDates';
@@ -67,6 +68,8 @@ export default function CalendarScreen() {
 
   if (!program) return <Screen><Body muted>Program not found.</Body></Screen>;
   const coach = data.profile?.role === 'coach';
+  // 2.3.0 F34: a general team's calendar has only sessions (from each program's week view) and breaks.
+  if (program.general) return <GeneralCalendar program={program} coach={coach} save={save} post={post} posting={posting} />;
   const readOnly = !!program.teamId && !coach;
   const todayKey = dateKey(today());
   const upcoming = upcomingEvents(program, today(), 6);
@@ -519,5 +522,91 @@ function DaySheet({
         </ScrollView>
       </View>
     </Modal>
+  );
+}
+
+/** 2.3.0 general teams: Session and Break only (no practices, matches, tournaments or testing days). */
+function GeneralCalendar({ program, coach, save, post, posting }: { program: Program; coach: boolean; save: (p: Program) => void; post: () => void; posting: boolean }) {
+  const { data } = useStore();
+  const { hasUnposted } = useTeams();
+  const [breakEdit, setBreakEdit] = useState<{ start: string; original?: CalendarEvent } | null>(null);
+  const [adding, setAdding] = useState(false);
+  const todayKey = dateKey(today());
+  const team = program.teamId!;
+  const programs = data.programs.filter((p) => p.teamId === team && p.general && !isDraftKey(p.groupKey));
+  const breaks = (program.events ?? []).filter((e) => e.type === 'break' && !e.teamName).sort((a, b) => a.date.localeCompare(b.date));
+  const days = Array.from({ length: 14 }, (_, i) => addDays(today(), i));
+  return (
+    <Screen>
+      <Stack.Screen options={{ title: 'Calendar' }} />
+      <Body muted style={{ fontSize: 13 }}>
+        {coach ? 'Sessions come from each program’s week view. A break pauses every program for your clients.' : 'Your sessions and breaks, set by your trainer.'}
+      </Body>
+      {coach && hasUnposted(team) ? (
+        <Card>
+          <Text style={{ fontWeight: '600' }}>Changes not posted</Text>
+          <Text style={{ fontSize: 13, color: colors.muted }}>Clients see new dates after you post.</Text>
+          <Button title={posting ? 'Posting…' : 'Post'} disabled={posting} onPress={post} />
+        </Card>
+      ) : null}
+      {coach ? <Button kind="secondary" title="Add" icon="plus" onPress={() => setAdding(true)} /> : null}
+      {adding ? (
+        <Card>
+          <Button title="Session" onPress={() => (setAdding(false), router.push(`/program/${program.id}`))} />
+          <Button kind="secondary" title="Break" onPress={() => (setAdding(false), setBreakEdit({ start: todayKey }))} />
+          <Button kind="ghost" title="Cancel" onPress={() => setAdding(false)} />
+        </Card>
+      ) : null}
+      <Label>Next 2 weeks</Label>
+      <Card style={{ gap: 0, paddingVertical: 4 }}>
+        {days.map((d, i) => {
+          const k = dateKey(d);
+          const brk = breaks.find((b) => k >= b.date && k <= (b.endDate ?? b.date));
+          const list = brk
+            ? []
+            : programs.flatMap((p) => {
+                const w = weekIndex(p, d);
+                const sid = w == null ? null : scheduleFor(p, w)[(d.getDay() + 6) % 7];
+                const s = p.sessions.find((x) => x.id === sid);
+                return s ? [`${s.name}${coach ? ` · ${p.name}` : ''}`] : [];
+              });
+          return (
+            <Row key={k} style={{ justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: i ? 1 : 0, borderTopColor: colors.line }}>
+              <Text style={{ fontWeight: k === todayKey ? '700' : '500', width: 96 }}>{formatKey(k)}</Text>
+              <Text style={{ fontSize: 13, color: brk || !list.length ? colors.muted : colors.ink, flex: 1, textAlign: 'right' }}>
+                {brk ? brk.label || 'Break' : list.length ? list.join(' · ') : 'Rest'}
+              </Text>
+            </Row>
+          );
+        })}
+      </Card>
+      {coach || breaks.length ? (
+        <View style={{ gap: 8 }}>
+          <Label>Breaks</Label>
+          {breaks.length === 0 ? <Body muted style={{ fontSize: 13 }}>No breaks.</Body> : null}
+          {breaks.map((b) => (
+            <Pressable key={b.date} accessibilityRole="button" disabled={!coach} onPress={() => setBreakEdit({ start: b.date, original: b })} style={{ minHeight: 44, justifyContent: 'center' }}>
+              <Row style={{ justifyContent: 'space-between' }}>
+                <BreakBand label={b.label || 'Break'} />
+                <Text style={{ fontSize: 13, color: colors.muted }}>{rangeText(b.date, b.endDate ?? b.date)}</Text>
+              </Row>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+      {breakEdit ? (
+        <BreakSheet
+          program={program}
+          start={breakEdit.start}
+          original={breakEdit.original}
+          onClose={() => setBreakEdit(null)}
+          onSave={(next, added) => {
+            save(next);
+            setBreakEdit(null);
+            showAlert(added ? 'Break added' : 'Break saved', 'Post to send it to your clients.');
+          }}
+        />
+      ) : null}
+    </Screen>
   );
 }

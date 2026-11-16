@@ -1,13 +1,18 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { Body, Card, colors, Icon, Label, Pill, Row, Screen, Text } from '../../components/ui';
-import { CATEGORY_LABEL, EQUIPMENT, getExercise } from '../../lib/exercises';
+import { CATEGORY_LABEL, equipmentLabel, getExercise, whyFor } from '../../lib/exercises';
+import { GENERAL_EQUIPMENT } from '../../lib/generalLibrary';
+import { useGeneralView } from '../../lib/useGeneral';
+import type { Equipment } from '../../lib/types';
 
 /** How to do an exercise: why it matters, steps, cues, mistakes, equipment, easier/harder options. */
 export default function ExerciseScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const ex = getExercise(id);
-  const label = (e: string) => EQUIPMENT.find((x) => x.id === e)?.label ?? e;
+  // 2.3.0: general teams read `whyGeneral` and "Cable station" (general-library.md §2, §5).
+  const general = useGeneralView();
+  const label = (e: Equipment) => GENERAL_EQUIPMENT.find((x) => x.id === e)?.label ?? equipmentLabel(e, general);
   const setups = ex.equipment.map((s) => (s.length ? s.map(label).join(' + ') : 'No equipment'));
 
   return (
@@ -17,7 +22,7 @@ export default function ExerciseScreen() {
         <Pill text={CATEGORY_LABEL[ex.category]} />
         <Pill text={ex.level === 1 ? 'Beginner-friendly' : ex.level === 2 ? 'Some experience' : 'Experienced lifters'} />
       </Row>
-      {ex.howTo.why ? <Body>{ex.howTo.why}</Body> : null}
+      {whyFor(ex, general) ? <Body>{whyFor(ex, general)}</Body> : null}
 
       <Section title="How to do it">
         {ex.howTo.steps.map((step, i) => (

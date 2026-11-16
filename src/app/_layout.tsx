@@ -95,6 +95,8 @@ function ThemeStack() {
         <Stack.Screen name="effort" options={{ title: 'Team effort' }} />
         <Stack.Screen name="recovery" options={{ title: 'Extra recovery' }} />
         <Stack.Screen name="racks" options={{ title: 'Racks' }} />
+        <Stack.Screen name="gym" options={{ title: 'Gym equipment' }} />
+        <Stack.Screen name="client" options={{ title: 'Client' }} />
         <Stack.Screen name="board/[teamId]" options={{ headerShown: false }} />
       </Stack>
       <DialogHost />

@@ -2,7 +2,7 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Body, Button, Card, colors, Field, H1, H2, Label, Lockup, NetTape, Note, OptionCard, Screen } from '../components/ui';
+import { Body, Button, Card, colors, Field, H1, H2, Label, Lockup, NetTape, Note, OptionCard, Screen, Text } from '../components/ui';
 import AccountForm from '../components/AccountForm';
 import { AgeQuestion } from '../components/AgeGate';
 import type { AgeAnswer } from '../lib/age';
@@ -80,7 +80,8 @@ export default function Onboarding() {
           'account',
           ...(account ? (['join'] as Step[]) : []),
           ...(!account ? (['name'] as Step[]) : []),
-          'position',
+          // 2.3.0 F33: no position step for a general (trainer) team.
+          ...(team?.kind === 'general' ? [] : (['position'] as Step[])),
           'level',
           ...(!team ? (['week'] as Step[]) : []),
         ];
@@ -174,19 +175,19 @@ export default function Onboarding() {
               <Label>Who are you?</Label>
               <OptionCard
                 icon="dumbbell"
-                title="I'm an athlete"
+                title="I'm an athlete or client"
                 subtitle="Build my program and track my progress"
                 selected={role === 'athlete'}
                 onPress={() => setRole('athlete')}
               />
               <OptionCard
                 icon="person.3"
-                title="I'm a coach"
+                title="I'm a coach or trainer"
                 subtitle="Build programs and send them to players"
                 selected={role === 'coach'}
                 onPress={() => setRole('coach')}
                 disabled={!!age?.isMinor}
-                caption={age?.isMinor ? 'Coach accounts are for adults 18 and older.' : undefined}
+                caption={age?.isMinor ? 'Coach and trainer accounts are for adults 18 and older.' : undefined}
               />
             </>
           )}
@@ -226,7 +227,7 @@ export default function Onboarding() {
                 <Card>
                   <Label>Joined</Label>
                   <H2>{team.name}</H2>
-                  {team.coachName ? <Body muted>Coach {team.coachName}</Body> : null}
+                  {team.coachName ? <Body muted>{team.kind === 'general' ? `Trainer ${team.coachName}` : `Coach ${team.coachName}`}</Body> : null}
                 </Card>
               ) : (
                 <JoinTeamForm onJoined={(t) => setTeam(t)} initialCode={linkCode} autoJoin={!!linkCode} />
@@ -256,6 +257,7 @@ export default function Onboarding() {
             <>
               <H1>Where are you at?</H1>
               <Label>Lifting experience</Label>
+              {team?.kind === 'general' ? <Text style={{ fontSize: 13, color: colors.muted }}>Your trainer confirms this.</Text> : null}
               {EXPERIENCE.map((e) => (
                 <OptionCard key={e.id} title={e.label} subtitle={e.blurb} selected={experience === e.id} onPress={() => setExperience(e.id)} />
               ))}

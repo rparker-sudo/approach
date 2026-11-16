@@ -85,14 +85,18 @@ export default function EffortBoard({ teamId, viewer }: { teamId: string; viewer
   const mine = consentFor(teamId);
   const accent = boardAccent(team?.settings.accentColor).color;
   // The athlete sees only the chips their permissions allow.
+  // 2.3.0 F34: general teams never show the Attendance or Jump gains tabs.
+  const general = team?.kind === 'general';
   const metrics = METRICS.filter(
-    (m) => viewer === 'coach' || ((m.id !== 'attendance' || canAttend(mine)) && (m.id !== 'jumpGains' || canTest(mine))),
+    (m) =>
+      !(general && (m.id === 'attendance' || m.id === 'jumpGains')) &&
+      (viewer === 'coach' || ((m.id !== 'attendance' || canAttend(mine)) && (m.id !== 'jumpGains' || canTest(mine)))),
   );
 
   if (viewer === 'athlete' && team && !team.settings.effortBoard) {
     return (
       <Card>
-        <Text style={{ fontSize: 14, color: colors.muted }}>Your coach turned off the effort board.</Text>
+        <Text style={{ fontSize: 14, color: colors.muted }}>{general ? 'Your trainer turned off the effort board.' : 'Your coach turned off the effort board.'}</Text>
       </Card>
     );
   }

@@ -23,8 +23,8 @@ const keyOfDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).pa
 export default function PostSheet({ team, program, gate, onClose }: { team: Team; program: Program; gate: GateState; onClose: () => void }) {
   const { data } = useStore();
   const { members, groups, postGeneral } = useTeams();
-  const roster = members[team.id] ?? [];
-  const teamGroups = groups[team.id] ?? [];
+  const roster = useMemo(() => members[team.id] ?? [], [members, team.id]);
+  const teamGroups = useMemo(() => groups[team.id] ?? [], [groups, team.id]);
   const current = program.groupKey && !program.groupKey.startsWith('draft:') ? program.groupKey : null;
   const [target, setTarget] = useState<Target>(current?.startsWith('client:') ? 'client' : current && current !== ALL ? 'group' : 'all');
   const [groupId, setGroupId] = useState<string | null>(current && current !== ALL && !current.startsWith('client:') ? current : null);

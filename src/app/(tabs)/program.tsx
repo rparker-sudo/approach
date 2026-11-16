@@ -6,7 +6,9 @@ import { Body, Button, Card, colors, H2, Icon, Label, NetTape, Pill, Row, Screen
 import { formatKey, today, upcomingEvents } from '../../lib/calendar';
 import { liftDayCount } from '../../lib/generator';
 import { useStore } from '../../lib/store';
-import { useTeams } from '../../lib/team';
+import { isDraftKey, useTeams } from '../../lib/team';
+import { goalLabel, isGeneral, programLine } from '../../lib/general';
+import { useGeneralView } from '../../lib/useGeneral';
 import { formatDate } from '../../lib/util';
 import type { Program } from '../../lib/types';
 import { PHASES } from '../../lib/types';
@@ -15,12 +17,13 @@ export default function ProgramTab() {
   const { data, activeProgram } = useStore();
   const { account, teams, postedFor } = useTeams();
   const coach = data.profile?.role === 'coach';
+  const general = useGeneralView();
 
   if (coach) {
     const drafts = data.programs.filter((p) => !p.teamId);
     return (
       <Screen tab>
-        <ScreenHeader title="Plan" subtitle="Team workouts" />
+        <ScreenHeader title={general ? 'Program' : 'Plan'} subtitle={general ? 'Your programs' : 'Team workouts'} />
         {teams.length === 0 ? (
           <Card>
             <NetTape />
@@ -30,6 +33,22 @@ export default function ProgramTab() {
         ) : (
           teams.map((t) => {
             const teamPrograms = data.programs.filter((x) => x.teamId === t.id);
+            if (isGeneral(t)) {
+              // 2.3.0: a general team's programs (drafts and posted), with goal and week.
+              return (
+                <Pressable key={t.id} accessibilityRole="button" onPress={() => router.push(`/team/${t.id}`)}>
+                  <Card>
+                    <Label>{t.name}</Label>
+                    {teamPrograms.length === 0 ? <H2>No programs yet</H2> : null}
+                    {teamPrograms.map((p) => (
+                      <Text key={p.id} style={{ fontSize: 15 }}>
+                        {p.name} <Text style={{ fontSize: 13, color: colors.muted }}>· {isDraftKey(p.groupKey) ? `${goalLabel(p.goal)} · Draft` : programLine(p)}</Text>
+                      </Text>
+                    ))}
+                  </Card>
+                </Pressable>
+              );
+            }
             return (
               <Pressable key={t.id} accessibilityRole="button" onPress={() => router.push(`/team/${t.id}`)}>
                 <Card>
@@ -59,14 +78,19 @@ export default function ProgramTab() {
             );
           })
         )}
-        <Label>Other programs</Label>
-        <Body muted style={{ fontSize: 13 }}>
-          Drafts, or programs to send as a code to athletes who don&apos;t use a team.
-        </Body>
-        {drafts.map((p) => (
-          <ProgramRow key={p.id} program={p} />
-        ))}
-        <Button kind="ghost" title="New program" icon="plus" onPress={() => router.push('/builder')} />
+        {/* F34: the volleyball generator isn't offered to a trainer with only general teams. */}
+        {general ? null : (
+          <>
+            <Label>Other programs</Label>
+            <Body muted style={{ fontSize: 13 }}>
+              Drafts, or programs to send as a code to athletes who don&apos;t use a team.
+            </Body>
+            {drafts.map((p) => (
+              <ProgramRow key={p.id} program={p} />
+            ))}
+            <Button kind="ghost" title="New program" icon="plus" onPress={() => router.push('/builder')} />
+          </>
+        )}
       </Screen>
     );
   }
@@ -89,10 +113,15 @@ export default function ProgramTab() {
       {waitingForCoach ? (
         <Card>
           <NetTape />
-          <H2>You&apos;re on {teams[0].name}</H2>
-          <Body muted>Your coach hasn&apos;t posted a workout yet. It shows up here as soon as they do.</Body>
+          <H2>{general ? `You're with ${teams[0].name}` : `You're on ${teams[0].name}`}</H2>
+          <Body muted>{general ? "Your trainer hasn't posted a program yet. It shows up here as soon as they do." : "Your coach hasn't posted a workout yet. It shows up here as soon as they do."}</Body>
         </Card>
       ) : null}
+      {general
+        ? data.programs
+            .filter((p) => p.general && p.teamId && p.id !== activeProgram?.id)
+            .map((p) => <ProgramDetail key={p.id} program={p} />)
+        : null}
       {activeProgram ? (
         <ProgramDetail program={activeProgram} />
       ) : waitingForCoach ? null : (
@@ -112,11 +141,11 @@ export default function ProgramTab() {
           />
         </View>
         <View style={{ flex: 1 }}>
-          <Button kind="ghost" title="New program" icon="plus" onPress={() => router.push('/builder')} />
+          {general ? null : <Button kind="ghost" title="New program" icon="plus" onPress={() => router.push('/builder')} />}
         </View>
       </Row>
-      <Button kind="ghost" title="Import a program code" icon="square.and.arrow.down" onPress={() => router.push('/import')} />
-      {others.length > 0 ? (
+      {general ? null : <Button kind="ghost" title="Import a program code" icon="square.and.arrow.down" onPress={() => router.push('/import')} />}
+      {others.length > 0 && !general ? (
         <>
           <Label>Other saved programs</Label>
           {others.map((p) => (

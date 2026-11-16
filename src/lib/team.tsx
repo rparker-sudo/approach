@@ -167,6 +167,10 @@ type TeamState = {
   acceptTrainerTerms: (teamId: string) => Promise<void>;
   /** 2.3.0 F36: post a program (draft or posted) to all clients, a group, or one client (`client:<uid>`), from startDate. */
   postGeneral: (teamId: string, sourceProgramId: string, targetKey: string, startDate: string) => Promise<void>;
+  /** 2.3.0 F40: save the gym equipment profile. */
+  setGymEquipment: (teamId: string, equipment: import('./types').Equipment[]) => Promise<void>;
+  /** 2.3.0 F43: delete every check-in (server and this phone). */
+  deleteMyCheckins: () => Promise<void>;
 };
 
 export type CoachExtras = {
@@ -241,7 +245,9 @@ function applyPosted(d: AppData, role: 'coach' | 'athlete', snap: Snapshot): App
       if (!p.teamId) return p;
       const cal = teamCalendars[p.teamId];
       const group = (snap.groups[p.teamId] ?? []).find((g) => g.id === p.groupKey);
-      return { ...p, events: cal?.events ?? p.events, lightDates: lightFor(cal, p.groupKey ?? ALL), groupName: group?.name ?? p.groupName };
+      const team = snap.teams.find((x) => x.id === p.teamId);
+      const gym = isGeneral(team) && team?.gymEquipment?.length ? { equipment: team.gymEquipment } : {};
+      return { ...p, ...gym, events: cal?.events ?? p.events, lightDates: lightFor(cal, p.groupKey ?? ALL), groupName: group?.name ?? p.groupName };
     });
   } else {
     // v2.2 (TM-2): one lifting program. Only the program team's workout is mirrored; the other teams add their
@@ -275,6 +281,8 @@ function applyPosted(d: AppData, role: 'coach' | 'athlete', snap: Snapshot): App
             groupKey: tp.groupKey,
             groupName: group?.name,
             general: true,
+            // F40: the gym profile as saved now (removed equipment switches each client to the closest exercise).
+            ...(t.gymEquipment?.length ? { equipment: t.gymEquipment } : {}),
             author: t.coachName ?? tp.program.author,
             postedAt: tp.updatedAt,
             unposted: false,
@@ -785,6 +793,14 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         return data.programs.some((p) => p.teamId === teamId && !isDraftKey(p.groupKey) && (p.unposted || !posted[postedKey(teamId, p.groupKey ?? ALL)]));
       },
       trainerStatus,
+      async setGymEquipment(teamId, equipment) {
+        await backend.setGymEquipment(teamId, equipment);
+        await refresh();
+      },
+      async deleteMyCheckins() {
+        await backend.deleteMyCheckins();
+        mutate((d) => ({ ...d, readinessLog: [] }));
+      },
       async createGeneralTeam(name, confirmations) {
         const t = await backend.createGeneralTeam(name, confirmations);
         await refresh();

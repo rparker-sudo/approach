@@ -5,14 +5,13 @@ import { useState } from 'react';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AgeQuestionScreen } from '../../components/AgeGate';
 import { CoachTermsSheet } from '../../components/CoachTerms';
-import YourChoices, { DEFAULT_CHOICES } from '../../components/YourChoices';
+import YourChoices, { DEFAULT_CHOICES, GENERAL_CHOICES } from '../../components/YourChoices';
 import { colors, fonts, H1, Icon, Screen, Text } from '../../components/ui';
 import type { AgeAnswer } from '../../lib/age';
 import { backend } from '../../lib/backend';
 import { useStore } from '../../lib/store';
 import { useTeams } from '../../lib/team';
 import { useGeneralView } from '../../lib/useGeneral';
-import { GENERAL_CHOICES } from '../../components/YourChoices';
 
 /**
  * Tabs: Lift (training), Fuel (nutrition), Plan (season/week), Progress (touch height and strength).

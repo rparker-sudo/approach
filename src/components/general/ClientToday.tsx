@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { resolveFor } from '../../lib/athlete';
 import { canCheckIn } from '../../lib/backend';
-import { dateKey, today } from '../../lib/calendar';
+import { breakOn, dateKey, today } from '../../lib/calendar';
 import { getExercise } from '../../lib/exercises';
 import { INTENSITY_LABEL, PAIN_TRAINER, programLine, scheduleFor, weekIndex } from '../../lib/general';
 import { formatMinutes } from '../../lib/rest';
@@ -51,7 +51,8 @@ export default function ClientToday() {
   const due = programs
     .map((p) => {
       const w = weekIndex(p, day);
-      const sid = w == null ? null : scheduleFor(p, w)[i];
+      // A break (Calendar → Break) pauses every program that day.
+      const sid = w == null || breakOn(p, day) ? null : scheduleFor(p, w)[i];
       const session = p.sessions.find((s) => s.id === sid);
       return session ? { program: p, session, resolved: resolveFor(data, p, session, day) } : null;
     })

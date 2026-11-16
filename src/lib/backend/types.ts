@@ -344,6 +344,14 @@ export interface Backend {
   trainerStatus(teamId: string): Promise<TrainerStatus | null>;
   /** 2.3.0 F31: accept changed Trainer Terms. */
   acceptTrainerTerms(teamId: string): Promise<void>;
+  /** 2.3.0 F40 (migration 010): the trainer saves the gym equipment profile. */
+  setGymEquipment(teamId: string, equipment: import('../types').Equipment[]): Promise<void>;
+  /** 2.3.0 F43 / compliance T5: the client deletes all their check-ins (server and this device). Returns rows deleted. */
+  deleteMyCheckins(): Promise<number>;
+  /** 2.3.0 F38: one client's recent logs with entries (sets, reps, weights, notes, cardio minutes). Trainer only (RLS). */
+  clientLogs(teamId: string, userId: string, sinceIso: string): Promise<(TeamLog & { entries: import('../types').WorkoutLog['entries'] })[]>;
+  /** 2.3.0 F38: one client's check-ins since a day. RLS returns rows only while the client shares (T5). */
+  clientCheckins(teamId: string, userId: string, sinceDay: string): Promise<Readiness[]>;
   renameTeam(teamId: string, name: string): Promise<void>;
   deleteTeam(teamId: string): Promise<void>;
   listMembers(teamId: string): Promise<Member[]>;

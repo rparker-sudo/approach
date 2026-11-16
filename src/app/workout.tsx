@@ -769,7 +769,7 @@ function CardioCard({ pe, entry, ei, setMinutes, toggleDone }: { pe: ResolvedExe
     const t = setInterval(() => setTick(Date.now()), 1000);
     return () => clearInterval(t);
   }, [started]);
-  const elapsed = started != null ? Math.max(0, Math.floor(((tick || Date.now()) - started) / 1000)) : 0;
+  const elapsed = started != null ? Math.max(0, Math.floor(((tick || started) - started) / 1000)) : 0;
   const done = !!entry.sets[0]?.done;
   return (
     <Card>

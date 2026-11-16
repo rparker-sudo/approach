@@ -76,7 +76,8 @@ type DB = {
   /** v2.2: userId → the team whose lift program they follow (same as profiles.lift_program_team_id). */
   liftProgram?: Record<string, string | null>;
   programs: TeamProgram[];
-  logs: TeamLog[];
+  /** entries: the same JSON the server keeps in workout_logs.entries (2.3.0 F38 reads it for the trainer). */
+  logs: (TeamLog & { entries?: WorkoutLog['entries'] })[];
   groups: Group[];
   calendars: TeamCalendar[];
   readiness: Readiness[];
@@ -647,6 +648,44 @@ export const localBackend: Backend = {
     await save(db);
   },
 
+  async setGymEquipment(teamId, equipment) {
+    const { db, user } = await me();
+    const t = coachOf(db, teamId, user.id);
+    // Same as migration 010: general teams only, known equipment ids only.
+    if (t.kind !== 'general') throw new BackendError('Only trainer teams have a gym equipment profile.');
+    t.gymEquipment = [...new Set(equipment)];
+    await save(db);
+  },
+
+  async deleteMyCheckins() {
+    const { db, user } = await me();
+    const before = db.readiness.length;
+    db.readiness = db.readiness.filter((r) => r.userId !== user.id);
+    await save(db);
+    return before - db.readiness.length;
+  },
+
+  async clientLogs(teamId, userId, sinceIso) {
+    const db = await load();
+    return db.logs
+      .filter((l) => l.teamId === teamId && l.userId === userId && l.date >= sinceIso && visibleTo(db, db.sessionUserId, teamId, l.userId))
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map((l) => ({ ...l, entries: l.entries ?? [] }));
+  },
+
+  async clientCheckins(teamId, userId, sinceDay) {
+    const db = await load();
+    return db.readiness
+      .filter(
+        (r) =>
+          r.teamId === teamId &&
+          r.userId === userId &&
+          r.day >= sinceDay &&
+          (r.userId === db.sessionUserId || (visibleTo(db, db.sessionUserId, teamId, r.userId) && canShareCheckIns(permsOf(db, teamId, r.userId)))),
+      )
+      .sort((a, b) => b.day.localeCompare(a.day));
+  },
+
   async updateTeamSettings(teamId, patch) {
     const { db, user } = await me();
     const t = coachOf(db, teamId, user.id);
@@ -1045,6 +1084,7 @@ export const localBackend: Backend = {
       prCount: log.prCount ?? 0,
       durationMin: log.durationMin ?? null,
       kind: log.kind ?? 'lift',
+      entries: log.entries,
     });
     await save(db);
   },

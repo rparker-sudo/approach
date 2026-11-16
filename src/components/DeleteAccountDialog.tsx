@@ -45,7 +45,7 @@ export default function DeleteAccountDialog({
           <Body muted>
             This deletes your account, your team memberships, logged workouts, and check-ins. Data on this phone is erased too. This
             can&apos;t be undone.
-            {coach ? " Your teams and every athlete's logs for those teams are deleted too." : ''}
+            {coach ? " Your teams and every member's logs for those teams are deleted too." : ''}
           </Body>
           <Body muted>
             We keep a short record of parent consent and coach supervision for 5 years, with no workout, check-in, or test results, as our

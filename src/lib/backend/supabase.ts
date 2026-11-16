@@ -3,7 +3,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import { COACH_TERMS_VERSION } from '../coachTerms';
 import { APP_URL } from '../links';
-import type { CalendarEvent, Position, Program, Role, WorkoutLog } from '../types';
+import type { CalendarEvent, Equipment, Position, Program, Role, WorkoutLog } from '../types';
 import {
   Account,
   Backend,
@@ -67,6 +67,7 @@ type TeamRow = {
   med_ball_lb?: number | string;
   accent_color?: string | null;
   kind?: TeamKind | null;
+  gym_equipment?: string[] | null;
 };
 
 /** team_members permission columns (migration 004). */
@@ -150,7 +151,7 @@ function toTeam(r: TeamRow): Team {
     medBallLb: r.med_ball_lb != null ? Number(r.med_ball_lb) : d.medBallLb,
     accentColor: r.accent_color ?? d.accentColor,
   };
-  return { id: r.id, name: r.name, joinCode: r.join_code, coachId: r.coach_id, coachName: r.coach?.name, createdAt: r.created_at, settings, kind: r.kind ?? 'volleyball' };
+  return { id: r.id, name: r.name, joinCode: r.join_code, coachId: r.coach_id, coachName: r.coach?.name, createdAt: r.created_at, settings, kind: r.kind ?? 'volleyball', ...(r.gym_equipment ? { gymEquipment: r.gym_equipment as Equipment[] } : {}) };
 }
 
 const SETTINGS_COLS: Record<keyof TeamSettings, string> = {
@@ -250,10 +251,15 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
   const TEAM_P2 = `${TEAM_BASE},practice_min,match_min,tournament_min,effort_board,board_effort_panel,team_goal,med_ball_lb`;
   const TEAM_P3 = `${TEAM_P2},accent_color`;
   const TEAM_P4 = `${TEAM_P3},kind`;
-  // Falls back to older columns until migrations 009 / 006 / 004 have run.
-  let TEAM_SELECT = TEAM_P4;
+  const TEAM_P5 = `${TEAM_P4},gym_equipment`;
+  // Falls back to older columns until migrations 010 / 009 / 006 / 004 have run.
+  let TEAM_SELECT = TEAM_P5;
   async function withTeamCols<T extends { error: { message: string } | null }>(run: (cols: string) => PromiseLike<T>): Promise<T> {
     let res = await run(TEAM_SELECT);
+    if (TEAM_SELECT === TEAM_P5 && isMissing(res.error)) {
+      TEAM_SELECT = TEAM_P4;
+      res = await run(TEAM_SELECT);
+    }
     if (TEAM_SELECT === TEAM_P4 && isMissing(res.error)) {
       TEAM_SELECT = TEAM_P3;
       res = await run(TEAM_SELECT);
@@ -467,6 +473,65 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
     async acceptTrainerTerms(teamId) {
       const { error } = await sb.rpc('accept_trainer_terms', { t: teamId, terms_version: TRAINER_TERMS_VERSION });
       if (error) fail(error);
+    },
+
+    async setGymEquipment(teamId, equipment) {
+      const { error } = await sb.from('teams').update({ gym_equipment: equipment }).eq('id', teamId);
+      if (isMissing(error)) throw new BackendError('The team database needs the 2.3.0 update first (README: Upgrading from 2.2.1).');
+      if (error) fail(error);
+    },
+
+    async deleteMyCheckins() {
+      const { data, error } = await sb.rpc('delete_my_checkins');
+      if (error) fail(error);
+      return (data as number) ?? 0;
+    },
+
+    async clientLogs(teamId, userId, sinceIso) {
+      const { data, error } = await sb
+        .from('workout_logs')
+        .select('id,team_id,user_id,session_name,logged_at,sets_done,note,entries,pr_count,duration_min,kind')
+        .eq('team_id', teamId)
+        .eq('user_id', userId)
+        .gte('logged_at', sinceIso)
+        .order('logged_at', { ascending: false })
+        .limit(50);
+      if (error) fail(error);
+      return (data as { id: string; team_id: string; user_id: string; session_name: string; logged_at: string; sets_done: number; note: string | null; entries: WorkoutLog['entries'] | null; pr_count: number | null; duration_min: number | null; kind: string | null }[]).map((r) => ({
+        id: r.id,
+        teamId: r.team_id,
+        userId: r.user_id,
+        userName: '',
+        sessionName: r.session_name,
+        date: r.logged_at,
+        setsDone: r.sets_done,
+        note: r.note ?? undefined,
+        prCount: r.pr_count ?? 0,
+        durationMin: r.duration_min,
+        kind: r.kind === 'extra_recovery' ? 'extra_recovery' : 'lift',
+        entries: r.entries ?? [],
+      }));
+    },
+
+    async clientCheckins(teamId, userId, sinceDay) {
+      const { data, error } = await sb
+        .from('readiness')
+        .select('team_id,user_id,day,sleep,soreness,energy,pain')
+        .eq('team_id', teamId)
+        .eq('user_id', userId)
+        .gte('day', sinceDay)
+        .order('day', { ascending: false });
+      if (isMissing(error)) return [];
+      if (error) fail(error);
+      return (data as { team_id: string; user_id: string; day: string; sleep: number; soreness: number; energy: number; pain: boolean }[]).map((r) => ({
+        teamId: r.team_id,
+        userId: r.user_id,
+        day: r.day,
+        sleep: r.sleep,
+        soreness: r.soreness,
+        energy: r.energy,
+        pain: r.pain,
+      }));
     },
 
     async renameTeam(teamId, name) {

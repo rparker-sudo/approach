@@ -48,10 +48,12 @@ export default function RacksScreen() {
   }, [teamId]);
 
   if (!team) return <Screen><Body muted>Team not found.</Body></Screen>;
+  // 2.3.0 design §S1b: Clients wording in general teams.
+  const g = team.kind === 'general';
   const present = here ?? new Set(roster.filter((m) => !followingOther.includes(m.userId)).map((m) => m.userId));
   const chosen = roster.filter((m) => present.has(m.userId));
   const count = rackCountFor(chosen.length, by, value);
-  const nameOf = (u: string) => roster.find((m) => m.userId === u)?.name ?? 'Athlete';
+  const nameOf = (u: string) => roster.find((m) => m.userId === u)?.name ?? (team.kind === 'general' ? 'Client' : 'Athlete');
   const placed = new Set((draft ?? []).flatMap((r) => r.userIds));
   const unassigned = roster.filter((m) => !placed.has(m.userId));
   const changed = JSON.stringify(draft) !== JSON.stringify(saved);
@@ -81,7 +83,7 @@ export default function RacksScreen() {
       try {
         await backend.saveRacks(teamId, draft);
         setSaved(draft);
-        showAlert('Racks saved', 'Athletes see their rack on the Lift screen.');
+        showAlert('Racks saved', g ? 'Clients see their rack on Today.' : 'Athletes see their rack on the Lift screen.');
       } catch (e) {
         showAlert("Couldn't save racks", e instanceof Error ? e.message : 'Try again.');
       } finally {
@@ -99,16 +101,16 @@ export default function RacksScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: 'Racks' }} />
-      <Body muted>Split the team into racks: who lifts together where. Racks don&apos;t change anyone&apos;s program.</Body>
+      <Body muted>{g ? "Split your class into racks: who trains together where. Racks don't change anyone's program." : "Split the team into racks: who lifts together where. Racks don't change anyone's program."}</Body>
 
       <Card>
         <H2>How many racks</H2>
         <ChipRow>
-          <Chip label="Athletes per rack" selected={by === 'size'} onPress={() => { setBy('size'); setValue(3); }} />
+          <Chip label={g ? 'Clients per rack' : 'Athletes per rack'} selected={by === 'size'} onPress={() => { setBy('size'); setValue(3); }} />
           <Chip label="Number of racks" selected={by === 'count'} onPress={() => { setBy('count'); setValue(Math.max(1, Math.ceil(chosen.length / 3))); }} />
         </ChipRow>
         <Row style={{ justifyContent: 'space-between' }}>
-          <Label>{by === 'size' ? 'Athletes per rack' : 'Racks'}</Label>
+          <Label>{by === 'size' ? (g ? 'Clients per rack' : 'Athletes per rack') : 'Racks'}</Label>
           <Stepper value={value} min={by === 'size' ? 2 : 1} max={by === 'size' ? 6 : 12} onChange={setValue} />
         </Row>
         <Text style={{ fontSize: 15, fontWeight: '600' }}>{sizeSummary(chosen.length, count)}</Text>
@@ -162,8 +164,8 @@ export default function RacksScreen() {
       {draft?.length ? (
         <View style={{ gap: 10 }}>
           <Label>Preview</Label>
-          <Text style={{ fontSize: 13, color: colors.muted }}>Use neutral names. Groups show on the team board.</Text>
-          {moving ? <Note>{`Tap a rack to move ${nameOf(moving)}, or Unassigned.`}</Note> : <Text style={{ fontSize: 13, color: colors.muted }}>Tap an athlete, then a rack, to move them.</Text>}
+          <Text style={{ fontSize: 13, color: colors.muted }}>{g ? 'Use neutral names. Groups show on the class board.' : 'Use neutral names. Groups show on the team board.'}</Text>
+          {moving ? <Note>{`Tap a rack to move ${nameOf(moving)}, or Unassigned.`}</Note> : <Text style={{ fontSize: 13, color: colors.muted }}>{g ? 'Tap a client, then a rack, to move them.' : 'Tap an athlete, then a rack, to move them.'}</Text>}
           {draft.map((r, i) => (
             <Card key={i}>
               <Pressable disabled={!moving} onPress={() => moveTo(i)}>

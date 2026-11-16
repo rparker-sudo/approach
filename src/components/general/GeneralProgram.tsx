@@ -26,7 +26,7 @@ import type { Program, ProgramWeekPlan, Session } from '../../lib/types';
 import { WEEKDAYS } from '../../lib/types';
 import { uid } from '../../lib/util';
 import Sheet from '../Sheet';
-import { Body, Button, Card, Checkbox, Chip, ChipRow, colors, Field, H2, Label, OptionCard, Pill, Row, Stepper, Text, Toggle } from '../ui';
+import { Body, Button, Card, Checkbox, ChipRow, colors, Field, H2, Label, OptionCard, Pill, Row, Stepper, Text, Toggle } from '../ui';
 import NewProgramSheet from './NewProgramSheet';
 import PostSheet from './PostSheet';
 

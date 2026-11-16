@@ -233,7 +233,8 @@ export function swapsFor(program: Program, session: Session, level: Level): { fr
   const out: { from: string; to: string | null }[] = [];
   for (const pe of session.exercises) {
     const ex = getExercise(pe.exerciseId);
-    const r = resolveExercise(ex, level, equipment);
+    if (pe.cardio) continue;
+    const r = resolveExercise(ex, level, equipment, exercisePool(!!program.general));
     if (!r) out.push({ from: ex.name, to: null });
     else if (r.id !== ex.id) out.push({ from: ex.name, to: r.name });
   }

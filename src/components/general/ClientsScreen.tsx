@@ -28,7 +28,6 @@ export default function ClientsScreen({ team }: { team: Team }) {
   const [sort, setSort] = useState<SortBy>('flags');
   const [newProgram, setNewProgram] = useState(false);
   const [groupSheet, setGroupSheet] = useState<{ id: string | null; name: string; editing: 'name' | 'clients' } | null>(null);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const status = t.trainerStatus[team.id];
   const seen = (data.openSeen ?? []).includes(team.id);
@@ -60,15 +59,12 @@ export default function ClientsScreen({ team }: { team: Team }) {
   const lightToday = !!data.teamCalendars?.[team.id]?.lightDates[ALL]?.includes(new Date().toISOString().slice(0, 10));
 
   async function act(fn: () => Promise<void>, done?: string) {
-    setBusy(true);
     setError(null);
     try {
       await fn();
       if (done) showAlert(done);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong.');
-    } finally {
-      setBusy(false);
     }
   }
 

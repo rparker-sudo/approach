@@ -17,7 +17,7 @@ Built from `docs/specs/trainer-mode.md` v0.3 (Phase A, then Phase B). Supabase m
 - **Client screens:** Today lists every session due from all their programs, with goal and week; "Your choices" with check-ins, sharing and the class board **off** by default; notes helper text; Delete my check-ins; turning sharing off hides past check-ins from the trainer.
 - **Wording:** Trainer/Client in general teams; neutral sign-up cards ("I'm a coach or trainer," "I'm an athlete or client").
 - **Website:** `/privacy` (Part A2 at `#health-data`) and `/terms` (§4T at `#trainer-terms`) regenerated from the v2.5 notice; footer link **Consumer health data** on every page.
-- **Pending Legal:** the trainer versions of the G3 pain card and G4 head-injury line (one constant each).
+- **Trainer versions of the G3 pain card and G4 head-injury line** (Legal approved as written).
 - Checks: `scripts/checks/v230-check.ts`, `supabase/tests/rls-2.3.0-a.sql`, `rls-2.3.0-b.sql`.
 
 ## 2.2.1 — app.approachstrength.com, Approach Strength, Coach Terms, Log in

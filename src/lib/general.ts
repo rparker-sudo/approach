@@ -94,9 +94,8 @@ export const LEGAL = {
 } as const;
 
 /**
- * G3 pain card and G4 head-injury line for general teams (design §S1b). PENDING LEGAL: Legal hasn't approved the trainer
- * versions yet (CLAUDE.md known conflict 5). Each is a single constant so approved text replaces it in one place.
- * Don't deploy until Ryan confirms Legal's wording.
+ * G3 pain card and G4 head-injury line for general teams (design §S1b). Legal approved this wording as written
+ * (confirmed by Ryan, November 16, 2026; CLAUDE.md known conflict 5). One constant each.
  */
 export const PAIN_TRAINER = "Don't train through pain. Talk to your trainer or a health professional before you train today.";
 export const HEAD_INJURY_TRAINER =

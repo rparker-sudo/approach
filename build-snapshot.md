@@ -8,7 +8,7 @@
 
 ## 1. Version and changes
 
-**2.3.0 (trainer mode, no AI):** built on branch `v2.3.0` (app) and `v2.3.0` (site repo) from the hand-off `e034bdb` (docs of Sun Nov 15, 2026). Acceptance report: `reports/v2.3.0-acceptance.md`. **Not deployed yet** (waits for Ryan's approval and Legal's G3/G4 wording). Migrations `009_trainer_a.sql`, `010_trainer_b.sql`. Summary in `CHANGELOG.md`; details and every judgment call in §8 ("2.3.0").
+**2.3.0 (trainer mode, no AI):** built on branch `v2.3.0` (app) and `v2.3.0` (site repo) from the hand-off `e034bdb` (docs of Sun Nov 15, 2026). Acceptance report: `reports/v2.3.0-acceptance.md`. Ryan approved the deploy on November 16, 2026, and confirmed Legal approved the G3/G4 wording. **Pending:** migrations 009/010 on the live project, then the merge to `main` and the tag. Migrations `009_trainer_a.sql`, `010_trainer_b.sql`. Summary in `CHANGELOG.md`; details and every judgment call in §8 ("2.3.0").
 
 **Current version:** 2.2.1 (`app.json`, `package.json`). Branch `v2.2.1` from the hand-off commit `e2bde34` (docs of Sat Nov 14, 2026). Acceptance report: `reports/v2.2.1-acceptance.md`. **Deployed November 15, 2026** (owner approved; tag `v2.2.1`).
 
@@ -270,7 +270,7 @@ $0 now. Future: Apple Developer Program $99/year; Supabase Pro about $25/month i
 ## 8. Known gaps, judgment calls and checks
 
 **2.3.0 judgment calls and gaps (for the planning team; also in `reports/v2.3.0-acceptance.md`):**
-- **Pending Legal:** G3 pain card (`PAIN_TRAINER`) and G4 head-injury line (`HEAD_INJURY_TRAINER`) for general teams use the design §S1b text, one constant each in `src/lib/general.ts`. Not to be deployed until Legal approves or supplies text.
+- **G3/G4 for general teams:** the pain card (`PAIN_TRAINER`) and head-injury line (`HEAD_INJURY_TRAINER`) use the design §S1b text, one constant each in `src/lib/general.ts`. Legal approved both as written (Ryan, November 16, 2026).
 - **Known conflicts built as settled in CLAUDE.md:** class board **off** by default for clients (compliance T6 over F33); combined-cap block across all programs posted to a client (Product to confirm); an unverified trainer can build but not post; removing gym equipment warns and each client switches to the closest exercise (Product to confirm); "lowest level among targets" for a group's weekly cap; youth pairing/station rules are warnings in general teams.
 - **General library kept apart from the volleyball library:** the 32 non-cardio general exercises are `scope: 'all'` as the doc says, but volleyball teams keep their 2.2.1 library (generator, picker, resolution) so volleyball programs don't change. Flag for Training/Product: decide whether volleyball pickers should show them.
 - **Doorframe Row:** its "why" mentions hitting and has no `whyGeneral`; general teams show no "why" line for it until Training supplies one.

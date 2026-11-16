@@ -1,5 +1,5 @@
 import { addDays, dateKey, fromKey, today as todayDate } from './calendar';
-import { ALL_EQUIPMENT, EXERCISES, exercisePool, fits, getExercise } from './exercises';
+import { ALL_EQUIPMENT, EXERCISES, exercisePool, fits, getExercise, registerCustomExercises } from './exercises';
 import { GENERAL_EASIER } from './generalLibrary';
 import { BACK_AFTER_BREAK_RAMP, clampCardio, programWeeks, RPE_CEILING, shiftBeginner, weekIndex, withWeekRpe } from './general';
 import { BEGINNER_EFFORT, homeAllowed, pickExercise, restSecFor } from './generator';
@@ -158,6 +158,8 @@ export function capEffort(effort: string, ceiling: number): string {
 
 /* ---------- resolveSession ---------- */
 export function resolveSession(program: Program, session: Session, athlete: AthleteContext, date: Date = todayDate()): ResolvedSession {
+  // 2.3.1: the program's own exercises resolve like library ones (level, tier, equipment).
+  registerCustomExercises(program.customExercises);
   if (program.general) return resolveGeneral(program, session, athlete, date);
   const day = sessionForDate(program, session, date);
   const home = session.location === 'home';
@@ -255,6 +257,7 @@ export function levelTable(programs: (Program | undefined)[]): LevelTable {
   const out: LevelTable = {};
   for (const program of programs) {
     if (!program) continue;
+    registerCustomExercises(program.customExercises);
     const equipment = program.equipment?.length ? program.equipment : ALL_EQUIPMENT;
     for (const session of program.sessions) {
       for (const pe of session.exercises) {

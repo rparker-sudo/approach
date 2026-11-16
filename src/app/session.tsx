@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { Body, Button, Card, colors, Field, H2, Label, Row, Screen, Stepper, Text, TextInput, Toggle, display, Icon } from '../components/ui';
 import WarmupCard from '../components/general/WarmupCard';
+import CustomExerciseSheet from '../components/CustomExerciseSheet';
+import { CustomInput, inputOf, roleOf } from '../lib/customExercise';
 import { ALL_EQUIPMENT, CATEGORY_LABEL, EXERCISES, exercisePool, fits, getExercise } from '../lib/exercises';
 import { CARDIO_BREAK_LINE, cardioProblems, CIRCUIT_LINE, clampCardio, generalEffortProblem, INTENSITY_LABEL, TALK_TEST } from '../lib/general';
 import { WARMUPS } from '../lib/generalLibrary';
@@ -16,7 +18,7 @@ import { blockRests, blocksOf, clockProblem, CLOCK_REASON, groupRows, labelOf, s
 import StationsEditor from '../components/StationsEditor';
 import { useTeams } from '../lib/team';
 import VersionLine, { DroppedLine } from '../components/VersionLine';
-import type { ExerciseCategory, ProgramExercise, Session, SlotRole } from '../lib/types';
+import type { Exercise, ExerciseCategory, ProgramExercise, Session, SlotRole } from '../lib/types';
 
 const CATS: ExerciseCategory[] = ['power', 'lower', 'upper', 'core', 'prehab'];
 const TIER_WORD = { P: 'Power', A: 'Heavy', B: 'Compound', C: 'Accessory', D: 'Care' } as const;
@@ -27,6 +29,8 @@ export default function SessionScreen() {
   const program = data.programs.find((p) => p.id === programId);
   const session = program?.sessions.find((s) => s.id === sessionId);
   const [picker, setPicker] = useState<{ replaceIndex: number | null } | null>(null);
+  // 2.3.1: create or edit a custom exercise; `replaceIndex` is where it goes once saved (null = add, undefined = edit only).
+  const [custom, setCustom] = useState<{ initial?: CustomInput; replaceIndex?: number | null } | null>(null);
   const [floorNote, setFloorNote] = useState<Record<number, string>>({});
   const [selected, setSelected] = useState<number[]>([]);
   const [groupMsg, setGroupMsg] = useState<string | null>(null);
@@ -156,6 +160,35 @@ export default function SessionScreen() {
   function remove(i: number) {
     update({ ...session!, exercises: session!.exercises.filter((_, k) => k !== i) });
   }
+  /** The row a new exercise gets: goal defaults in trainer teams; custom exercises follow their type. */
+  function rowFor(ex: Exercise): ProgramExercise {
+    if (general) {
+      const role: SlotRole = ex.category === 'power' ? 'power' : ex.category === 'core' ? 'core' : ex.category === 'prehab' ? (ex.pattern === 'mobility' ? 'mobility' : 'care') : ex.tier === 'A' ? 'main' : ex.tier === 'B' ? 'secondary' : 'accessory';
+      const rx = rxFor(goal, role) ?? { sets: 3, reps: '8–10', effort: 'RPE 7' };
+      return { exerciseId: ex.id, sets: rx.sets, reps: rx.reps, effort: rx.effort, role };
+    }
+    if (ex.custom) {
+      const role = roleOf(ex.tier, ex.pattern);
+      if (role === 'power') return { exerciseId: ex.id, sets: 3, reps: '3', effort: 'Max effort', role };
+      if (role === 'care' || role === 'mobility') return { exerciseId: ex.id, sets: 2, reps: '10', effort: 'Easy', role };
+      return { exerciseId: ex.id, sets: 3, reps: '8–10', effort: 'RPE 7', role };
+    }
+    return { exerciseId: ex.id, sets: 3, reps: '8', effort: 'RPE 7', role: 'accessory' };
+  }
+  /** Save a custom exercise into this program, and (when it came from Add/Swap) put it in the session, in one save. */
+  function saveCustom(ex: Exercise, replaceIndex: number | null | undefined) {
+    const list = [...(program!.customExercises ?? []).filter((x) => x.id !== ex.id), ex];
+    let exercises = session!.exercises;
+    if (replaceIndex === null) exercises = [...exercises, rowFor(ex)];
+    else if (typeof replaceIndex === 'number') exercises = exercises.map((e, k) => (k === replaceIndex ? { ...rowFor(ex), sets: e.sets, reps: e.reps, effort: e.effort } : e));
+    saveProgram({
+      ...program!,
+      customExercises: list,
+      sessions: program!.sessions.map((s) => (s.id === session!.id ? { ...session!, exercises } : s)),
+      ...(program!.teamId ? { unposted: true } : null),
+    });
+    setCustom(null);
+  }
   function pick(exerciseId: string) {
     const ex = getExercise(exerciseId);
     if (general && ex.durationOnly) {
@@ -169,13 +202,9 @@ export default function SessionScreen() {
     }
     if (picker?.replaceIndex != null) {
       setEx(picker.replaceIndex, { exerciseId, ...(general ? { cardio: undefined } : {}) });
-    } else if (general) {
-      // The goal fills the slot's defaults (adult-goals.md §2).
-      const role: SlotRole = ex.category === 'power' ? 'power' : ex.category === 'core' ? 'core' : ex.category === 'prehab' ? (ex.pattern === 'mobility' ? 'mobility' : 'care') : ex.tier === 'A' ? 'main' : ex.tier === 'B' ? 'secondary' : 'accessory';
-      const rx = rxFor(goal, role) ?? { sets: 3, reps: '8–10', effort: 'RPE 7' };
-      update({ ...session!, exercises: [...session!.exercises, { exerciseId, sets: rx.sets, reps: rx.reps, effort: rx.effort, role }] });
     } else {
-      update({ ...session!, exercises: [...session!.exercises, { exerciseId, sets: 3, reps: '8', effort: 'RPE 7', role: 'accessory' }] });
+      // The goal fills the slot's defaults in trainer teams (adult-goals.md §2); custom exercises follow their type.
+      update({ ...session!, exercises: [...session!.exercises, rowFor(ex)] });
     }
     setPicker(null);
   }
@@ -437,6 +466,38 @@ export default function SessionScreen() {
             </Pressable>
           </Row>
           <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 0, gap: 8, paddingBottom: 48 }}>
+            {/* 2.3.1: the coach's own exercises for this program. */}
+            <Button
+              kind="secondary"
+              icon="plus"
+              title="Create custom exercise"
+              onPress={() => {
+                setCustom({ replaceIndex: picker?.replaceIndex ?? null });
+                setPicker(null);
+              }}
+            />
+            {(program.customExercises ?? []).length ? (
+              <View style={{ gap: 8 }}>
+                <Label>Your exercises</Label>
+                {(program.customExercises ?? []).map((x) => (
+                  <Card key={x.id} style={{ padding: 12, gap: 6 }}>
+                    <Pressable accessibilityRole="button" onPress={() => pick(x.id)} style={{ minHeight: 44, justifyContent: 'center' }}>
+                      <Text style={{ fontWeight: '600', fontSize: 16 }}>{x.name}</Text>
+                      {x.cue ? <Text style={{ color: colors.muted, fontSize: 13 }}>{x.cue}</Text> : null}
+                    </Pressable>
+                    <Button
+                      small
+                      kind="ghost"
+                      title="Edit"
+                      onPress={() => {
+                        setCustom({ initial: inputOf(x) });
+                        setPicker(null);
+                      }}
+                    />
+                  </Card>
+                ))}
+              </View>
+            ) : null}
             {pickerGroups.map((g) =>
               g.items.length ? (
                 <View key={g.title} style={{ gap: 8 }}>
@@ -455,6 +516,9 @@ export default function SessionScreen() {
           </ScrollView>
         </View>
       </Modal>
+      {custom ? (
+        <CustomExerciseSheet initial={custom.initial} general={general} onClose={() => setCustom(null)} onSave={(ex) => saveCustom(ex, custom.initial ? undefined : custom.replaceIndex)} />
+      ) : null}
     </Screen>
   );
 }

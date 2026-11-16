@@ -1,12 +1,14 @@
 # Approach Strength — build snapshot
 
-*As of November 16, 2026 (v2.3.0, built on branch `v2.3.0` from `docs/specs/trainer-mode.md` v0.3; deployed November 16, 2026). Facts only. Items marked **(unverified)** could not be confirmed from the code or from the owner. **(pending)** = waits for the owner's dashboard step or the live test.*
+*As of November 16, 2026 (v2.3.1 on branch `v2.3.1`: custom exercises, an owner request; built on 2.3.0 trainer mode from `docs/specs/trainer-mode.md` v0.3, deployed November 16, 2026). Facts only. Items marked **(unverified)** could not be confirmed from the code or from the owner. **(pending)** = waits for the owner's dashboard step or the live test.*
 
 **What it is:** a weight-training, nutrition and planning app for volleyball athletes and coaches, and (from 2.3.0) for personal trainers with adult clients ("general" teams). Product name **Approach Strength** (since 2.2.1, D-035). Home-screen short name: "Approach". App: https://app.approachstrength.com. Website: https://approachstrength.com.
 
 ---
 
 ## 1. Version and changes
+
+**2.3.1 (custom exercises, owner request 11/16):** branch `v2.3.1`. Coaches and trainers can create their own exercises inside any program (saved in the existing program JSON, no migration). Each one carries a type (sets the tier), a movement (pattern) and a level, so resolveSession, rest floors, pairing rules and effort caps treat it like a library exercise. Report: `reports/v2.3.1-acceptance.md`. **Not deployed yet.**
 
 **2.3.0 (trainer mode, no AI):** built on branch `v2.3.0` (app) and `v2.3.0` (site repo) from the hand-off `e034bdb` (docs of Sun Nov 15, 2026). Acceptance report: `reports/v2.3.0-acceptance.md`. Ryan approved the deploy on November 16, 2026, and confirmed Legal approved the G3/G4 wording. **Deployed November 16, 2026:** Ryan ran migrations 009 and 010 on the live project (column check returned 4); `v2.3.0` was merged into `main` in both repos (app and website); tag `v2.3.0` pushed by Ryan from his Mac (app repo; the website repo has no tag yet). Ryan confirmed the live checks (legal pages, anchors, footer link, app version and type picker). Migrations `009_trainer_a.sql`, `010_trainer_b.sql`. Summary in `CHANGELOG.md`; details and every judgment call in §8 ("2.3.0").
 
@@ -269,6 +271,15 @@ $0 now. Future: Apple Developer Program $99/year; Supabase Pro about $25/month i
 ---
 
 ## 8. Known gaps, judgment calls and checks
+
+**2.3.1 judgment calls (custom exercises; for the planning team and Legal):**
+- **Owner decision outside the specs:** Ryan asked for custom exercises in all programs (volleyball and trainer teams) on 11/16 and chose: stored inside each program, coach sets type and level, name/cue/equipment/how-to/weighted, version 2.3.1. CLAUDE.md says volleyball teams don't change; this is a deliberate owner-approved change for volleyball coaches (athletes see more exercises only when their coach adds them).
+- **Version number:** the trainer spec reserves **2.3.1** for the AI assistant (B10). Ryan chose 2.3.1 for this; the AI release will need another number. **Planning team to renumber.**
+- **G-5 / Legal:** no new table or column. The coach's exercise definitions (name, cue, steps, equipment, tags) travel inside `team_programs.program`, like coach notes already do. They're program content, not data about users. **Legal to confirm** this needs no T4 row.
+- **G-6:** custom names, cues and steps are the coach's own words, shown to athletes (including minors) as written. The claim-word rule covers our copy, not coach content (same as coach notes). **Legal to confirm.**
+- **Safety:** the coach picks a type and a level. Athletes below the level get the closest library exercise of the same movement, and minors' rules (effort clamp, circuit/pairing, testing) work off the tier. A coach could still mislabel a heavy lift as "Accessory": noted for Training (a CSCS review could add a confirmation line).
+- **Not offered:** cardio (duration-only stays with the library) and Olympic lifts. Custom exercises aren't used in home sessions (each athlete gets a library exercise of the same movement for their home equipment).
+- **History:** the device keeps a copy of every custom exercise it has seen (`customSeen`, device only), so logged history keeps the name after a program changes.
 
 **2.3.0 judgment calls and gaps (for the planning team; also in `reports/v2.3.0-acceptance.md`):**
 - **G3/G4 for general teams:** the pain card (`PAIN_TRAINER`) and head-injury line (`HEAD_INJURY_TRAINER`) use the design §S1b text, one constant each in `src/lib/general.ts`. Legal approved both as written (Ryan, November 16, 2026).

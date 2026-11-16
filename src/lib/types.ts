@@ -137,6 +137,8 @@ export type Exercise = {
   whyGeneral?: string;
   /** 2.3.0: cardio, logged by minutes only (adult rules §6). */
   durationOnly?: boolean;
+  /** 2.3.1: written by the coach or trainer for one program (`custom-…` id). Never in the library, generator or pools. */
+  custom?: boolean;
 };
 
 /** What an exercise does in a session. Sets the prescription and default rest. */
@@ -259,6 +261,8 @@ export type Program = {
   startDate?: string;
   /** 2.3.0 general: the template this program was started from (name only). */
   templateOf?: string;
+  /** 2.3.1: the coach's own exercises for this program (posted inside the program JSON; no new table). */
+  customExercises?: Exercise[];
   /** 2.3.0 trainer device only: a duplicate's intended client (`client:<uid>`), preselected at Post. Never posted. */
   draftTarget?: string;
 };
@@ -376,6 +380,8 @@ export type AppData = {
   templates?: Program[];
   /** 2.3.0 trainers: general teams already shown "Your team is open" (F32b). */
   openSeen?: string[];
+  /** 2.3.1: every custom exercise this device has seen, so history keeps its name after a program changes (device only). */
+  customSeen?: Record<string, Exercise>;
 };
 
 export type LocalTeamCalendar = {

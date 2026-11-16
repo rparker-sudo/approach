@@ -524,9 +524,20 @@ export function whyFor(ex: Exercise, general: boolean): string {
   return (general && (ex.whyGeneral ?? WHY_GENERAL[ex.id])) || ex.howTo.why;
 }
 
+/**
+ * 2.3.1 custom exercises: coaches' own exercises live inside their programs. They're registered here (by unique `custom-…`
+ * id) so every screen and resolveSession can look them up; they never join EXERCISES, GENERAL_POOL or the generator.
+ */
+const CUSTOM = new Map<string, Exercise>();
+export function registerCustomExercises(list: Exercise[] | undefined) {
+  for (const ex of list ?? []) if (ex?.custom && ex.id.startsWith('custom-')) CUSTOM.set(ex.id, ex);
+}
+export const isCustomId = (id: string) => id.startsWith('custom-');
+
 export function getExercise(id: string): Exercise {
   return (
-    BY_ID.get(id) ?? {
+    BY_ID.get(id) ??
+    CUSTOM.get(id) ?? {
       id,
       name: id,
       category: 'core',

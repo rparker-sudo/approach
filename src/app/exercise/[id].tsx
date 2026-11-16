@@ -23,7 +23,11 @@ export default function ExerciseScreen() {
         <Pill text={ex.level === 1 ? 'Beginner-friendly' : ex.level === 2 ? 'Some experience' : 'Experienced lifters'} />
       </Row>
       {whyFor(ex, general) ? <Body>{whyFor(ex, general)}</Body> : null}
+      {/* 2.3.1: written by the coach or trainer, not from the Approach Strength library. */}
+      {ex.custom ? <Body muted>{general ? 'A custom exercise from the trainer.' : 'A custom exercise from the coach.'}</Body> : null}
+      {ex.custom && ex.cue ? <Body>{ex.cue}</Body> : null}
 
+      {ex.howTo.steps.length ? (
       <Section title="How to do it">
         {ex.howTo.steps.map((step, i) => (
           <Row key={i} style={{ alignItems: 'flex-start', gap: 10 }}>
@@ -32,18 +36,23 @@ export default function ExerciseScreen() {
           </Row>
         ))}
       </Section>
+      ) : null}
 
+      {ex.howTo.cues.length ? (
       <Section title={general ? "Cues" : "Coaching cues"}>
         {ex.howTo.cues.map((c, i) => (
           <Text key={i} style={{ lineHeight: 22 }}>• {c}</Text>
         ))}
       </Section>
+      ) : null}
 
+      {ex.howTo.mistakes.length ? (
       <Section title="Common mistakes">
         {ex.howTo.mistakes.map((m, i) => (
           <Text key={i} style={{ lineHeight: 22, color: colors.muted }}>• {m}</Text>
         ))}
       </Section>
+      ) : null}
 
       <Section title="Equipment">
         {setups.map((s, i) => (

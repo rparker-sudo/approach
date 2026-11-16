@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppData, BodyLog, Profile, Program, ReadinessEntry, TouchLog, WorkoutLog } from './types';
 import { uid } from './util';
+import { registerCustomExercises } from './exercises';
 
 const KEY = 'volley-strength/data/v1';
 /** Not-eligible flag (2.1, S1). Kept apart from app data so erasing data doesn't clear it. Nothing else is saved. */
@@ -77,6 +78,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [data]);
 
   const update = useCallback((fn: (d: AppData) => AppData) => setData((d) => fn(d)), []);
+
+  // 2.3.1: custom exercises from every program and template on this device (and ones seen before) resolve by id.
+  const customs = useMemo(
+    () => [...Object.values(data.customSeen ?? {}), ...[...data.programs, ...(data.templates ?? [])].flatMap((p) => p.customExercises ?? [])],
+    [data.programs, data.templates, data.customSeen],
+  );
+  registerCustomExercises(customs);
+  useEffect(() => {
+    const seen = data.customSeen ?? {};
+    const fresh = customs.filter((c) => JSON.stringify(seen[c.id]) !== JSON.stringify(c));
+    // Keeping the device's copy in step with programs (an external source: team sync).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (fresh.length) setData((d) => ({ ...d, customSeen: { ...(d.customSeen ?? {}), ...Object.fromEntries(fresh.map((c) => [c.id, c])) } }));
+  }, [customs, data.customSeen]);
 
   const store = useMemo<Store>(
     () => ({

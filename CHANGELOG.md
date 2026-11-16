@@ -4,6 +4,14 @@ Version numbers: whole numbers (1.0, 2.0) for big changes, decimals (1.1, 1.2) f
 The number is in `app.json` (`expo.version`, written as 1.1.0 for 1.1) and shows in the app under Settings.
 Each version has a matching GitHub tag (`v1.0`, `v1.1`, …) and download (`approach-1.0.zip`).
 
+## 2.3.1 — custom exercises
+Owner request (Ryan, November 16, 2026), outside the planning specs. No migration (custom exercises are saved inside the existing program JSON). Report: `reports/v2.3.1-acceptance.md`.
+
+- **Create custom exercise** in every program's session editor (volleyball teams, trainer teams, and personal programs): name, one-line cue, type (Power, Heavy, Compound, Accessory, Care/mobility), movement, level, equipment, weighted or not, and optional how-to steps. Edit from the picker's "Your exercises" list.
+- **Same safety handling as the library:** the type sets the demand tier (rest floors, pairing rules, effort caps for minors, the RPE 8 cap in trainer teams); athletes below the level get the closest library exercise of the same movement, with the usual "Your version" note. Custom exercises never join the library or the generator, and cardio and Olympic lifts aren't offered.
+- Athletes and clients see them like library exercises; the how-to screen says "A custom exercise from the coach" (or trainer).
+- Checks: `scripts/checks/v231-check.ts`, `scripts/checks/browser-v231.js`.
+
 ## 2.3.0 — trainer mode (adult clients), no AI
 Built from `docs/specs/trainer-mode.md` v0.3 (Phase A, then Phase B). Supabase migrations `009_trainer_a.sql` and `010_trainer_b.sql` (run once each, in order, after 008; both safe to re-run). Acceptance report: `reports/v2.3.0-acceptance.md`. **Volleyball teams don't change.**
 

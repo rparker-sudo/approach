@@ -91,7 +91,7 @@ function BuilderForm() {
     if (existing) {
       // Keep the season calendar. Date choices that pointed at old sessions go back to automatic; chosen rest days stay.
       const overrides = Object.fromEntries(Object.entries(existing.overrides ?? {}).filter(([, v]) => v === null));
-      program = { ...program, events: existing.events, overrides, lightDates: existing.lightDates };
+      program = { ...program, events: existing.events, overrides, lightDates: existing.lightDates, customExercises: existing.customExercises };
     }
     if (team) {
       // The coach's working copy of the team workout. Posting sends it to the roster.

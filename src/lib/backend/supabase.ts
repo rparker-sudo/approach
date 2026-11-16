@@ -31,7 +31,10 @@ import {
   TeamCalendar,
   TeamLog,
   TeamProgram,
+  TeamKind,
+  clientOf,
 } from './types';
+import { TRAINER_TERMS_VERSION } from '../trainerTerms';
 
 if (Platform.OS !== 'web') {
   // Supabase needs a full URL implementation on iOS/Android (loaded only off the web).
@@ -63,6 +66,7 @@ type TeamRow = {
   team_goal?: number | null;
   med_ball_lb?: number | string;
   accent_color?: string | null;
+  kind?: TeamKind | null;
 };
 
 /** team_members permission columns (migration 004). */
@@ -146,7 +150,7 @@ function toTeam(r: TeamRow): Team {
     medBallLb: r.med_ball_lb != null ? Number(r.med_ball_lb) : d.medBallLb,
     accentColor: r.accent_color ?? d.accentColor,
   };
-  return { id: r.id, name: r.name, joinCode: r.join_code, coachId: r.coach_id, coachName: r.coach?.name, createdAt: r.created_at, settings };
+  return { id: r.id, name: r.name, joinCode: r.join_code, coachId: r.coach_id, coachName: r.coach?.name, createdAt: r.created_at, settings, kind: r.kind ?? 'volleyball' };
 }
 
 const SETTINGS_COLS: Record<keyof TeamSettings, string> = {
@@ -245,10 +249,15 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
   const TEAM_BASE = 'id,name,join_code,coach_id,created_at,coach:profiles!teams_coach_id_fkey(name)';
   const TEAM_P2 = `${TEAM_BASE},practice_min,match_min,tournament_min,effort_board,board_effort_panel,team_goal,med_ball_lb`;
   const TEAM_P3 = `${TEAM_P2},accent_color`;
-  // Falls back to older columns until migrations 006 / 004 have run.
-  let TEAM_SELECT = TEAM_P3;
+  const TEAM_P4 = `${TEAM_P3},kind`;
+  // Falls back to older columns until migrations 009 / 006 / 004 have run.
+  let TEAM_SELECT = TEAM_P4;
   async function withTeamCols<T extends { error: { message: string } | null }>(run: (cols: string) => PromiseLike<T>): Promise<T> {
     let res = await run(TEAM_SELECT);
+    if (TEAM_SELECT === TEAM_P4 && isMissing(res.error)) {
+      TEAM_SELECT = TEAM_P3;
+      res = await run(TEAM_SELECT);
+    }
     if (TEAM_SELECT === TEAM_P3 && isMissing(res.error)) {
       TEAM_SELECT = TEAM_P2;
       res = await run(TEAM_SELECT);
@@ -425,6 +434,39 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
         if (!/duplicate key/i.test(error.message)) fail(error); // retry only on a join-code clash
       }
       throw new BackendError("Couldn't create a unique team code. Try again.");
+    },
+
+    async createGeneralTeam(name, confirmations) {
+      await userId();
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const { data, error } = await sb.rpc('create_general_team', {
+          team_name: name.trim(),
+          join_code: makeJoinCode(),
+          terms_version: TRAINER_TERMS_VERSION,
+          confirmations,
+        });
+        if (!error) {
+          const r = data as TeamRow;
+          return toTeam({ ...r, kind: 'general' });
+        }
+        if (isMissing(error)) throw new BackendError('The team database needs the 2.3.0 update first (README: Upgrading from 2.2.1).');
+        if (!/duplicate key/i.test(error.message)) fail(error);
+      }
+      throw new BackendError("Couldn't create a unique team code. Try again.");
+    },
+
+    async trainerStatus(teamId) {
+      const { data, error } = await sb.rpc('my_team_status', { t: teamId });
+      if (isMissing(error)) return null;
+      if (error) fail(error);
+      const row = (Array.isArray(data) ? data[0] : data) as { kind: TeamKind; verified_at: string | null; terms_version: string | null; current_terms: string } | undefined;
+      if (!row || row.kind !== 'general') return null;
+      return { verifiedAt: row.verified_at, termsVersion: row.terms_version, currentTerms: row.current_terms };
+    },
+
+    async acceptTrainerTerms(teamId) {
+      const { error } = await sb.rpc('accept_trainer_terms', { t: teamId, terms_version: TRAINER_TERMS_VERSION });
+      if (error) fail(error);
     },
 
     async renameTeam(teamId, name) {
@@ -924,7 +966,11 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
       const updatedAt = new Date().toISOString();
       const { error } = await sb
         .from('team_programs')
-        .upsert({ team_id: teamId, group_key: groupKey, program, updated_at: updatedAt }, { onConflict: 'team_id,group_key' });
+        // 2.3.0: a program for one client carries target_user_id (RLS shows it to that client only).
+        .upsert(
+          { team_id: teamId, group_key: groupKey, program, updated_at: updatedAt, ...(clientOf(groupKey) ? { target_user_id: clientOf(groupKey) } : {}) },
+          { onConflict: 'team_id,group_key' },
+        );
       if (isMissing(error) && groupKey === 'all') {
         const old = await sb.from('team_programs').upsert({ team_id: teamId, program, updated_at: updatedAt });
         if (old.error) fail(old.error);

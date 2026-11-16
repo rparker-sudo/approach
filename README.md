@@ -106,6 +106,36 @@ Do these in order. Every change is recorded in `build-snapshot.md`.
 
 **Check query (optional):** `select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name like 'coach_terms_%';` should return 2.
 
+### Upgrading from 2.2.1 (to 2.3.0)
+Volleyball teams don't change. Do these in order; every change is recorded in `build-snapshot.md`.
+
+1. **Database:** in Supabase → SQL Editor, run `supabase/migrations/009_trainer_a.sql`, then `supabase/migrations/010_trainer_b.sql` (each is safe to run twice). 009 adds general teams (`teams.kind`), the trainer Terms record and verification fields, client-targeted programs (`team_programs.target_user_id`), adults-only joins, and turns off testing and parent consent for general teams. 010 adds the gym equipment profile and "Delete my check-ins".
+2. **Website:** push the site repo with the regenerated `/privacy` (Part A2 at `#health-data`) and `/terms` (§4T at `#trainer-terms`) and the "Consumer health data" footer link.
+3. Deploy 2.3.0 (push to `main`).
+
+**Verifying a trainer (TM-19).** A new general team is closed: clients can't join and the trainer can't post until you verify them. There is no in-app control for this. In Supabase → SQL Editor (which runs as the service role), find the team and open it:
+
+```sql
+-- Find general teams waiting for verification.
+select id, name, join_code, trainer_terms_version, trainer_terms_accepted_at, created_at
+  from teams where kind = 'general' and trainer_verified_at is null order by created_at;
+
+-- Open a team once you've checked the trainer (replace the code and your name).
+update teams set trainer_verified_at = now(), trainer_verified_by = 'Ryan'
+ where kind = 'general' and join_code = 'ABC123';
+```
+
+To pause a team (lapse): existing clients keep their programs, but no one new can join and the trainer can't post.
+
+```sql
+update teams set trainer_verified_at = null, trainer_verified_by = null
+ where kind = 'general' and join_code = 'ABC123';
+```
+
+Only the service role can change these two columns; a trigger rejects the change from any app account, including the trainer's.
+
+**Check query (optional):** `select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'teams' and column_name in ('kind', 'trainer_verified_at', 'trainer_verified_by', 'gym_equipment');` should return 4 after both migrations.
+
 ## Browser version on GitHub Pages
 
 The repository includes `.github/workflows/deploy-web.yml`, which builds the browser version and publishes it every time you push to `main`. Team QR codes and join links point at it.

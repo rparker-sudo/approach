@@ -105,7 +105,26 @@ export type Team = {
   /** Athletes only (v2.2): this is the team whose lift program they follow. */
   isLiftProgram?: boolean;
   settings: TeamSettings;
+  /** 2.3.0: 'volleyball' (every team before 2.3.0) or 'general' (a trainer's adult clients). Can't change once a team has members. */
+  kind: TeamKind;
 };
+
+export type TeamKind = 'volleyball' | 'general';
+
+/** 2.3.0 (compliance T2/T3): the trainer's own view of her general team. Only the team's trainer can read it. */
+export type TrainerStatus = {
+  /** Set only by Approach Strength (service role) after the TM-19 email. Null = not open (or paused). */
+  verifiedAt: string | null;
+  termsVersion: string | null;
+  currentTerms: string;
+};
+
+/** The three separate confirmations at general-team creation (F31, compliance T2), each with the time it was ticked. */
+export type TrainerConfirmations = { terms: string; adults_responsible: string; no_cobranding: string };
+
+/** Group key for a program posted to one client (2.3.0 A4): `client:<user id>`. */
+export const clientKey = (userId: string) => `client:${userId}`;
+export const clientOf = (groupKey: string) => (groupKey.startsWith('client:') ? groupKey.slice(7) : null);
 
 /** A position group inside a team. 'all' (Whole team) is implicit and not stored. */
 export type Group = {
@@ -167,7 +186,7 @@ export type LevelTable = Record<string, [string | null, string | null, string | 
 
 export type TeamProgram = {
   teamId: string;
-  /** 'all' = Whole team, otherwise a group id. */
+  /** 'all' = Whole team, a group id, or `client:<user id>` for one client (general teams, 2.3.0). */
   groupKey: string;
   program: Program;
   updatedAt: string;
@@ -317,6 +336,12 @@ export interface Backend {
   /** Coaches: teams they own. Athletes: teams they've joined. */
   listMyTeams(): Promise<Team[]>;
   createTeam(name: string): Promise<Team>;
+  /** 2.3.0 F31: a general team, with the three Trainer confirmations (compliance T2). */
+  createGeneralTeam(name: string, confirmations: TrainerConfirmations): Promise<Team>;
+  /** 2.3.0: the trainer's view of her team's gate and Terms version (null for volleyball teams or non-owners). */
+  trainerStatus(teamId: string): Promise<TrainerStatus | null>;
+  /** 2.3.0 F31: accept changed Trainer Terms. */
+  acceptTrainerTerms(teamId: string): Promise<void>;
   renameTeam(teamId: string, name: string): Promise<void>;
   deleteTeam(teamId: string): Promise<void>;
   listMembers(teamId: string): Promise<Member[]>;

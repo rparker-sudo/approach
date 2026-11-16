@@ -37,7 +37,9 @@ import {
   TestSession,
   Rack,
   StationRun,
+  clientOf,
 } from './types';
+import { TRAINER_TERMS_VERSION } from '../trainerTerms';
 
 /**
  * Demo mode: a pretend server stored on this device. Several accounts can
@@ -83,6 +85,11 @@ type DB = {
   testSessions: TestSession[];
   tests: TestResult[];
   sessionUserId: string | null;
+  /**
+   * 2.3.0 (migration 009): the trainer Terms record and verification for general teams, kept apart from Team like the
+   * server's column grants. Demo mode has no service role: tests (or a developer) set verifiedAt in demo storage.
+   */
+  trainer?: Record<string, { termsVersion: string; acceptedAt: string; acceptedBy: string; confirmations: Record<string, string>; verifiedAt: string | null; verifiedBy: string | null }>;
 };
 
 const EMPTY: DB = {
@@ -115,7 +122,7 @@ async function load(): Promise<DB> {
       const isMinor = db.users.find((u) => u.id === m.userId)?.isMinor;
       return { ...m, perms: permsFromStatus(consentStatus, isMinor), consentVersion: consentStatus === 'training_only' || consentStatus === 'full' ? 1 : null };
     });
-    db.teams = db.teams.map((t) => ({ ...t, settings: { ...DEFAULT_TEAM_SETTINGS, ...(t.settings ?? {}) } }));
+    db.teams = db.teams.map((t) => ({ ...t, kind: t.kind ?? 'volleyball', settings: { ...DEFAULT_TEAM_SETTINGS, ...(t.settings ?? {}) } }));
     // Live progress older than 24 hours is deleted.
     const cutoff = Date.now() - 864e5;
     db.live = db.live.filter((l) => new Date(l.updatedAt).getTime() >= cutoff);
@@ -244,6 +251,22 @@ function canLoadTest(db: DB, userId: string, day: string, teamId?: string | null
 /** Leaving or being removed from a team removes the athlete from its racks (the rack keeps its name). */
 function dropFromRacks(db: DB, teamId: string, userId: string) {
   db.racks = (db.racks ?? []).map((r) => (r.teamId === teamId ? { ...r, userIds: r.userIds.filter((u) => u !== userId) } : r));
+}
+
+const isGeneralTeam = (db: DB, teamId: string) => db.teams.find((t) => t.id === teamId)?.kind === 'general';
+
+/** Same as the server's general_team_open(): verified by the service role. */
+const generalOpen = (db: DB, teamId: string) => !!db.trainer?.[teamId]?.verifiedAt;
+
+/** Same as general_team_can_post(): open and on the current trainer Terms. */
+const generalCanPost = (db: DB, teamId: string) => generalOpen(db, teamId) && db.trainer?.[teamId]?.termsVersion === TRAINER_TERMS_VERSION;
+
+/** Same as the 2.3.0 team_programs select policy: volleyball members see every program; general clients see team-wide, own group, own. */
+function programVisible(db: DB, viewerId: string | null, p: TeamProgram) {
+  if (!isGeneralTeam(db, p.teamId) || isCoach(db, p.teamId, viewerId)) return true;
+  const m = db.members.find((x) => x.teamId === p.teamId && x.userId === viewerId);
+  if (!m) return false;
+  return p.groupKey === 'all' || (!!m.groupId && p.groupKey === m.groupId) || clientOf(p.groupKey) === viewerId;
 }
 
 function coachOf(db: DB, teamId: string, userId: string) {
@@ -430,10 +453,59 @@ export const localBackend: Backend = {
       coachName: user.name,
       createdAt: new Date().toISOString(),
       settings: { ...DEFAULT_TEAM_SETTINGS },
+      kind: 'volleyball',
     };
     db.teams.push(team);
     await save(db);
     return team;
+  },
+
+  async createGeneralTeam(name, confirmations) {
+    const { db, user } = await me();
+    if (user.role !== 'coach') throw new BackendError('Only coaches and trainers can create teams.');
+    if (!name.trim()) throw new BackendError('Give your team a name.');
+    const c = confirmations as Record<string, unknown>;
+    if (!['terms', 'adults_responsible', 'no_cobranding'].every((k) => typeof c?.[k] === 'string' && c[k])) {
+      throw new BackendError('Tick all three boxes to create a general team.');
+    }
+    let code = makeJoinCode();
+    while (db.teams.some((t) => t.joinCode === code)) code = makeJoinCode();
+    const now = new Date().toISOString();
+    const team: Team = {
+      id: uid(),
+      name: name.trim(),
+      joinCode: code,
+      coachId: user.id,
+      coachName: user.name,
+      createdAt: now,
+      settings: { ...DEFAULT_TEAM_SETTINGS, effortBoard: false },
+      kind: 'general',
+    };
+    db.teams.push(team);
+    db.trainer = {
+      ...(db.trainer ?? {}),
+      [team.id]: { termsVersion: TRAINER_TERMS_VERSION, acceptedAt: now, acceptedBy: user.id, confirmations: { ...confirmations }, verifiedAt: null, verifiedBy: null },
+    };
+    await save(db);
+    return team;
+  },
+
+  async trainerStatus(teamId) {
+    const { db, user } = await me();
+    if (!isCoach(db, teamId, user.id) || !isGeneralTeam(db, teamId)) return null;
+    const r = db.trainer?.[teamId];
+    return { verifiedAt: r?.verifiedAt ?? null, termsVersion: r?.termsVersion ?? null, currentTerms: TRAINER_TERMS_VERSION };
+  },
+
+  async acceptTrainerTerms(teamId) {
+    const { db, user } = await me();
+    coachOf(db, teamId, user.id);
+    const r = db.trainer?.[teamId];
+    if (!r) throw new BackendError('Only general teams have trainer Terms.');
+    r.termsVersion = TRAINER_TERMS_VERSION;
+    r.acceptedAt = new Date().toISOString();
+    r.acceptedBy = user.id;
+    await save(db);
   },
 
   async renameTeam(teamId, name) {
@@ -562,6 +634,7 @@ export const localBackend: Backend = {
   async recordConsent(teamId, userId, perms) {
     const { db, user } = await me();
     if (!isCoach(db, teamId, user.id)) throw new BackendError('Only the team coach can record consent.');
+    if (isGeneralTeam(db, teamId)) throw new BackendError('Clients choose these themselves.');
     if (!coachTermsOk(user as DB['users'][number])) throw new BackendError(COACH_TERMS_REASON);
     if (db.users.find((u) => u.id === userId)?.isMinor === false) throw new BackendError('Adults choose these themselves.');
     const m = db.members.find((x) => x.teamId === teamId && x.userId === userId);
@@ -767,6 +840,7 @@ export const localBackend: Backend = {
   async confirmSupervision(teamId, day, battery: TestBattery) {
     const { db, user } = await me();
     coachOf(db, teamId, user.id);
+    if (isGeneralTeam(db, teamId)) throw new BackendError("Testing isn't part of general teams.");
     if (!coachTermsOk(user as DB['users'][number])) throw new BackendError(COACH_TERMS_REASON);
     const existing = db.testSessions.find((x) => x.teamId === teamId && x.day === day && x.groupKey === 'all');
     if (existing) return existing;
@@ -785,6 +859,7 @@ export const localBackend: Backend = {
     const { db, user } = await me();
     const coach = isCoach(db, t.teamId, user.id);
     if (!coach && t.userId !== user.id) throw new BackendError('Only the team coach can do that.');
+    if (isGeneralTeam(db, t.teamId)) throw new BackendError("Testing isn't part of general teams.");
     if (!canTest(permsOf(db, t.teamId, t.userId))) throw new BackendError("Testing isn't turned on for you on this team.");
     if (t.reps != null && !db.testSessions.some((x) => x.teamId === t.teamId && x.day === t.day && x.battery !== 'jump')) {
       throw new BackendError("Strength checks open when your coach confirms they're supervising.");
@@ -816,6 +891,11 @@ export const localBackend: Backend = {
   async postProgram(teamId, groupKey, program: Program) {
     const { db, user } = await me();
     coachOf(db, teamId, user.id);
+    if (isGeneralTeam(db, teamId)) {
+      if (!generalCanPost(db, teamId)) throw new BackendError('You can post once your team is open.');
+      const target = clientOf(groupKey);
+      if (target && !db.members.some((m) => m.teamId === teamId && m.userId === target)) throw new BackendError("That client isn't on the team.");
+    }
     const tp: TeamProgram = { teamId, groupKey, program, updatedAt: new Date().toISOString() };
     db.programs = [...db.programs.filter((p) => !(p.teamId === teamId && p.groupKey === groupKey)), tp];
     await save(db);
@@ -824,7 +904,7 @@ export const localBackend: Backend = {
 
   async getPrograms(teamIds) {
     const db = await load();
-    return db.programs.filter((p) => teamIds.includes(p.teamId));
+    return db.programs.filter((p) => teamIds.includes(p.teamId) && programVisible(db, db.sessionUserId, p));
   },
 
   async joinTeam(code) {
@@ -834,6 +914,11 @@ export const localBackend: Backend = {
       throw new BackendError(
         "Teams aren't shared between phones yet: this app is in demo mode. Ask your coach to connect team sync (Supabase), then try the code again.",
       );
+    }
+    if (team.kind === 'general' && !db.members.some((m) => m.teamId === team.id && m.userId === user.id)) {
+      // Same as join_team (compliance T1, T3): adults only, and only once the trainer is verified.
+      if (user.isMinor !== false) throw new BackendError('This team is for adults 18 and older.');
+      if (!generalOpen(db, team.id)) throw new BackendError("This trainer's team isn't open yet.");
     }
     if (!db.members.some((m) => m.teamId === team.id && m.userId === user.id)) {
       // Minors join with nothing on (coach records the form); adults with participation only.
@@ -866,6 +951,11 @@ export const localBackend: Backend = {
 
   async listGroups(teamId) {
     const db = await load();
+    // 2.3.0: in general teams a client sees only their own group's name.
+    if (isGeneralTeam(db, teamId) && !isCoach(db, teamId, db.sessionUserId)) {
+      const mine = db.members.find((m) => m.teamId === teamId && m.userId === db.sessionUserId)?.groupId;
+      return db.groups.filter((g) => g.teamId === teamId && g.id === mine);
+    }
     return db.groups.filter((g) => g.teamId === teamId);
   },
 

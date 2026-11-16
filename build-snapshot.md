@@ -220,7 +220,7 @@ Supabase and GitHub (Pages, Actions) only. `pg_cron` is a built-in Supabase exte
 - Screenshots S1–S6 are in `assets/screens/` (demo mode, sample data, approved by the owner 11/15; seed and capture scripts were scratch only, not in the repo).
 - No JavaScript, forms, cookies, or third-party requests; self-hosted fonts.
 - Checks: `scripts/checks/site-copy-match.py` and `legal-pages-match.py` (both in `run-all.sh`), plus a browser pass (tap targets, 320 px, 200% zoom, menu without JS).
-- Report: `reports/marketing-site-acceptance.md`. **Status: built and checked; published after the owner approves.**
+- Report: `reports/marketing-site-acceptance.md`. **Published November 15, 2026** (site commit `d66444b`); the owner confirmed the live checks on 11/16. All rows pass.
 
 ### Settings changes (old → new), 2.2.1 §1–§3, §8
 Every change listed in the spec, made by the owner in a dashboard. Filled in as each step is done.

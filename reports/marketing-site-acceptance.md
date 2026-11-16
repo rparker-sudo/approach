@@ -2,8 +2,8 @@
 
 Spec: `docs/specs/marketing-site.md` **v1.1** · Copy: `docs/copy/website-copy.md` **v1.1** · Design: `docs/design/marketing-site.md` v1.0 · Saved November 15, 2026, **before** asking Ryan to approve publishing.
 
-**Result: no criterion fails.**
-- 1 row is pending until publishing: the live HTTPS check on `approachstrength.com` for the new pages. The placeholder and legal pages are already live there, and `www` already redirects.
+**Result: every criterion passes.**
+- **Published November 15, 2026** (owner approved; site repo commit `d66444b`, GitHub Pages deploy succeeded). **All 12 rows pass**: the owner ran the 7 live checks on 11/16 (pages over HTTPS, legal pages at the same URLs, `www`, 404, entry buttons → Log in, menu on a phone).
 - Everything else was tested on the generated site. It was served locally the way GitHub Pages serves it: `/features` → `features.html`, a missing path → `404.html`.
 
 How it was tested:
@@ -14,7 +14,7 @@ How it was tested:
 
 | # | Criterion | Result | Evidence |
 |---|---|---|---|
-| 1 | `/`, `/features`, `/pricing`, `/admin-preview`, `/safety` and the three legal pages load over HTTPS on `approachstrength.com`; `www` redirects; 404 works | **pass (local) · pending (live, after publish)** | Locally all pages return 200, and a missing path returns the 404 page ("That page isn't here."). On the live domain today: the placeholder and legal pages over HTTPS, and `www` → apex (Ryan, 11/15). The new pages are checked live right after publishing. |
+| 1 | `/`, `/features`, `/pricing`, `/admin-preview`, `/safety` and the three legal pages load over HTTPS on `approachstrength.com`; `www` redirects; 404 works | **pass** | Locally all pages return 200, and a missing path returns the 404 page ("That page isn't here."). On the live domain today: the placeholder and legal pages over HTTPS, and `www` → apex (Ryan, 11/15). Live after publishing (Ryan, confirmed 11/16): `/`, `/features`, `/pricing`, `/admin-preview`, `/safety`, `/privacy`, `/terms`, `/consent` over HTTPS; `www` → apex; `/nope` → "That page isn't here."; Coach/Athlete cards open Log in on `app.`; header Log in opens the app; the phone menu opens and closes. |
 | 2 | Coach and Athlete go to `https://app.approachstrength.com/sign-in?role=…` and open Log in; header Log in goes to the app; no `<form` or `<input` | **pass** | Entry-card hrefs: `…/sign-in?role=coach`, `…/sign-in?role=athlete`, `/admin-preview`. Header and menu **Log in** → `https://app.approachstrength.com`. `sign-in?role=` opens the 2.2.1 Log in screen (2.2.1 report row 20, live check 11/15). Source scan: 0 `<form`, 0 `<input` in every page. |
 | 3 | No `<script>`, no cookies, no third-party requests | **pass** | Source scan: 0 `<script>`. Headless browser at 4 widths: **0 cookies**, and the network log shows only the site's own host (CSS, self-hosted WOFF2 fonts, outlined SVG lockups, screenshots). Fonts are Inter and Inter Tight, subset WOFF2, with OFL license files in `fonts/`. |
 | 4 | Every feature on `/` and `/features` shows a text label matching the copy (and the roadmap); only Live features have images | **pass** | Home: 6 cards, all `LIVE`. Features: 19 cards (11 Live, 5 Coming soon, 3 Later). Labels are text, styled fill / outline / dashed. Images: exactly the 6 Live rows from design §3 (S1, S3, S4, S2, S6, S5); none on Coming soon or Later. The labels match copy v1.1, which Product checked against the roadmap on 11/14. No feature shipped or was dropped between 11/14 and the 11/15 publish date (2.2.1 added none of the Coming soon items). |

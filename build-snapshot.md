@@ -1,6 +1,6 @@
 # Approach Strength — build snapshot
 
-*As of November 16, 2026 (v2.3.0, built on branch `v2.3.0` from `docs/specs/trainer-mode.md` v0.3; not deployed yet). Facts only. Items marked **(unverified)** could not be confirmed from the code or from the owner. **(pending)** = waits for the owner's dashboard step or the live test.*
+*As of November 16, 2026 (v2.3.0, built on branch `v2.3.0` from `docs/specs/trainer-mode.md` v0.3; deployed November 16, 2026). Facts only. Items marked **(unverified)** could not be confirmed from the code or from the owner. **(pending)** = waits for the owner's dashboard step or the live test.*
 
 **What it is:** a weight-training, nutrition and planning app for volleyball athletes and coaches, and (from 2.3.0) for personal trainers with adult clients ("general" teams). Product name **Approach Strength** (since 2.2.1, D-035). Home-screen short name: "Approach". App: https://app.approachstrength.com. Website: https://approachstrength.com.
 
@@ -8,7 +8,7 @@
 
 ## 1. Version and changes
 
-**2.3.0 (trainer mode, no AI):** built on branch `v2.3.0` (app) and `v2.3.0` (site repo) from the hand-off `e034bdb` (docs of Sun Nov 15, 2026). Acceptance report: `reports/v2.3.0-acceptance.md`. Ryan approved the deploy on November 16, 2026, and confirmed Legal approved the G3/G4 wording. **Pending:** migrations 009/010 on the live project, then the merge to `main` and the tag. Migrations `009_trainer_a.sql`, `010_trainer_b.sql`. Summary in `CHANGELOG.md`; details and every judgment call in §8 ("2.3.0").
+**2.3.0 (trainer mode, no AI):** built on branch `v2.3.0` (app) and `v2.3.0` (site repo) from the hand-off `e034bdb` (docs of Sun Nov 15, 2026). Acceptance report: `reports/v2.3.0-acceptance.md`. Ryan approved the deploy on November 16, 2026, and confirmed Legal approved the G3/G4 wording. **Deployed November 16, 2026:** Ryan ran migrations 009 and 010 on the live project (column check returned 4); `v2.3.0` was merged into `main` in both repos (app and website); tag `v2.3.0`. Migrations `009_trainer_a.sql`, `010_trainer_b.sql`. Summary in `CHANGELOG.md`; details and every judgment call in §8 ("2.3.0").
 
 **Current version:** 2.2.1 (`app.json`, `package.json`). Branch `v2.2.1` from the hand-off commit `e2bde34` (docs of Sat Nov 14, 2026). Acceptance report: `reports/v2.2.1-acceptance.md`. **Deployed November 15, 2026** (owner approved; tag `v2.2.1`).
 
@@ -231,6 +231,7 @@ Supabase and GitHub (Pages, Actions) only. `pg_cron` is a built-in Supabase exte
 
 - **App:** https://app.approachstrength.com (Pages custom domain moved 11/15). 2.2.1 deployed from `main` on November 15, 2026.
 - **Website:** https://approachstrength.com from `rparker-sudo/approachstrength-site` (placeholder + legal pages, live 11/15). When the owner set the custom domain, GitHub added `CNAME` to that repo.
+- **2.3.0:** app and website deployed from `main` on November 16, 2026. Migrations 009 and 010 applied by Ryan (Supabase SQL Editor) the same day. No domain, DNS, repo-variable, Pages or Supabase setting changes.
 - **Supabase:** live, Free plan. 002–007 applied (005–007 on November 14, 2026, with pg_cron enabled, per the owner). 008 applied November 15, 2026 (owner). Auth Site URL and Redirect URLs moved to `app.` 11/15.
 
 ### Marketing site (Part C, spec `docs/specs/marketing-site.md` v1.1)

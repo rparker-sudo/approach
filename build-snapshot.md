@@ -8,7 +8,7 @@
 
 ## 1. Version and changes
 
-**2.3.0 (trainer mode, no AI):** built on branch `v2.3.0` (app) and `v2.3.0` (site repo) from the hand-off `e034bdb` (docs of Sun Nov 15, 2026). Acceptance report: `reports/v2.3.0-acceptance.md`. Ryan approved the deploy on November 16, 2026, and confirmed Legal approved the G3/G4 wording. **Deployed November 16, 2026:** Ryan ran migrations 009 and 010 on the live project (column check returned 4); `v2.3.0` was merged into `main` in both repos (app and website); tag `v2.3.0`. Migrations `009_trainer_a.sql`, `010_trainer_b.sql`. Summary in `CHANGELOG.md`; details and every judgment call in §8 ("2.3.0").
+**2.3.0 (trainer mode, no AI):** built on branch `v2.3.0` (app) and `v2.3.0` (site repo) from the hand-off `e034bdb` (docs of Sun Nov 15, 2026). Acceptance report: `reports/v2.3.0-acceptance.md`. Ryan approved the deploy on November 16, 2026, and confirmed Legal approved the G3/G4 wording. **Deployed November 16, 2026:** Ryan ran migrations 009 and 010 on the live project (column check returned 4); `v2.3.0` was merged into `main` in both repos (app and website); tag `v2.3.0` pushed by Ryan from his Mac (both repos). Ryan confirmed the live checks (legal pages, anchors, footer link, app version and type picker). Migrations `009_trainer_a.sql`, `010_trainer_b.sql`. Summary in `CHANGELOG.md`; details and every judgment call in §8 ("2.3.0").
 
 **Current version:** 2.2.1 (`app.json`, `package.json`). Branch `v2.2.1` from the hand-off commit `e2bde34` (docs of Sat Nov 14, 2026). Acceptance report: `reports/v2.2.1-acceptance.md`. **Deployed November 15, 2026** (owner approved; tag `v2.2.1`).
 

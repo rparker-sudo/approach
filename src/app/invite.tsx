@@ -4,16 +4,44 @@ import QRCode from '../components/QRCode';
 import { Body, Button, Card, colors, display, H2, Note, Text } from '../components/ui';
 import { isDemoMode } from '../lib/backend';
 import { joinUrl } from '../lib/links';
-import { shareTeamInvite } from '../lib/share';
+import { shareClientInvite, shareTeamInvite } from '../lib/share';
+import { GATE, gateState, isGeneral } from '../lib/general';
+import { useStore } from '../lib/store';
 import { useTeams } from '../lib/team';
 
 /** Big QR code a coach can project in the gym, screenshot, or share. */
 export default function InviteScreen() {
   const { teamId } = useLocalSearchParams<{ teamId: string }>();
-  const { teams, account } = useTeams();
+  const { teams, account, trainerStatus } = useTeams();
+  const { data } = useStore();
   const { width } = useWindowDimensions();
   const team = teams.find((t) => t.id === teamId);
   if (!team) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+  if (isGeneral(team)) {
+    // 2.3.0 F32a: the code and QR stay dimmed with Share disabled until the team is open.
+    const gate = gateState(trainerStatus[team.id], (data.openSeen ?? []).includes(team.id));
+    const open = gate === 'open' || gate === 'terms';
+    const link = joinUrl(team.joinCode);
+    const size = Math.min(width - 64, 360);
+    return (
+      <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: 16, paddingBottom: 48, gap: 16, alignItems: 'center' }} contentInsetAdjustmentBehavior="automatic">
+        <Stack.Screen options={{ title: `Join ${team.name}` }} />
+        <View style={{ alignSelf: 'stretch', gap: 16, alignItems: 'center', opacity: open ? 1 : 0.35 }}>
+          <Text style={[display(20), { textAlign: 'center' }]}>{team.name}</Text>
+          {link ? <QRCode value={link} size={size} /> : null}
+          <Text style={[display(24), { textAlign: 'center' }]} selectable={open}>
+            {team.joinCode}
+          </Text>
+        </View>
+        <Body muted style={{ textAlign: 'center' }}>
+          {open ? "Clients scan with the iPhone Camera, make an account, and they're in." : GATE.codeDimmed}
+        </Body>
+        <View style={{ alignSelf: 'stretch' }}>
+          <Button kind="secondary" title="Share link" icon="square.and.arrow.up" disabled={!open} onPress={() => shareClientInvite(team.name, team.joinCode, account?.name)} />
+        </View>
+      </ScrollView>
+    );
+  }
   const link = joinUrl(team.joinCode);
   const size = Math.min(width - 64, 360);
 

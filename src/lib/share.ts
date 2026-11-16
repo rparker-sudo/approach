@@ -11,6 +11,18 @@ export async function shareProgramCode(p: Program, coachName?: string) {
   await shareText(intro + encodeProgram(p), `Approach Strength: ${p.name}`);
 }
 
+/** 2.3.0: invite clients to a general team (Trainer wording, design §S2). */
+export async function shareClientInvite(teamName: string, joinCode: string, trainerName?: string) {
+  const link = joinUrl(joinCode);
+  const msg =
+    `Join ${teamName} on Approach Strength${trainerName ? ` (Trainer ${trainerName})` : ''}.\n\n` +
+    (link
+      ? `Open this link on your phone: ${link}\nMake an account and you're in.\n\nCode: ${joinCode}`
+      : `1. Open Approach Strength and make an account.\n2. Enter code: ${joinCode}`) +
+    '\n\nThe programs your trainer posts will show up in the app.';
+  await shareText(msg, `Join ${teamName}`);
+}
+
 /** Invite athletes to a team by its join code. */
 export async function shareTeamInvite(teamName: string, joinCode: string, coachName?: string) {
   const link = joinUrl(joinCode);

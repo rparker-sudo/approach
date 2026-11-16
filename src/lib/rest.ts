@@ -31,6 +31,8 @@ export function tierOf(ex: Exercise, equipment?: Equipment[]): Tier {
   if (ex.id === 'hip-thrust') return !equipment || equipment.includes('barbell') ? 'A' : 'B';
   const t = TIERS[ex.id];
   if (t) return t;
+  // 2.3.0 general library: tiers come from general-library.md §4a (only those exercises carry `scope`).
+  if (ex.scope) return ex.tier;
   if (ex.category === 'power') return 'P';
   if (ex.category === 'prehab') return 'D';
   if (ex.category === 'core') return 'C';

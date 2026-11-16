@@ -7,6 +7,8 @@ import { useStore } from '../lib/store';
 import { teamProgramId, useTeams } from '../lib/team';
 import { formatDate } from '../lib/util';
 import ScreenHeader from './ScreenHeader';
+import CreateTeamFlow from './general/CreateTeamFlow';
+import { gateState, isGeneral } from '../lib/general';
 import { Body, Button, Card, colors, Field, H2, Icon, NetTape, Note, Pill, Row, Text } from './ui';
 
 /** Monday 00:00 of this week. */
@@ -20,7 +22,8 @@ export function weekStart(d = new Date()) {
 /** Coach home: the teams this coach manages. */
 export default function TeamHome() {
   const { data } = useStore();
-  const { account, teams, members, logs, postedFor, hasUnposted, syncing, lastError, refresh, createTeam } = useTeams();
+  const { account, teams, members, logs, postedFor, hasUnposted, syncing, lastError, refresh, createTeam, trainerStatus } = useTeams();
+  const [creating, setCreating] = useState(false);
   const insets = useSafeAreaInsets();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
@@ -57,7 +60,7 @@ export default function TeamHome() {
         <Card>
           <NetTape />
           <H2>Sign in to manage teams</H2>
-          <Body muted>Teams need a coach account so athletes can join and get your workouts on their phones.</Body>
+          <Body muted>Create a team for your athletes or clients. They join with your code.</Body>
           <Button title="Sign in or create account" onPress={() => router.push('/account')} />
         </Card>
       ) : (
@@ -73,7 +76,7 @@ export default function TeamHome() {
             </Note>
           ) : null}
 
-          {teams.length === 0 && !adding ? (
+          {teams.length === 0 && !adding && !creating ? (
             <Card>
               <NetTape />
               <H2>No teams yet</H2>
@@ -83,6 +86,30 @@ export default function TeamHome() {
 
           {teams.map((t) => {
             const roster = members[t.id] ?? [];
+            if (isGeneral(t)) {
+              // 2.3.0: a general team's card (Trainer/Client wording; gate state instead of the volleyball workout status).
+              const gate = gateState(trainerStatus[t.id], (data.openSeen ?? []).includes(t.id));
+              const programs = data.programs.filter((p) => p.teamId === t.id && !p.groupKey?.startsWith('draft:')).length;
+              return (
+                <Pressable key={t.id} accessibilityRole="button" onPress={() => router.push(`/team/${t.id}`)}>
+                  <Card>
+                    <Row style={{ justifyContent: 'space-between' }}>
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <H2>{t.name}</H2>
+                        <Text style={{ fontSize: 13, color: colors.muted }}>
+                          {roster.length} {roster.length === 1 ? 'client' : 'clients'} · Code {t.joinCode}
+                        </Text>
+                      </View>
+                      <Icon name="chevron.right" size={14} color={colors.faint} />
+                    </Row>
+                    <Row style={{ gap: 6, flexWrap: 'wrap' }}>
+                      {gate === 'not_open' ? <Pill text="Not open yet" /> : gate === 'paused' ? <Pill text="Paused" bg={colors.day.game} /> : gate === 'terms' ? <Pill text="Trainer Terms changed" bg={colors.day.game} /> : null}
+                      <Pill text={`${programs} ${programs === 1 ? 'program' : 'programs'} posted`} />
+                    </Row>
+                  </Card>
+                </Pressable>
+              );
+            }
             const weekLogs = (logs[t.id] ?? []).filter((l) => l.date >= since);
             const trained = new Set(weekLogs.map((l) => l.userId)).size;
             const local = data.programs.find((p) => p.id === teamProgramId(t.id));
@@ -130,8 +157,16 @@ export default function TeamHome() {
                 </View>
               </Row>
             </Card>
+          ) : creating ? (
+            <CreateTeamFlow
+              onCancel={() => setCreating(false)}
+              volleyball={() => {
+                setCreating(false);
+                setAdding(true);
+              }}
+            />
           ) : (
-            <Button title="New team" icon="plus" onPress={() => setAdding(true)} />
+            <Button title="New team" icon="plus" onPress={() => setCreating(true)} />
           )}
         </>
       )}

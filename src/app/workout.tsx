@@ -26,8 +26,10 @@ import { useTeams } from '../lib/team';
 import type { LoggedSet, WorkoutLog } from '../lib/types';
 import { estimateStrength, uid } from '../lib/util';
 import { goBack } from '../lib/nav';
+import { INTENSITY_LABEL, LEGAL, TALK_TEST, weekIndex } from '../lib/general';
 
-type Entry = { exerciseId: string; sets: LoggedSet[] };
+/** minutesDone: 2.3.0 cardio blocks (minutes only). */
+type Entry = { exerciseId: string; sets: LoggedSet[]; minutesDone?: number };
 type Draft = { entries: Entry[]; index: number; note: string; startedAt: number };
 type Summary = { sets: number; total: number; minutes: number; prs: string[]; team: boolean };
 
@@ -71,6 +73,9 @@ export default function Workout() {
   const blocks = useMemo(() => blocksOf(plan), [plan]);
   const isHome = session?.location === 'home';
   const noSuggestions = isRecovery || !!day?.lightHome; // light home day: no weight suggestions (H2)
+  const general = !!program?.general;
+  // adult-goals.md §2: Back after a break, first suggestion about 20% below the last logged weight (week 1 of the ramp).
+  const breakStart = general && program?.goal === 'back_after_break' && weekIndex(program, today()) === 0;
   // Stations (F29b): the shared rotation timer and this athlete's rack.
   const [run, setRun] = useState<StationRun | null>(null);
   const [rackIndex, setRackIndex] = useState<number | null>(null);
@@ -102,6 +107,12 @@ export default function Workout() {
     () =>
       plan.map((pe) => {
         if (noSuggestions) return null; // extra recovery and the light home day never create weight suggestions
+        if (program?.general) {
+          // 2.3.0: no testing (no estimates); no suggestion for the assisted pull-up (assist weight goes down) or cardio.
+          if (pe.cardio || pe.exerciseId === 'assisted-pullup') return null;
+          const s = suggestWeight(data.logs, pe, program.equipment, undefined, day?.easing.active);
+          return breakStart && s ? backAfterBreak(s) : s;
+        }
         const est = data.strengthEstimates?.[pe.exerciseId];
         return suggestWeight(data.logs, pe, program?.equipment, est && program ? { e1rm: est.e1rm, phase: program.phase } : undefined, day?.easing.active);
       }),
@@ -112,7 +123,8 @@ export default function Workout() {
   const fresh = (): Draft => ({
     entries: plan.map((pe, i) => ({
       exerciseId: pe.exerciseId,
-      sets: Array.from({ length: pe.sets }, (): LoggedSet => ({
+      ...(pe.cardio ? { minutesDone: pe.cardio.minutes } : {}),
+      sets: Array.from({ length: pe.cardio ? 1 : pe.sets }, (): LoggedSet => ({
         weight: suggestions[i] ? String(suggestions[i]!.weight) : '',
         reps: String(repRange(pe.reps)?.[0] ?? ''),
         done: false,
@@ -266,6 +278,9 @@ export default function Workout() {
     );
   }
 
+  function setMinutes(ei: number, minutes: number) {
+    setDraft((d) => (d ? { ...d, entries: d.entries.map((e, i) => (i === ei ? { ...e, minutesDone: minutes } : e)) } : d));
+  }
   function toggleDone(ei: number, si: number) {
     const entry = entries[ei];
     const s = entry.sets[si];
@@ -333,6 +348,10 @@ export default function Workout() {
     };
     // Stations: each exercise records the station it was done at (unfinished sets stay "not done").
     log.entries = entries.map((e, i) => (plan[i]?.stationId ? { ...e, stationId: plan[i].stationId } : e));
+    // 2.3.0 cardio (adult rules A4): the log keeps minutes only, and only for a block marked done.
+    log.entries = log.entries.map((e, i) =>
+      plan[i]?.cardio ? { exerciseId: e.exerciseId, sets: [], ...(e.sets[0]?.done && e.minutesDone ? { minutesDone: Math.min(60, Math.max(1, Math.round(e.minutesDone))) } : {}) } : e,
+    );
     if (isHome && !data.homeHintSeen) mutate((d) => ({ ...d, homeHintSeen: true }));
     // New best estimated strength vs. earlier logs.
     const prs: string[] = [];
@@ -410,7 +429,11 @@ export default function Workout() {
             ))}
           </View>
         ) : null}
-        <Note>{`${summary.team ? 'Your coach can see this workout. ' : ''}Refuel within an hour: protein and carbs.`}</Note>
+        {general ? (
+          <Note>{summary.team ? 'Sent to your trainer.' : 'Saved.'}</Note>
+        ) : (
+          <Note>{`${summary.team ? 'Your coach can see this workout. ' : ''}Refuel within an hour: protein and carbs.`}</Note>
+        )}
         <Button title="Done" onPress={() => goBack()} />
       </ScrollView>
     );
@@ -457,7 +480,7 @@ export default function Workout() {
       </View>
       <Row style={{ gap: 6, flexWrap: 'wrap' }}>
         {isRecovery ? null : <Pill text={day.block.label} />}
-        {day.light ? <Pill text="Lightened by coach" bg={colors.day.game} /> : null}
+        {day.light ? <Pill text={general ? 'Lightened by your trainer' : 'Lightened by coach'} bg={colors.day.game} /> : null}
         {day.easing.active ? <Pill text="Easing back in this week" /> : null}
       </Row>
       <DroppedLine count={day.dropped} />
@@ -514,7 +537,7 @@ export default function Workout() {
 
         {mode === 'focus' ? (
           <>
-            <ExerciseCard {...cardProps(idx)} pe={plan[idx]} teamId={program.teamId} entry={entries[idx]} suggestion={suggestions[idx]} ei={idx} big setSet={setSet} toggleDone={toggleDone} />
+            <ExerciseCard {...cardProps(idx)} general={general} setMinutes={setMinutes} pe={plan[idx]} teamId={program.teamId} entry={entries[idx]} suggestion={suggestions[idx]} ei={idx} big setSet={setSet} toggleDone={toggleDone} />
             <Row>
               <View style={{ flex: 1 }}>
                 <Button large kind="ghost" title="Previous" disabled={idx === 0} onPress={() => update({ index: idx - 1 })} />
@@ -531,7 +554,7 @@ export default function Workout() {
           </>
         ) : (
           plan.map((pe, i) => (
-            <ExerciseCard key={i} {...cardProps(i)} pe={pe} teamId={program.teamId} entry={entries[i]} suggestion={suggestions[i]} ei={i} setSet={setSet} toggleDone={toggleDone} />
+            <ExerciseCard key={i} {...cardProps(i)} general={general} setMinutes={setMinutes} pe={pe} teamId={program.teamId} entry={entries[i]} suggestion={suggestions[i]} ei={i} setSet={setSet} toggleDone={toggleDone} />
           ))
         )}
 
@@ -541,10 +564,12 @@ export default function Workout() {
             <TextInput
               style={{ minHeight: 70, textAlignVertical: 'top' }}
               multiline
-              placeholder="Optional note: sore knee, felt strong, etc."
+              placeholder={general ? 'Note for your trainer (optional)' : 'Optional note: sore knee, felt strong, etc.'}
               value={draft.note}
               onChangeText={(t) => update({ note: t })}
             />
+            {/* Compliance T5: always visible in general teams. */}
+            {general ? <Text style={{ fontSize: 13, color: colors.muted }}>{LEGAL.notesHelper}</Text> : null}
             <Button large title="Finish workout" icon="checkmark" onPress={finish} />
           </>
         ) : null}
@@ -599,6 +624,8 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 function ExerciseCard({
+  general,
+  setMinutes,
   label,
   blockLine,
   harder,
@@ -624,9 +651,12 @@ function ExerciseCard({
   big?: boolean;
   setSet: (ei: number, si: number, patch: Partial<LoggedSet>) => void;
   toggleDone: (ei: number, si: number) => void;
+  general?: boolean;
+  setMinutes?: (ei: number, minutes: number) => void;
 }) {
   const info = getExercise(pe.exerciseId);
   const timed = !repRange(pe.reps);
+  if (pe.cardio) return <CardioCard pe={pe} entry={entry} ei={ei} setMinutes={setMinutes!} toggleDone={toggleDone} />;
   return (
     <Card style={label ? { borderLeftWidth: 4, borderLeftColor: colors.ink } : undefined}>
       {blockLine ? <Text style={{ fontSize: 13, fontWeight: '700' }}>{blockLine}</Text> : null}
@@ -655,7 +685,7 @@ function ExerciseCard({
           <Text style={{ fontSize: 13, color: colors.muted }}>Pick a weight you could lift 2–3 more times.</Text>
         )
       ) : null}
-      {pe.notes ? <Text style={{ fontSize: 13 }}>Coach: {pe.notes}</Text> : null}
+      {pe.notes ? <Text style={{ fontSize: 13 }}>{general ? 'Trainer' : 'Coach'}: {pe.notes}</Text> : null}
       {harder && onHarder ? (
         <View style={{ borderWidth: 1, borderColor: colors.line, borderRadius: 12, padding: 10, gap: 6 }}>
           <Text style={{ fontSize: 14, fontWeight: '600' }}>{`Ready for a harder version? ${harder.name}`}</Text>
@@ -727,4 +757,49 @@ function groupLine(plan: ResolvedExercise[], i: number, entries: Entry[]): strin
   const rounds = Math.min(...idx.map((k) => entries[k]?.sets.length ?? 0));
   const round = Math.min(rounds, Math.min(...idx.map((k) => entries[k]?.sets.filter((x) => x.done).length ?? 0)) + 1);
   return `${names} · Round ${round} of ${rounds}`;
+}
+
+/** 2.3.0 F41: "Bike · 10 min · Easy", the talk-test line, minutes done (prefilled, 56 pt), Done, and an optional count-up timer. */
+function CardioCard({ pe, entry, ei, setMinutes, toggleDone }: { pe: ResolvedExercise; entry: Entry; ei: number; setMinutes: (ei: number, m: number) => void; toggleDone: (ei: number, si: number) => void }) {
+  const info = getExercise(pe.exerciseId);
+  const [started, setStarted] = useState<number | null>(null);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (started == null) return;
+    const t = setInterval(() => setTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [started]);
+  const elapsed = started != null ? Math.max(0, Math.floor(((tick || Date.now()) - started) / 1000)) : 0;
+  const done = !!entry.sets[0]?.done;
+  return (
+    <Card>
+      <Text style={[display(12), { color: colors.muted }]}>Cardio</Text>
+      <Text style={{ fontSize: 20, fontWeight: '600' }}>{`${info.name} · ${pe.cardio!.minutes} min · ${INTENSITY_LABEL[pe.cardio!.intensity]}`}</Text>
+      <Text style={{ fontSize: 14, color: colors.muted }}>{TALK_TEST[pe.cardio!.intensity]}</Text>
+      {pe.notes ? <Text style={{ fontSize: 13 }}>Trainer: {pe.notes}</Text> : null}
+      <Label>Minutes done</Label>
+      <TextInput
+        style={{ minHeight: 56, fontSize: 20 }}
+        keyboardType="number-pad"
+        accessibilityLabel="Minutes done"
+        value={entry.minutesDone != null ? String(entry.minutesDone) : ''}
+        onChangeText={(t) => setMinutes(ei, Math.min(60, Math.max(0, Math.round(Number(t.replace(/[^0-9]/g, '')) || 0))))}
+      />
+      <Row style={{ gap: 8 }}>
+        <View style={{ flex: 1 }}>
+          <Button large kind="secondary" title={started == null ? 'Start timer' : `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`} onPress={() => setStarted(started == null ? Date.now() : null)} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button large title={done ? 'Done ✓' : 'Done'} onPress={() => toggleDone(ei, 0)} />
+        </View>
+      </Row>
+    </Card>
+  );
+}
+
+/** Back after a break: the first suggestion starts about 20% below the last logged weight (rounded down to 2.5 lb). */
+function backAfterBreak(s: Suggestion): Suggestion {
+  const top = s.weight - s.delta;
+  const w = Math.max(2.5, Math.floor((top * 0.8) / 2.5) * 2.5);
+  return w >= s.weight ? s : { ...s, weight: w, delta: w - top, reason: 'easing' };
 }

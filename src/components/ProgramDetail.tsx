@@ -11,8 +11,15 @@ import { formatDate } from '../lib/util';
 import { Body, Button, Card, colors, Label, Pill, Row, Text } from './ui';
 import CapNotice from './CapNotice';
 import { ProgramWeek } from './week';
+import GeneralProgram from './general/GeneralProgram';
 
+/** 2.3.0: general-team programs use the trainer's week view (F39) or the client's read-only week. */
 export default function ProgramDetail({ program, afterDelete }: { program: Program; afterDelete?: () => void }) {
+  if (program.general) return <GeneralProgram program={program} />;
+  return <VolleyballProgramDetail program={program} afterDelete={afterDelete} />;
+}
+
+function VolleyballProgramDetail({ program, afterDelete }: { program: Program; afterDelete?: () => void }) {
   const { data, setActiveProgram, deleteProgram } = useStore();
   const coach = data.profile?.role === 'coach';
   const isActive = data.activeProgramId === program.id;

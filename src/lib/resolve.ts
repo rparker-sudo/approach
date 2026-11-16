@@ -1,5 +1,7 @@
 import { addDays, dateKey, fromKey, today as todayDate } from './calendar';
-import { ALL_EQUIPMENT, EXERCISES, fits, getExercise } from './exercises';
+import { ALL_EQUIPMENT, EXERCISES, exercisePool, fits, getExercise } from './exercises';
+import { GENERAL_EASIER } from './generalLibrary';
+import { BACK_AFTER_BREAK_RAMP, clampCardio, programWeeks, RPE_CEILING, shiftBeginner, weekIndex, withWeekRpe } from './general';
 import { BEGINNER_EFFORT, homeAllowed, pickExercise, restSecFor } from './generator';
 import { blockRests, blocksOf } from './groups';
 import { BlockInfo, sessionForDate } from './progression';
@@ -94,20 +96,28 @@ export const isStrength = (pe: Pick<ProgramExercise, 'role'>, ex: Exercise) =>
  * to the first exercise at or below their level that fits the program's equipment; else the lowest-level exercise
  * of the same pattern that fits; else null (drop the slot). Olympic lifts resolve to a jump below advanced.
  */
-export function resolveExercise(ex: Exercise, level: Level, equipment: Equipment[]): Exercise | null {
-  if (ex.level <= level && !(ex.pattern === 'olympic' && level < 3)) return ex;
+export function resolveExercise(ex: Exercise, level: Level, equipment: Equipment[], pool: Exercise[] = EXERCISES): Exercise | null {
+  const general = pool !== EXERCISES;
+  // 2.3.0 general teams: the exercise must also fit the gym equipment profile (F40); volleyball keeps 2.2.1 behavior.
+  if (ex.level <= level && !(ex.pattern === 'olympic' && level < 3) && (!general || fits(ex, equipment))) return ex;
   if (ex.pattern === 'olympic') {
-    const jumps = EXERCISES.filter((e) => e.pattern === 'jump' && e.level <= level && fits(e, equipment));
+    const jumps = pool.filter((e) => e.pattern === 'jump' && e.level <= level && fits(e, equipment));
     return jumps.find((e) => e.id === 'box-jump') ?? jumps.find((e) => e.id === 'squat-jump') ?? jumps[0] ?? null;
   }
   const seen = new Set<string>();
   let cur: Exercise | undefined = ex;
-  while (cur?.easier && !seen.has(cur.easier)) {
-    seen.add(cur.easier);
-    cur = EXERCISES.find((e) => e.id === cur!.easier);
+  const easierOf = (e: Exercise): string | undefined => {
+    const alt = general ? GENERAL_EASIER[e.id] : undefined;
+    const altEx = alt ? pool.find((x) => x.id === alt) : undefined;
+    return altEx && fits(altEx, equipment) ? alt : e.easier;
+  };
+  while (cur && easierOf(cur) && !seen.has(easierOf(cur)!)) {
+    const next: string = easierOf(cur)!;
+    seen.add(next);
+    cur = pool.find((e) => e.id === next);
     if (cur && cur.level <= level && fits(cur, equipment)) return cur;
   }
-  const same = EXERCISES.filter((e) => e.pattern === ex.pattern && e.level <= level && fits(e, equipment)).sort(
+  const same = pool.filter((e) => e.pattern === ex.pattern && e.level <= level && fits(e, equipment)).sort(
     (a, b) => a.level - b.level || a.id.localeCompare(b.id),
   );
   return same[0] ?? null;
@@ -148,6 +158,7 @@ export function capEffort(effort: string, ceiling: number): string {
 
 /* ---------- resolveSession ---------- */
 export function resolveSession(program: Program, session: Session, athlete: AthleteContext, date: Date = todayDate()): ResolvedSession {
+  if (program.general) return resolveGeneral(program, session, athlete, date);
   const day = sessionForDate(program, session, date);
   const home = session.location === 'home';
   const lightHome = !!session.light;
@@ -281,4 +292,113 @@ export function effortProblem(pe: Pick<ProgramExercise, 'role' | 'effort' | 'exe
     block: hasMinor,
     message: `For athletes under 18, strength work stays at RPE ${ceiling} or below. Stop with about 2 reps left.`,
   };
+}
+
+/* ---------- 2.3.0 general teams (adult-training-rules.md, adult-goals.md) ---------- */
+/**
+ * The general-team version of resolveSession (same G-1 entry point; never called for volleyball programs):
+ *  1. the week: deload (about −40% sets, RPE 6, same rest) or a trainer-lightened date; "Back after a break" ramp weeks 1–4
+ *     (week 1 level 1 only, week 2 max level 2, no power in weeks 1–2, the ramp's sets/reps/effort);
+ *  2. level resolution with the general library and the gym equipment profile (G8, F40);
+ *  3. effort: the week's RPE on main/secondary, beginners one RPE lower (a default), then the RPE 8 cap (6 when easing back, G9);
+ *  4. cardio stays duration-only (5–60 min, Easy/Moderate; Back after a break: Easy, ≤ 15);
+ *  5. rest floors and the estimate as built.
+ */
+function resolveGeneral(program: Program, session: Session, athlete: AthleteContext, date: Date): ResolvedSession {
+  const pool = exercisePool(true);
+  const home = session.location === 'home';
+  const equipment = home ? athlete.homeEquipment ?? [] : program.equipment?.length ? program.equipment : ALL_EQUIPMENT;
+  const easing = easingFor(athlete.logs, date);
+  const w = weekIndex(program, date) ?? 0;
+  const plan = program.weeks?.[w];
+  const ramp = program.goal === 'back_after_break' && w < 4 ? BACK_AFTER_BREAK_RAMP[(w + 1) as 1 | 2 | 3 | 4] : null;
+  const light = !!program.lightDates?.includes(dateKey(date));
+  const deload = !ramp && !!plan?.deload;
+  const level = (ramp?.maxLevel ? Math.min(athlete.level, ramp.maxLevel) : athlete.level) as Level;
+  const ceiling = easing.active ? 6 : RPE_CEILING;
+  const swaps: { from: string; to: string }[] = [];
+  let dropped = 0;
+  const out: ResolvedExercise[] = [];
+  const usedHome = new Set<string>();
+  for (const pe of session.exercises) {
+    const original = getExercise(pe.exerciseId);
+    const role = pe.role ?? (original.category === 'power' ? 'power' : undefined);
+    // No power (jumps or throws) in ramp weeks 1–2; light days drop power as built.
+    if ((ramp && !ramp.power && (role === 'power' || original.tier === 'P')) || (light && role === 'power')) continue;
+    if (pe.cardio || original.durationOnly) {
+      const resolved = resolveExercise(original, level, equipment, pool) ?? (fits(getExercise('walk-jog'), equipment) ? getExercise('walk-jog') : null);
+      if (!resolved) {
+        dropped++;
+        continue;
+      }
+      if (resolved.id !== original.id) swaps.push({ from: original.name, to: resolved.name });
+      const rx = clampCardio(pe.cardio ?? { minutes: 10, intensity: 'easy' }, program.goal);
+      out.push({ ...pe, exerciseId: resolved.id, sets: 1, reps: `${rx.minutes} min`, effort: rx.intensity === 'easy' ? 'Easy' : 'Moderate', cardio: rx, ...(resolved.id !== original.id ? { teamExerciseId: original.id } : {}), restSecResolved: 0 });
+      continue;
+    }
+    let resolved = home ? resolveHomeExercise(original, pe.role, level, equipment, false, usedHome) : resolveExercise(original, level, equipment, pool);
+    const harderId = resolved ? athlete.harderPicks?.[resolved.id] : null;
+    if (resolved && harderId) {
+      const harder = pool.find((e) => e.id === harderId);
+      if (harder && harder.level <= level && fits(harder, equipment)) resolved = harder;
+    }
+    if (!resolved) {
+      dropped++;
+      continue;
+    }
+    usedHome.add(resolved.id);
+    if (resolved.id !== original.id) swaps.push({ from: original.name, to: resolved.name });
+    let { sets, reps, effort } = pe;
+    const strength = isStrength(pe, resolved);
+    const mainish = pe.role === 'main' || pe.role === 'secondary';
+    if (ramp && strength) {
+      sets = pe.role === 'main' ? ramp.mainSets : Math.min(sets, ramp.otherSets);
+      reps = ramp.reps;
+      effort = ramp.effort;
+    } else if (plan?.rpe != null && mainish && !deload) {
+      effort = withWeekRpe(effort, plan.rpe);
+    }
+    if (strength && athlete.level === 1 && !ramp) effort = shiftBeginner(effort);
+    if (deload || light) {
+      if (strength || role === 'power') {
+        sets = Math.max(1, Math.round(sets * 0.6));
+        effort = role === 'power' ? 'Easy, fast' : light ? 'Easy' : 'RPE 6';
+      }
+    }
+    if (strength) effort = capEffort(effort, ceiling);
+    out.push({ ...pe, exerciseId: resolved.id, sets, reps, effort, ...(resolved.id !== original.id ? { teamExerciseId: original.id } : {}), restSecResolved: 0 });
+  }
+  if (athlete.level === 1) {
+    for (const [g, idx] of blocksOf(out)) {
+      if (idx.length < 4) continue;
+      for (const i of idx.slice(3)) out[i] = { ...out[i], group: undefined, afterCircuit: true };
+      const extra = idx.slice(3).map((i) => out[i]);
+      const rest = out.filter((_, i) => !idx.slice(3).includes(i));
+      const last = rest.map((pe, k) => (pe.group === g ? k : -1)).filter((k) => k >= 0).pop()!;
+      rest.splice(last + 1, 0, ...extra);
+      out.splice(0, out.length, ...rest);
+    }
+  }
+  const ctx = { phase: program.phase, equipment: home ? equipment : program.equipment, home, light: false };
+  // Cardio has no rest table: a 60 s transition after the block (general-library.md §4a).
+  const rests = blockRests(out, out.map((pe) => (pe.cardio ? 60 : restSecFor(pe, ctx))), ctx);
+  out.forEach((pe, i) => (pe.restSecResolved = rests[i]));
+  if (session.format === 'stations') {
+    for (const st of session.stations ?? []) for (const pe of out) if (pe.group && st.groups.includes(pe.group)) pe.stationId = st.id;
+  }
+  const estMinutes =
+    estimateMinutes(
+      out.filter((e) => !e.cardio).map((e) => ({ ex: getExercise(e.exerciseId), sets: e.filler ? 0 : e.sets, reps: e.reps, restSec: e.restSecResolved })),
+      home ? 'home' : 'school',
+    ) +
+    out.reduce((n, e) => n + (e.cardio?.minutes ?? 0), 0) +
+    (session.warmup === null ? 0 : 7);
+  const weeks = programWeeks(program);
+  const block: BlockInfo = {
+    week: w + 1,
+    weeks,
+    deload,
+    label: ramp ? `Ramp week ${w + 1} of 4` : deload ? `Deload week (${w + 1} of ${weeks})` : `Week ${w + 1} of ${weeks}`,
+  };
+  return { session, exercises: out, dropped, swaps, block, light, easing, estMinutes, home, lightHome: false };
 }

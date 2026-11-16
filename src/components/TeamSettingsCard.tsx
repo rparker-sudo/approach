@@ -96,7 +96,7 @@ function Toggle({ label, value, onChange }: { label: string; value: boolean; onC
 }
 
 /** F9c Board color: 8 presets, a hex field, a live preview on the board background, and the contrast note. */
-function BoardColor({ team }: { team: Team }) {
+export function BoardColor({ team }: { team: Team }) {
   const { updateTeamSettings } = useTeams();
   const [chosen, setChosen] = useState(team.settings.accentColor ?? DEFAULT_ACCENT);
   const [hex, setHex] = useState('');

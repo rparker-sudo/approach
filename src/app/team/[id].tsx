@@ -10,6 +10,8 @@ import { CoachTermsReason, useCoachTermsOk } from '../../components/CoachTerms';
 import TestingBanner from '../../components/TestingBanner';
 import StationControls from '../../components/StationControls';
 import TestsSection from '../../components/TestsSection';
+import ClientsScreen from '../../components/general/ClientsScreen';
+import { isGeneral } from '../../lib/general';
 import { LevelChip, LevelSwaps, levelSetLine, SetLevelSheet } from '../../components/LevelRoster';
 import { defaultTeamGoal, liftDaysOf, weeksRemaining } from '../../lib/effort';
 import { weekStart } from '../../components/TeamHome';
@@ -25,7 +27,15 @@ import { PHASES } from '../../lib/types';
 import { liftDayCount } from '../../lib/generator';
 import { formatDate } from '../../lib/util';
 
-export default function TeamScreen() {
+/** 2.3.0: general teams get the trainer's Clients screen; volleyball teams keep the 2.2.1 team screen below. */
+export default function TeamRoute() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const team = useTeams().teams.find((x) => x.id === id);
+  if (team && isGeneral(team)) return <ClientsScreen team={team} />;
+  return <TeamScreen />;
+}
+
+function TeamScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data } = useStore();
   const t = useTeams();

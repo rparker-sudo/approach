@@ -48,7 +48,8 @@ export const DAY_TYPES: { id: DayType; label: string; short: string }[] = [
 /** Monday first. */
 export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-export type ExerciseCategory = 'lower' | 'upper' | 'core' | 'power' | 'prehab';
+/** 2.3.0: 'cardio' (general teams only; duration-only). */
+export type ExerciseCategory = 'lower' | 'upper' | 'core' | 'power' | 'prehab' | 'cardio';
 
 export type Equipment =
   | 'barbell'
@@ -60,7 +61,21 @@ export type Equipment =
   | 'pullup-bar'
   | 'box'
   | 'med-ball'
-  | 'bands';
+  | 'bands'
+  /* 2.3.0 general teams' gym equipment profile only (general-library.md §2). */
+  | 'leg-press'
+  | 'leg-curl-machine'
+  | 'leg-extension-machine'
+  | 'chest-press-machine'
+  | 'shoulder-press-machine'
+  | 'assisted-pullup-machine'
+  | 'sled'
+  | 'bike'
+  | 'rower'
+  | 'treadmill'
+  | 'elliptical'
+  | 'stair-climber'
+  | 'jump-rope';
 
 /** Movement families. The generator fills session slots by pattern. */
 export type Pattern =
@@ -81,7 +96,14 @@ export type Pattern =
   | 'knee-care'
   | 'ankle-care'
   | 'hand-care'
-  | 'mobility';
+  | 'mobility'
+  /* 2.3.0 (general-library.md §3) */
+  | 'knee-ext'
+  | 'knee-flex'
+  | 'shoulder-iso'
+  | 'arm-flex'
+  | 'arm-ext'
+  | 'cardio';
 
 export type HowTo = {
   /** Why it matters for volleyball, one sentence. */
@@ -109,6 +131,12 @@ export type Exercise = {
   howTo: HowTo;
   /** Demand tier (rest-and-supersets §2, §7): P power, A heavy compound, B compound, C accessory, D care/mobility. */
   tier: 'P' | 'A' | 'B' | 'C' | 'D';
+  /** 2.3.0 (taxonomy C1): 'general' = general teams only; 'volleyball' = volleyball teams only. Missing = 'all'. */
+  scope?: 'all' | 'general' | 'volleyball';
+  /** 2.3.0: sport-neutral "why" shown in general teams (general-library.md §5). */
+  whyGeneral?: string;
+  /** 2.3.0: cardio, logged by minutes only (adult rules §6). */
+  durationOnly?: boolean;
 };
 
 /** What an exercise does in a session. Sets the prescription and default rest. */
@@ -133,6 +161,27 @@ export type ProgramExercise = {
   filler?: boolean;
   /** Built by auto-pairing ("Auto" tag); any manual change clears it. */
   autoGroup?: boolean;
+  /** 2.3.0 general teams: a cardio block, duration only (adult rules §6). sets/reps are unused. */
+  cardio?: CardioRx;
+};
+
+/** Cardio prescription: 5–60 min, Easy or Moderate. Nothing else exists (no HR, pace, distance, calories). */
+export type CardioRx = { minutes: number; intensity: 'easy' | 'moderate' };
+
+/** 2.3.0 program goals (adult-goals.md §1). */
+export type Goal = 'strength' | 'muscle' | 'general' | 'back_after_break';
+
+/** 2.3.0 general warm-ups (general-library.md §6). */
+export type WarmupId = 'W1' | 'W2' | 'W3';
+
+/** 2.3.0: one week of a multi-week program (B2). */
+export type ProgramWeekPlan = {
+  /** Effort on main/secondary for the week (≤ 8). Missing = the goal's wave default. */
+  rpe?: number;
+  /** Deload: about −40% sets, RPE 6, same rest. */
+  deload?: boolean;
+  /** Session id per weekday for this week. Missing = the program's liftSchedule. */
+  schedule?: (string | null)[];
 };
 
 /** v2.2 pass 3 station rotation (circuits-and-stations.md Part 2). */
@@ -153,6 +202,8 @@ export type Session = {
   format?: 'standard' | 'stations';
   stations?: Station[];
   stationTransitionSec?: number;
+  /** 2.3.0 general teams: general warm-up (default on, W1–W3). null = off. Missing = W1. */
+  warmup?: WarmupId | null;
 };
 
 export type Program = {
@@ -198,6 +249,18 @@ export type Program = {
   blockWeeks?: number;
   /** Dates the coach lightened (readiness). */
   lightDates?: string[];
+  /** 2.3.0: built for a general (trainer) team. Turns on the adult rules in resolveSession and the builder. */
+  general?: boolean;
+  /** 2.3.0 general: the program's goal (adult-goals.md). */
+  goal?: Goal;
+  /** 2.3.0 general: 1–16 weeks (B2). */
+  weeks?: ProgramWeekPlan[];
+  /** 2.3.0 general: first day of week 1 (YYYY-MM-DD, a Monday by default). */
+  startDate?: string;
+  /** 2.3.0 general: the template this program was started from (name only). */
+  templateOf?: string;
+  /** 2.3.0 trainer device only: a duplicate's intended client (`client:<uid>`), preselected at Post. Never posted. */
+  draftTarget?: string;
 };
 
 /** A dated volleyball event. date is local 'YYYY-MM-DD'. */
@@ -237,7 +300,8 @@ export type WorkoutLog = {
   sessionId: string;
   sessionName: string;
   /** stationId: the station the exercise was done at (stations format; progression ignores order). */
-  entries: { exerciseId: string; sets: LoggedSet[]; stationId?: string }[];
+  /** minutesDone: 2.3.0 cardio blocks log minutes only (adult rules A4). */
+  entries: { exerciseId: string; sets: LoggedSet[]; stationId?: string; minutesDone?: number }[];
   note?: string;
   /** Team this workout counts for (sent to the coach). */
   teamId?: string;
@@ -308,6 +372,10 @@ export type AppData = {
   lastRack?: Record<string, string>;
   /** v2.2 coaches: teams whose testing-day checklist was read on this device (F25a). */
   checklistRead?: string[];
+  /** 2.3.0 trainers: program templates, on this device only (F39d; plan only, never a client's logs). */
+  templates?: Program[];
+  /** 2.3.0 trainers: general teams already shown "Your team is open" (F32b). */
+  openSeen?: string[];
 };
 
 export type LocalTeamCalendar = {

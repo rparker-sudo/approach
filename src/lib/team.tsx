@@ -25,7 +25,10 @@ import {
   TeamSettings,
   TestResult,
   TestSession,
+  TrainerConfirmations,
+  TrainerStatus,
 } from './backend';
+import { generalEffortProblem, isGeneral } from './general';
 import { dateKey, today } from './calendar';
 import { LEVEL_OF } from './athlete';
 import { isLow } from './readiness';
@@ -49,6 +52,9 @@ export const ALL = 'all';
 /** Local program id for a team workout. Athletes always use the whole-team id. */
 export const teamProgramId = (teamId: string, groupKey: string = ALL) =>
   groupKey === ALL ? `team-${teamId}` : `team-${teamId}-${groupKey}`;
+
+/** 2.3.0 general teams: a program the trainer is building, not yet posted to anyone (target chosen at Post, F36). */
+export const isDraftKey = (groupKey?: string) => !!groupKey?.startsWith('draft:');
 
 const postedKey = (teamId: string, groupKey: string = ALL) => `${teamId}:${groupKey}`;
 
@@ -155,6 +161,12 @@ type TeamState = {
   setMemberLevel: (teamId: string, userId: string, level: number) => Promise<void>;
   /** v2.2 athlete: choose which team's lifting program to follow. */
   setLiftProgram: (teamId: string) => Promise<void>;
+  /** 2.3.0 trainers: verification and Terms status per general team (null for volleyball teams). */
+  trainerStatus: Record<string, TrainerStatus | null>;
+  createGeneralTeam: (name: string, confirmations: TrainerConfirmations) => Promise<Team>;
+  acceptTrainerTerms: (teamId: string) => Promise<void>;
+  /** 2.3.0 F36: post a program (draft or posted) to all clients, a group, or one client (`client:<uid>`), from startDate. */
+  postGeneral: (teamId: string, sourceProgramId: string, targetKey: string, startDate: string) => Promise<void>;
 };
 
 export type CoachExtras = {
@@ -201,7 +213,9 @@ function applyPosted(d: AppData, role: 'coach' | 'athlete', snap: Snapshot): App
       }
       // Group workouts whose group was deleted go away.
       const keys = new Set([ALL, ...(snap.groups[t.id] ?? []).map((g) => g.id)]);
-      programs = programs.filter((p) => p.teamId !== t.id || keys.has(p.groupKey ?? ALL));
+      // 2.3.0 general teams also keep client programs and drafts.
+      const extra = (k: string) => isGeneral(t) && (k.startsWith('client:') || isDraftKey(k));
+      programs = programs.filter((p) => p.teamId !== t.id || keys.has(p.groupKey ?? ALL) || extra(p.groupKey ?? ALL));
     }
     for (const tp of snap.posted) {
       const team = snap.teams.find((t) => t.id === tp.teamId);
@@ -239,7 +253,38 @@ function applyPosted(d: AppData, role: 'coach' | 'athlete', snap: Snapshot): App
       .map(({ test: _t, ...e }) => e);
     for (const t of snap.teams) {
       if (t.id !== liftTeam?.id) {
-        programs = programs.filter((p) => p.id !== teamProgramId(t.id));
+        programs = programs.filter((p) => p.id !== teamProgramId(t.id) && !(isGeneral(t) && p.teamId === t.id));
+        continue;
+      }
+      if (isGeneral(t)) {
+        // 2.3.0 (A4): a client follows every program posted to them: their own, their group's and the whole team's (the
+        // server returns only those). Each is its own local program; Today lists every session due (G-1 per session).
+        const rank = (k: string) => (k.startsWith('client:') ? 0 : k === ALL ? 2 : 1);
+        const mine = snap.posted.filter((x) => x.teamId === t.id).sort((a, b) => rank(a.groupKey) - rank(b.groupKey));
+        const ids = new Set(mine.map((x) => teamProgramId(t.id, x.groupKey)));
+        programs = programs.filter((p) => p.teamId !== t.id || ids.has(p.id));
+        const cal = snap.calendars.find((c) => c.teamId === t.id);
+        for (const tp of [...mine].reverse()) {
+          const id = teamProgramId(t.id, tp.groupKey);
+          const group = (snap.groups[t.id] ?? []).find((g) => g.id === tp.groupKey);
+          const mirrored: Program = {
+            ...tp.program,
+            id,
+            teamId: t.id,
+            teamName: t.name,
+            groupKey: tp.groupKey,
+            groupName: group?.name,
+            general: true,
+            author: t.coachName ?? tp.program.author,
+            postedAt: tp.updatedAt,
+            unposted: false,
+            events: (cal?.events ?? []).filter((e) => e.type === 'break'),
+            lightDates: lightFor(cal, tp.groupKey),
+          };
+          const local = programs.find((p) => p.id === id);
+          const same = local && JSON.stringify(local) === JSON.stringify(mirrored);
+          if (!same) programs = local ? programs.map((p) => (p.id === id ? mirrored : p)) : [mirrored, ...programs];
+        }
         continue;
       }
       const mine = t.myGroupId ? snap.posted.find((tp) => tp.teamId === t.id && tp.groupKey === t.myGroupId) : undefined;
@@ -275,8 +320,9 @@ function applyPosted(d: AppData, role: 'coach' | 'athlete', snap: Snapshot): App
   let liftTeamId = d.liftTeamId;
   let teamLevels = d.teamLevels;
   if (role === 'athlete') {
-    // The program team's workout is the plan.
-    const teamProgram = programs.find((p) => p.teamId);
+    // The program team's workout is the plan (general teams: the client's own program first, then group, then team-wide).
+    const liftId = (snap.teams.find((t) => t.isLiftProgram) ?? snap.teams[0])?.id;
+    const teamProgram = programs.find((p) => p.teamId && p.teamId === liftId) ?? programs.find((p) => p.teamId);
     if (teamProgram) activeProgramId = teamProgram.id;
     liftTeamId = (snap.teams.find((t) => t.isLiftProgram) ?? snap.teams[0])?.id ?? null;
     teamLevels = Object.fromEntries(snap.teams.map((t) => [t.id, { level: t.myLevel ?? null, confirmed: !!t.myLevelConfirmed, teamName: t.name }]));
@@ -304,6 +350,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const [testSessions, setTestSessions] = useState<Record<string, TestSession | undefined>>({});
   const [testResults, setTestResults] = useState<Record<string, TestResult[]>>({});
   const [coachExtras, setCoachExtras] = useState<Record<string, CoachExtras>>({});
+  const [trainerStatus, setTrainerStatus] = useState<Record<string, TrainerStatus | null>>({});
   const [syncing, setSyncing] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   const accountRef = useRef<Account | null>(account);
@@ -418,6 +465,8 @@ export function TeamProvider({ children }: { children: ReactNode }) {
           }),
         );
         setCoachExtras(Object.fromEntries(ids.map((id, i) => [id, extras[i]])));
+        const gs = await Promise.all(t.map((x) => (isGeneral(x) ? backend.trainerStatus(x.id).catch(() => null) : Promise.resolve(null))));
+        setTrainerStatus(Object.fromEntries(ids.map((id, i) => [id, gs[i]])));
       } else {
         const tr = await Promise.all(t.map((x) => (canTest(x.myPerms) ? backend.listTestResults(x.id, acct.id) : Promise.resolve([] as TestResult[]))));
         setTestResults(Object.fromEntries(ids.map((id, i) => [id, tr[i]])));
@@ -513,6 +562,11 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     async (teamId: string, groupKey: string) => {
       const local = dataRef.current.programs.find((p) => p.id === teamProgramId(teamId, groupKey));
       if (!local) throw new BackendError('Build a workout for this group first.');
+      // 2.3.0 adult rules A1/A3: general teams block RPE above 8, failure, max, AMRAP and "for time" in strength rows.
+      if (isGeneral(teamsRef.current.find((x) => x.id === teamId))) {
+        const bad = local.sessions.flatMap((s) => s.exercises).map(generalEffortProblem).find(Boolean);
+        if (bad) throw new BackendError(`${bad} Fix the effort on the highlighted exercises, then post.`);
+      }
       // 1.6 backstop: a team with any minor can't post strength effort above the ceiling.
       const hasMinor = (membersRef.current[teamId] ?? []).some((m) => m.isMinor !== false);
       const blocked = local.sessions.flatMap((s) => s.exercises).map((e) => effortProblem(e, local.phase, hasMinor)).find((x) => x?.block);
@@ -574,6 +628,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     setTestSessions({});
     setTestResults({});
     setCoachExtras({});
+    setTrainerStatus({});
     mutate((d) => {
       const programs = d.programs.filter((p) => !p.teamId);
       return {
@@ -722,12 +777,36 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       },
       async postTeam(teamId) {
         await postCalendarIfNeeded(teamId);
-        const unposted = dataRef.current.programs.filter((p) => p.teamId === teamId && (p.unposted || !posted[postedKey(teamId, p.groupKey ?? ALL)]));
+        const unposted = dataRef.current.programs.filter((p) => p.teamId === teamId && !isDraftKey(p.groupKey) && (p.unposted || !posted[postedKey(teamId, p.groupKey ?? ALL)]));
         for (const p of unposted) await postProgram(teamId, p.groupKey ?? ALL);
       },
       hasUnposted(teamId) {
         if (data.teamCalendars?.[teamId]?.unposted) return true;
-        return data.programs.some((p) => p.teamId === teamId && (p.unposted || !posted[postedKey(teamId, p.groupKey ?? ALL)]));
+        return data.programs.some((p) => p.teamId === teamId && !isDraftKey(p.groupKey) && (p.unposted || !posted[postedKey(teamId, p.groupKey ?? ALL)]));
+      },
+      trainerStatus,
+      async createGeneralTeam(name, confirmations) {
+        const t = await backend.createGeneralTeam(name, confirmations);
+        await refresh();
+        return t;
+      },
+      async acceptTrainerTerms(teamId) {
+        await backend.acceptTrainerTerms(teamId);
+        await refresh();
+      },
+      async postGeneral(teamId, sourceProgramId, targetKey, startDate) {
+        const source = dataRef.current.programs.find((p) => p.id === sourceProgramId);
+        if (!source) throw new BackendError("Couldn't post. Your program is saved as a draft.");
+        const id = teamProgramId(teamId, targetKey);
+        const groupName = (groups[teamId] ?? []).find((g) => g.id === targetKey)?.name;
+        const { draftTarget: _dt, forName: _fn, ...plan } = source;
+        const copy: Program = { ...plan, id, teamId, groupKey: targetKey, groupName, startDate, general: true, unposted: true };
+        mutate((d) => ({ ...d, programs: [copy, ...d.programs.filter((p) => p.id !== id)] }));
+        dataRef.current = { ...dataRef.current, programs: [copy, ...dataRef.current.programs.filter((p) => p.id !== id)] };
+        await postCalendarIfNeeded(teamId);
+        await postProgram(teamId, targetKey);
+        // A draft becomes the posted program.
+        if (isDraftKey(source.groupKey)) mutate((d) => ({ ...d, programs: d.programs.filter((p) => p.id !== source.id) }));
       },
       async createGroup(teamId, name, positionHint) {
         const g = await backend.createGroup(teamId, name, positionHint);
@@ -779,7 +858,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         }));
       },
     }),
-    [account, checked, accountUnknown, teams, members, groups, logs, readiness, posted, attendance, testSessions, testResults, coachExtras, syncing, lastError, refresh, mutate, data, postCalendarIfNeeded, postProgram, writeCalendar, clearTeamState],
+    [account, checked, accountUnknown, teams, members, groups, logs, readiness, posted, attendance, testSessions, testResults, coachExtras, trainerStatus, syncing, lastError, refresh, mutate, data, postCalendarIfNeeded, postProgram, writeCalendar, clearTeamState],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

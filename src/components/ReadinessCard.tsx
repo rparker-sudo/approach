@@ -7,6 +7,8 @@ import { useTeams } from '../lib/team';
 import { Button, Card, Chip, ChipRow, colors, Label, Note, Row, Text } from './ui';
 
 const SHARING = 'Your coach sees your check-ins. Teammates never do.';
+/** 2.3.0 general teams (design §S1b). */
+const SHARING_GENERAL = 'Your trainer sees your check-ins if you share them. Other clients never do.';
 
 const SCALES = [
   { key: 'sleep', label: 'Sleep', low: 'Bad', high: 'Great' },
@@ -20,7 +22,8 @@ type Scores = { sleep: number; soreness: number; energy: number };
  * Daily check-in. It never changes the athlete's workout by itself; for team
  * athletes it goes to the coach, who decides whether to lighten the day.
  */
-export default function ReadinessCard() {
+export default function ReadinessCard({ general }: { general?: boolean } = {}) {
+  const leader = general ? 'trainer' : 'coach';
   const { data, mutate } = useStore();
   const { teams, checkIn, consentFor } = useTeams();
   const day = dateKey(today());
@@ -49,7 +52,7 @@ export default function ReadinessCard() {
           </Text>
           {onTeam ? (
             <Text style={{ fontSize: 12, color: colors.muted }}>
-              {sharedWith.every((t) => existing.sentTo.includes(t.id)) ? 'Sent to your coach.' : 'Sending to your coach…'}
+              {sharedWith.every((t) => existing.sentTo.includes(t.id)) ? `Sent to your ${leader}.` : `Sending to your ${leader}…`}
             </Text>
           ) : null}
         </Card>
@@ -62,7 +65,7 @@ export default function ReadinessCard() {
       <Label>How are you today?</Label>
       {showNotice ? (
         <View style={{ gap: 8 }}>
-          <Note>{SHARING}</Note>
+          <Note>{general ? SHARING_GENERAL : SHARING}</Note>
           <Button small kind="secondary" title="Got it." onPress={() => mutate((d) => ({ ...d, checkinNoticeSeen: true }))} />
         </View>
       ) : null}
@@ -108,7 +111,9 @@ export default function ReadinessCard() {
         <Chip label="No" selected={pain === false} onPress={() => setPain(false)} />
         <Chip label="Yes" selected={pain === true} onPress={() => setPain(true)} />
       </ChipRow>
-      <Text style={{ fontSize: 13, color: colors.muted }}>Tell your coach, parent, or athletic trainer in person about any pain.</Text>
+      <Text style={{ fontSize: 13, color: colors.muted }}>
+        {general ? 'Tell your trainer in person about any pain.' : 'Tell your coach, parent, or athletic trainer in person about any pain.'}
+      </Text>
       <Button
         title="Check in"
         disabled={!ready}
@@ -118,7 +123,15 @@ export default function ReadinessCard() {
         }}
       />
       <Text style={{ fontSize: 12, color: colors.muted }}>
-        {onTeam ? (showNotice ? "It doesn't change your workout; your coach decides if the team goes lighter." : SHARING) : "Just for you. It doesn't change your workout."}
+        {onTeam
+          ? showNotice
+            ? general
+              ? "It doesn't change your session; your trainer decides if you go lighter."
+              : "It doesn't change your workout; your coach decides if the team goes lighter."
+            : general
+              ? SHARING_GENERAL
+              : SHARING
+          : "Just for you. It doesn't change your workout."}
       </Text>
     </Card>
   );

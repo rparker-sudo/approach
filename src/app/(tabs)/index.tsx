@@ -12,6 +12,8 @@ import ScreenHeader from '../../components/ScreenHeader';
 import Sheet from '../../components/Sheet';
 import VersionLine, { DroppedLine } from '../../components/VersionLine';
 import TeamHome from '../../components/TeamHome';
+import ClientToday from '../../components/general/ClientToday';
+import { useGeneralView } from '../../lib/useGeneral';
 import {
   Banner,
   Body,
@@ -44,7 +46,10 @@ import { weekdayIndex } from '../../lib/util';
 
 export default function Home() {
   const { data } = useStore();
+  const general = useGeneralView();
   if (data.profile?.role === 'coach') return <TeamHome />;
+  // 2.3.0 F42: clients of a general team.
+  if (general) return <ClientToday />;
   return <Today />;
 }
 

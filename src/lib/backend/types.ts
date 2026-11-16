@@ -107,6 +107,8 @@ export type Team = {
   settings: TeamSettings;
   /** 2.3.0: 'volleyball' (every team before 2.3.0) or 'general' (a trainer's adult clients). Can't change once a team has members. */
   kind: TeamKind;
+  /** 2.3.0 general teams: the gym equipment profile (F40, migration 010 `teams.gym_equipment`). Null/missing = not set yet. */
+  gymEquipment?: import('../types').Equipment[] | null;
 };
 
 export type TeamKind = 'volleyball' | 'general';

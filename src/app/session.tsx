@@ -1,8 +1,12 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
-import { Body, Button, Card, colors, Field, H2, Label, Row, Screen, Stepper, Text, TextInput, display, Icon } from '../components/ui';
-import { ALL_EQUIPMENT, CATEGORY_LABEL, EXERCISES, fits, getExercise } from '../lib/exercises';
+import { Body, Button, Card, colors, Field, H2, Label, Row, Screen, Stepper, Text, TextInput, Toggle, display, Icon } from '../components/ui';
+import WarmupCard from '../components/general/WarmupCard';
+import { ALL_EQUIPMENT, CATEGORY_LABEL, EXERCISES, exercisePool, fits, getExercise } from '../lib/exercises';
+import { CARDIO_BREAK_LINE, cardioProblems, CIRCUIT_LINE, clampCardio, generalEffortProblem, INTENSITY_LABEL, TALK_TEST } from '../lib/general';
+import { WARMUPS } from '../lib/generalLibrary';
+import { cardioFor, rxFor } from '../lib/starter';
 import { formatRest, restSecFor } from '../lib/generator';
 import { useStore } from '../lib/store';
 import { resolveFor } from '../lib/athlete';
@@ -12,7 +16,7 @@ import { blockRests, blocksOf, clockProblem, CLOCK_REASON, groupRows, labelOf, s
 import StationsEditor from '../components/StationsEditor';
 import { useTeams } from '../lib/team';
 import VersionLine, { DroppedLine } from '../components/VersionLine';
-import type { ExerciseCategory, ProgramExercise, Session } from '../lib/types';
+import type { ExerciseCategory, ProgramExercise, Session, SlotRole } from '../lib/types';
 
 const CATS: ExerciseCategory[] = ['power', 'lower', 'upper', 'core', 'prehab'];
 const TIER_WORD = { P: 'Power', A: 'Heavy', B: 'Compound', C: 'Accessory', D: 'Care' } as const;
@@ -32,9 +36,11 @@ export default function SessionScreen() {
   const coach = data.profile?.role === 'coach';
   const canStart = !coach && data.activeProgramId === program.id;
 
+  const general = !!program.general;
   // Athletes see their version of the team's workout (G-1: resolveSession).
   if (program.teamId && !coach) {
     const resolved = resolveFor(data, program, session);
+    const warm = general && session.warmup !== null ? WARMUPS.find((w) => w.id === (session.warmup ?? 'W1')) : undefined;
     return (
       <Screen>
         <Stack.Screen options={{ title: session.name }} />
@@ -46,8 +52,19 @@ export default function SessionScreen() {
           />
         ) : null}
         <Body muted style={{ fontSize: 13 }}>{`${session.focus} · ${formatMinutes(resolved.estMinutes)}`}</Body>
+        {warm ? <WarmupCard id={warm.id} /> : null}
         {resolved.exercises.map((e, i) => {
           const info = getExercise(e.exerciseId);
+          if (e.cardio) {
+            return (
+              <Card key={`${e.exerciseId}-${i}`} style={{ gap: 6 }}>
+                <Text style={[display(12), { color: colors.muted }]}>Cardio</Text>
+                <H2>{`${info.name} · ${e.cardio.minutes} min · ${INTENSITY_LABEL[e.cardio.intensity]}`}</H2>
+                <Text style={{ fontSize: 13, color: colors.muted }}>{TALK_TEST[e.cardio.intensity]}</Text>
+                {e.notes ? <Text style={{ fontSize: 13 }}>Trainer: {e.notes}</Text> : null}
+              </Card>
+            );
+          }
           return (
             <Card key={`${e.exerciseId}-${i}`} style={{ gap: 6 }}>
               <Text style={[display(12), { color: colors.muted }]}>{CATEGORY_LABEL[info.category]}</Text>
@@ -58,7 +75,7 @@ export default function SessionScreen() {
               <Text style={{ fontSize: 16, fontWeight: '600' }}>
                 {e.sets} × {e.reps} <Text style={{ fontSize: 13, color: colors.muted }}>· {e.effort} · Rest {formatRest(e.restSecResolved)}</Text>
               </Text>
-              {e.notes ? <Text style={{ fontSize: 13 }}>Coach: {e.notes}</Text> : null}
+              {e.notes ? <Text style={{ fontSize: 13 }}>{general ? 'Trainer' : 'Coach'}: {e.notes}</Text> : null}
               <Body muted style={{ fontSize: 13 }}>{info.cue}</Body>
             </Card>
           );
@@ -79,15 +96,19 @@ export default function SessionScreen() {
   const target = lengthTarget(program.phase, session.light ? 'light' : home ? 'home' : 'school');
   const hasMinor = !!program.teamId && (members[program.teamId] ?? []).some((m) => m.isMinor !== false);
   const swapping = picker?.replaceIndex != null ? getExercise(session.exercises[picker.replaceIndex].exerciseId) : null;
-  const usable = EXERCISES.filter((x) => fits(x, gym));
+  // 2.3.0: general teams pick from the whole library + the general library, limited to the gym equipment profile (F39c).
+  const pool = exercisePool(general);
+  const usable = pool.filter((x) => fits(x, gym));
   const pickerGroups: { title: string; items: typeof EXERCISES; dim?: boolean }[] = [
     ...(swapping ? [{ title: 'Same movement', items: usable.filter((x) => x.pattern === swapping.pattern && x.id !== swapping.id) }] : []),
-    ...CATS.map((c) => ({
+    ...(general ? [...CATS, 'cardio' as ExerciseCategory] : CATS).map((c) => ({
       title: CATEGORY_LABEL[c],
       items: usable.filter((x) => x.category === c && (!swapping || x.pattern !== swapping.pattern)),
     })),
-    { title: 'Needs other equipment', items: EXERCISES.filter((x) => !fits(x, gym)), dim: true },
+    ...(general ? [] : [{ title: 'Needs other equipment', items: EXERCISES.filter((x) => !fits(x, gym)), dim: true }]),
   ];
+  const goal = program.goal ?? 'general';
+  const sessionProblems = general ? cardioProblems(session, program.goal) : [];
 
   function update(next: Session) {
     saveProgram({
@@ -133,8 +154,23 @@ export default function SessionScreen() {
     update({ ...session!, exercises: session!.exercises.filter((_, k) => k !== i) });
   }
   function pick(exerciseId: string) {
+    const ex = getExercise(exerciseId);
+    if (general && ex.durationOnly) {
+      // F41: a cardio block is minutes + Easy/Moderate only.
+      const rx = clampCardio(cardioFor(goal), program!.goal);
+      const row: ProgramExercise = { exerciseId, sets: 1, reps: `${rx.minutes} min`, effort: INTENSITY_LABEL[rx.intensity], cardio: rx };
+      if (picker?.replaceIndex != null) update({ ...session!, exercises: session!.exercises.map((e, k) => (k === picker.replaceIndex ? row : e)) });
+      else update({ ...session!, exercises: [...session!.exercises, row] });
+      setPicker(null);
+      return;
+    }
     if (picker?.replaceIndex != null) {
-      setEx(picker.replaceIndex, { exerciseId });
+      setEx(picker.replaceIndex, { exerciseId, ...(general ? { cardio: undefined } : {}) });
+    } else if (general) {
+      // The goal fills the slot's defaults (adult-goals.md §2).
+      const role: SlotRole = ex.category === 'power' ? 'power' : ex.category === 'core' ? 'core' : ex.category === 'prehab' ? (ex.pattern === 'mobility' ? 'mobility' : 'care') : ex.tier === 'A' ? 'main' : ex.tier === 'B' ? 'secondary' : 'accessory';
+      const rx = rxFor(goal, role) ?? { sets: 3, reps: '8–10', effort: 'RPE 7' };
+      update({ ...session!, exercises: [...session!.exercises, { exerciseId, sets: rx.sets, reps: rx.reps, effort: rx.effort, role }] });
     } else {
       update({ ...session!, exercises: [...session!.exercises, { exerciseId, sets: 3, reps: '8', effort: 'RPE 7', role: 'accessory' }] });
     }
@@ -146,7 +182,7 @@ export default function SessionScreen() {
       <Stack.Screen options={{ title: session.name }} />
       {program.teamId ? (
         <Body muted style={{ fontSize: 13 }}>
-          Changes save on this phone. Post the team workout to send them to {program.teamName ?? 'the team'}.
+          {general ? 'Changes save on this phone. Post the program to send it to your clients.' : `Changes save on this phone. Post the team workout to send them to ${program.teamName ?? 'the team'}.`}
         </Body>
       ) : null}
       {canStart ? (
@@ -164,9 +200,29 @@ export default function SessionScreen() {
       </Row>
       {home ? (
         <Body muted style={{ fontSize: 13 }}>
-          Each athlete gets the best version for their home equipment and level. Your sets, reps, and effort stay the same.
+          {general
+            ? 'Each client gets the best version for their home equipment and level. Your sets, reps, and effort stay the same.'
+            : 'Each athlete gets the best version for their home equipment and level. Your sets, reps, and effort stay the same.'}
         </Body>
       ) : null}
+      {general ? (
+        <Card>
+          <Row style={{ justifyContent: 'space-between', minHeight: 44 }}>
+            <Text style={{ fontSize: 15, fontWeight: '600', flex: 1 }}>General warm-up</Text>
+            <Toggle accessibilityLabel="General warm-up" value={session.warmup !== null} onValueChange={(v) => update({ ...session, warmup: v ? 'W1' : null })} />
+          </Row>
+          {session.warmup !== null ? (
+            <Row style={{ gap: 6, flexWrap: 'wrap' }}>
+              {WARMUPS.map((w) => (
+                <Button key={w.id} small kind={(session.warmup ?? 'W1') === w.id ? 'primary' : 'ghost'} title={w.name} onPress={() => update({ ...session, warmup: w.id })} />
+              ))}
+            </Row>
+          ) : null}
+        </Card>
+      ) : null}
+      {sessionProblems.map((m) => (
+        <Text key={m} accessibilityRole="alert" style={{ fontSize: 13, color: colors.errorText }}>{m}</Text>
+      ))}
       {program.teamId ? <StationsEditor program={program} session={session} hasMinor={hasMinor} onChange={update} /> : null}
 
       {session.exercises.map((e, i) => {
@@ -176,8 +232,48 @@ export default function SessionScreen() {
         const block = e.group ? blocksOf(session.exercises).get(e.group) ?? [] : [];
         const firstInBlock = block.length >= 2 && block[0] === i;
         const lastInBlock = block.length >= 2 && block[block.length - 1] === i;
-        const problem = program.teamId ? effortProblem(e, program.phase, hasMinor) : null;
+        const generalProblem = general ? generalEffortProblem(e) : null;
+        const problem = general ? (generalProblem ? { block: true, message: generalProblem } : null) : program.teamId ? effortProblem(e, program.phase, hasMinor) : null;
         const clock = clockProblem(e, block.length >= 3, program.equipment);
+        if (general && e.cardio) {
+          const max = program.goal === 'back_after_break' ? 15 : 60;
+          return (
+            <Card key={`${e.exerciseId}-${i}`}>
+              <Text style={[display(12), { color: colors.muted }]}>Cardio</Text>
+              <Pressable accessibilityRole="link" onPress={() => router.push(`/exercise/${info.id}`)} style={{ minHeight: 44, justifyContent: 'center' }}>
+                <H2>{info.name}</H2>
+              </Pressable>
+              <Row style={{ justifyContent: 'space-between' }}>
+                <Label>Minutes</Label>
+                <Stepper value={e.cardio.minutes} min={5} max={max} onChange={(n) => setEx(i, { cardio: clampCardio({ ...e.cardio!, minutes: n }, program.goal), reps: `${n} min` })} />
+              </Row>
+              <Label>Effort</Label>
+              <Row style={{ gap: 6 }}>
+                {(['easy', 'moderate'] as const).map((k) => (
+                  <View key={k} style={{ flex: 1 }}>
+                    <Button
+                      small
+                      kind={e.cardio!.intensity === k ? 'primary' : 'ghost'}
+                      title={INTENSITY_LABEL[k]}
+                      disabled={k === 'moderate' && program.goal === 'back_after_break'}
+                      onPress={() => setEx(i, { cardio: { ...e.cardio!, intensity: k }, effort: INTENSITY_LABEL[k] })}
+                    />
+                  </View>
+                ))}
+              </Row>
+              <Text style={{ fontSize: 13, color: colors.muted }}>{TALK_TEST[e.cardio.intensity]}</Text>
+              {program.goal === 'back_after_break' ? <Text style={{ fontSize: 13, color: colors.muted }}>{CARDIO_BREAK_LINE}</Text> : null}
+              <Row>
+                <View style={{ flex: 1 }}>
+                  <Button small kind="ghost" title="Swap" onPress={() => setPicker({ replaceIndex: i })} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button small kind="danger" title="Remove" onPress={() => remove(i)} />
+                </View>
+              </Row>
+            </Card>
+          );
+        }
         const prevHeavy = i > 0 && ['A', 'P'].includes(tierOf(getExercise(session.exercises[i - 1].exerciseId), program.equipment));
         return (
           <View key={`${e.exerciseId}-${i}`} style={{ gap: 6 }}>
@@ -249,11 +345,11 @@ export default function SessionScreen() {
             </Row>
             {problem ? (
               <Text accessibilityRole="alert" style={{ fontSize: 13, color: problem.block ? colors.errorText : colors.warningText }}>
-                {problem.block ? problem.message : `${problem.message} This team is all adults, so you can still post it.`}
+                {problem.block || general ? problem.message : `${problem.message} This team is all adults, so you can still post it.`}
               </Text>
             ) : null}
             {clock ? (
-              <Text accessibilityRole="alert" style={{ fontSize: 13, color: hasMinor ? colors.errorText : colors.warningText }}>{CLOCK_REASON}</Text>
+              <Text accessibilityRole="alert" style={{ fontSize: 13, color: !general && hasMinor ? colors.errorText : colors.warningText }}>{general ? CIRCUIT_LINE : CLOCK_REASON}</Text>
             ) : null}
             <Row style={{ justifyContent: 'space-between' }}>
               <Label>Rest</Label>
@@ -311,13 +407,20 @@ export default function SessionScreen() {
       <Text style={{ fontSize: 14, fontWeight: '600', color: minutes > target ? colors.warningText : colors.ink }}>
         {`${formatMinutes(minutes)} · target ${target}${minutes > target ? ' ●' : ''}`}
       </Text>
+      {general ? (
+        <Text accessibilityRole="link" onPress={() => router.push({ pathname: '/gym', params: { teamId: program.teamId! } })} style={{ fontSize: 13, textDecorationLine: 'underline', minHeight: 44, paddingVertical: 12 }}>
+          Missing something? Add equipment in Gym equipment.
+        </Text>
+      ) : null}
 
       <Button kind="secondary" title="Add exercise" icon="plus" onPress={() => setPicker({ replaceIndex: null })} />
 
       <Card>
         <Label>What does effort mean?</Label>
         <Body style={{ fontSize: 14 }}>
-          RPE is how hard a set feels, 1–10. RPE 7 means about 3 reps left in the tank. Strength sets stop with about 2 reps left: RPE 8 or below, RPE 7 in-season.
+          {general
+            ? 'RPE is how hard a set feels, 1–10. RPE 7 means about 3 reps left in the tank. Strength sets stop with about 2 reps left: RPE 8 or below.'
+            : 'RPE is how hard a set feels, 1–10. RPE 7 means about 3 reps left in the tank. Strength sets stop with about 2 reps left: RPE 8 or below, RPE 7 in-season.'}
         </Body>
       </Card>
 
@@ -351,3 +454,4 @@ export default function SessionScreen() {
     </Screen>
   );
 }
+

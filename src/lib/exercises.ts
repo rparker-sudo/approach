@@ -1,4 +1,5 @@
 import { TIER_IDS } from './rest';
+import { GENERAL_EXERCISES, WHY_GENERAL } from './generalLibrary';
 import type { Equipment, Exercise, ExerciseCategory, HowTo, Pattern } from './types';
 
 /**
@@ -504,7 +505,23 @@ export const EXERCISES: Exercise[] = [
       ['Leaning toward or away from the bag.', 'Shrugging the loaded shoulder.', 'Overloading the bag so the straps strain.'])),
 ];
 
-const BY_ID = new Map(EXERCISES.map((e) => [e.id, e]));
+/** Every exercise id resolves, including the general library's (a log or program from a general team can be opened anywhere). */
+const BY_ID = new Map([...EXERCISES, ...GENERAL_EXERCISES].map((e) => [e.id, e]));
+
+/**
+ * 2.3.0: the library a team's builder, picker and resolution use. Volleyball teams: EXERCISES exactly as in 2.2.1.
+ * General teams: EXERCISES (with `whyGeneral`) + the general library (taxonomy C1: 0 exercises hidden).
+ */
+export const GENERAL_POOL: Exercise[] = [
+  ...EXERCISES.filter((e) => e.scope !== 'volleyball').map((e) => (WHY_GENERAL[e.id] ? { ...e, whyGeneral: WHY_GENERAL[e.id] } : e)),
+  ...GENERAL_EXERCISES,
+];
+export const exercisePool = (general: boolean): Exercise[] => (general ? GENERAL_POOL : EXERCISES);
+
+/** The "why" line for the team in view: `whyGeneral` in general teams when it exists, else `why`. */
+export function whyFor(ex: Exercise, general: boolean): string {
+  return (general && (ex.whyGeneral ?? WHY_GENERAL[ex.id])) || ex.howTo.why;
+}
 
 export function getExercise(id: string): Exercise {
   return (
@@ -529,6 +546,7 @@ export const CATEGORY_LABEL: Record<ExerciseCategory, string> = {
   upper: 'Upper body',
   core: 'Core',
   prehab: 'Prehab',
+  cardio: 'Cardio',
 };
 
 /* ---------------- Equipment ---------------- */
@@ -547,6 +565,10 @@ export const EQUIPMENT: { id: Equipment; label: string }[] = [
 ];
 
 export const ALL_EQUIPMENT: Equipment[] = EQUIPMENT.map((e) => e.id);
+
+/** 2.3.0 F40: in general teams `cable` reads "Cable station" (same id). */
+export const equipmentLabel = (id: Equipment, general: boolean) =>
+  general && id === 'cable' ? 'Cable station' : EQUIPMENT.find((e) => e.id === id)?.label ?? id;
 
 export const EQUIPMENT_PRESETS: { id: string; label: string; equipment: Equipment[] }[] = [
   { id: 'full', label: 'Full weight room', equipment: ALL_EQUIPMENT },

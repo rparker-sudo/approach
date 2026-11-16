@@ -1,6 +1,6 @@
 # Approach Strength: Soft-Launch Privacy Notice and Terms
-Owner: Legal & Compliance (07) · Draft v2.4 · Updated Sat Nov 14, 2026
-**Draft. Not legal advice. A licensed attorney should review it before real users see it.** (Founder decision TM-6 removed the attorney gate; Legal still recommends one.) This replaces the longer drafts (`legal/privacy-policy-draft.md`, `legal/terms-of-service-draft.md`) for the web soft launch only. Published as `public/privacy.html` (Part A) and `public/terms.html` (Part B) at `approachstrength.com/privacy` and `/terms`. **The build must publish this text exactly. No find-and-replace in build scripts.**
+Owner: Legal & Compliance (07) · Draft v2.5 · Updated Sun Nov 15, 2026
+**Draft. Not legal advice. A licensed attorney should review it before real users see it.** (Founder decision TM-6 removed the attorney gate; Legal still recommends one.) This replaces the longer drafts (`legal/privacy-policy-draft.md`, `legal/terms-of-service-draft.md`) for the web soft launch only. Published as `public/privacy.html` (Parts A and A2) and `public/terms.html` (Part B) at `approachstrength.com/privacy` and `/terms`. **The build must publish this text exactly. No find-and-replace in build scripts.**
 
 **Changes**
 - **11/10:** reverted to the coach-recorded consent form v2 (C17); contact email; experience level, multiple teams, and the 5-year proof record (C12).
@@ -11,13 +11,18 @@ Owner: Legal & Compliance (07) · Draft v2.4 · Updated Sat Nov 14, 2026
   - Zoho Mail and the marketing site added to Part A;
   - **Terms §4 rewritten as the coach clause (TM-13)**, with a new §4A on indemnity;
   - §9 limits expanded.
+- **11/15 (trainer mode, 2.3.0; T-A2/T-B4):**
+  - **Part A2**, privacy for adult clients of a personal trainer, with check-ins (including the pain flag) treated as **consumer health data** (anchor `#health-data`);
+  - **Terms §4T**, Trainer Terms, and §4TA on responsibility for claims (anchor `#trainer-terms`);
+  - §2 and §6 updated for trainers;
+  - no AI anywhere (TM-18).
 
 ---
 
 ## Part A: Privacy Notice
 *Last updated: [publish date]*
 
-Approach Strength is a free volleyball strength-training web app in an early test, run by Ryan Parker. This notice explains what we collect and why.
+Approach Strength is a free strength-training web app in an early test, run by Ryan Parker. Most of this notice is about **volleyball teams** (athletes, coaches, and parents). If you're an adult training with a **personal trainer** on Approach Strength, read **Part A2** too. This notice explains what we collect and why.
 
 **Who can use it.** You must be 13 or older. If you're under 18, your coach must have a signed consent form from your parent or guardian before you can log anything, and each optional feature below stays off unless your parent agreed to it. If you're on more than one team, each team's coach needs their own form. Coaches must be 18 or older. If you're 18 or older, you make these choices yourself in Settings → Privacy.
 
@@ -53,11 +58,48 @@ Approach Strength is a free volleyball strength-training web app in an early tes
 
 ---
 
+## Part A2: Adult clients of a personal trainer {#health-data}
+*Last updated: [publish date]*
+
+This part applies if you're **18 or older** and joined a **personal trainer's** client team on Approach Strength. Everything in Part A also applies, except the parts about parents, consent forms, positions, matches, and testing days, which aren't used on trainer teams.
+
+**Your trainer is independent.** Your trainer runs their own business and uses Approach Strength as a tool to give you programs. They aren't employed by us. Your training agreement, payments, health screening, and any records your trainer keeps outside the app are between you and your trainer.
+
+**What we store for you on our servers**
+- **Account:** name, email, password (held by our login provider), birth year, and that you're 18 or older.
+- **Training:** which trainer team and group you're in; your experience level (set by your trainer); the programs your trainer gives you, including the goal (Strength, Muscle, General fitness, or Back after a break); workouts you log (exercises, sets, reps, weights, notes, and cardio minutes); and your choices in Settings.
+- **Daily check-ins, only if you turn them on:** sleep, soreness, energy (1–5), and **whether you have pain today (yes/no).**
+
+**What we never collect on trainer teams:** your body weight or measurements, health history, injuries or where it hurts, medical conditions, medications, pregnancy, heart rate or wearable data, location, photos, or contacts. **Don't put health or injury details in workout notes.** Your trainer can read your notes. Talk to your trainer in person instead.
+
+**Consumer health data.** Your check-ins, including the pain question, are **consumer health data** under some state laws (for example, Washington's My Health My Data Act and Nevada's similar law). For this data:
+- **We collect it only if you turn check-ins on** in Settings → Your choices. They're **off** until you do.
+- **We share it with your trainer only if you separately turn on "Share my check-ins with my trainer."** That's off by default too. If you share, your trainer sees your answers, and on days you report pain, sees "Pain reported today," with no other detail. Other clients never see your check-ins.
+- **We use it only** to show you your check-ins, and (if you share) to show your trainer. We never sell it, use it for ads, or give it to anyone else except the service providers that host the app (Supabase, GitHub Pages).
+- **Your trainer can't require you to share** check-ins as a condition of training with them on Approach Strength.
+- **Your rights:** you can see your check-ins, stop collecting or sharing them at any time (turning sharing off also hides past check-ins from your trainer), delete your check-in history in Settings, and ask us which providers have handled it. Email ryan@approachstrength.com for anything you can't do in the app. If we say no to a request, you can ask us to reconsider by replying to our answer. If we still say no, you can contact your state's Attorney General.
+
+**Who sees your data on a trainer team**
+- **You** see everything you've logged.
+- **Your trainer** sees your programs, workouts, notes, personal bests, level, and your check-ins only if you share them. Trainers never see a ranking of their clients.
+- **Other clients** see nothing about you, unless your trainer turns on the team board **and** you turn on "Show me on the team board" (off by default). Then other clients in your session see your board name ("Jordan M." or initials) and workout progress, never weights, check-ins, or level.
+- **Your gym** doesn't get access to Approach Strength or your data.
+
+**No AI.** Approach Strength doesn't use AI to write programs or read your data. If that changes, we'll update this notice first.
+
+**Leaving and deleting.** If you leave your trainer's team, or they remove you, your trainer loses access to your data right away. You keep your own history. You can delete your account anytime in Settings; it's removed within 30 days.
+
+**Not medical advice.** Approach Strength doesn't screen you for exercise, diagnose, or treat anything. If you're returning from an injury, illness, surgery, or pregnancy, or you have a medical condition, get cleared by a qualified health professional and tell your trainer before training. "Back after a break" programs are for time off, not for returning from injury. If something hurts, stop, and tell your trainer in person.
+
+**Questions or requests:** ryan@approachstrength.com
+
+---
+
 ## Part B: Terms (Soft Launch)
 *Last updated: [publish date]*
 
 1. **Test version.** Approach Strength is free and in an early test, run by Ryan Parker ("we"). It may change, have bugs, or stop.
-2. **Eligibility.** 13+. Under 18 requires a signed parent/guardian consent form on file with the coach of each team. Coaches are 18+ and must accept §4 before recording consent or running testing days.
+2. **Eligibility.** 13+. Under 18 requires a signed parent/guardian consent form on file with the coach of each team. Coaches are 18+ and must accept §4 before recording consent or running testing days. **Personal trainer teams are for adults only (18+).** Trainers must accept §4T and be confirmed by us before clients can join.
 3. **Training risk.** Strength and conditioning training, including jump tests and strength checks, can cause injury. Approach Strength gives general training information, **not medical advice**. Learn new lifts with a qualified coach, use weights you can control, never grind out a rep, and stop if something hurts. You (or your parent, for minors) accept these risks.
 4. **Coach Terms.** If you use Approach Strength as a coach, you agree to the following. You accept them with a separate checkbox when you create or next use a coach account, and we record the version and date.
    1. **You run your training.** Approach Strength is a tool. You decide what your athletes do, and you're responsible for the programs you post or edit, how they're carried out, and supervising your athletes, as your school, club, or role requires. The app's limits (levels, caps, rest floors, testing rules) are minimums, not a substitute for your judgment.
@@ -71,14 +113,34 @@ Approach Strength is a free volleyball strength-training web app in an early tes
    9. **Your duties stay yours.** Nothing in these Terms changes your duties to your athletes, your school or club, or the law (including any mandated-reporter duties). We don't monitor athletes and can't do those things for you.
 
    **4A. Responsibility for claims.** To the extent the law allows, you agree to defend and indemnify Ryan Parker (and any business he forms to run Approach Strength) against claims, losses, and reasonable legal costs arising from (a) your breach of §4, (b) training or testing you programmed, ran, or supervised, or (c) your misuse of athlete data. This doesn't cover claims caused by a defect in the app itself or by our own negligence. If your employer or club doesn't allow you to accept this paragraph, tell us before using Approach Strength with athletes. *(Attorney to review; see the drafting note below.)*
+   **4T. Trainer Terms** {#trainer-terms}. If you use Approach Strength as a **personal trainer** with a client team ("Training clients, adults 18+"), these terms apply **instead of §4 and §4A**. You accept them with separate checkboxes when you create a client team, and we record the version and date. If we change them, you'll need to accept again before posting new programs.
+   1. **You're an independent professional.** You train clients through your own business. You aren't our employee, agent, or partner, and we aren't a party to your agreements with your clients or your gym. Approach Strength is software only. It doesn't provide training, supervise anyone, or check your work.
+   2. **Confirmations.** Before your first client can join, you confirm to us in writing, by email to ryan@approachstrength.com: (a) your **current certification** (name and issuing body); (b) that you carry your **own professional liability insurance** (insurer and expiry date); and (c) that you train clients through **your own business**. You keep these current while you use Approach Strength with clients, and you tell us right away if any of them lapses. Until we confirm, or if any lapses, your team is **closed** to new clients and you can't post new programs.
+   3. **You run your training.** You decide what your clients do, and you're responsible for the programs you give them, how they're carried out, and any supervision. **Screening clients before they train** (health questions, medical clearance, and deciding whether a program suits them) is your job, done outside the app. Approach Strength doesn't screen clients. The app's limits (levels, effort ceilings, weekly caps, rest floors) are minimums, not a substitute for your judgment.
+   4. **Adults only, no medical services.** Only clients 18 or older. Don't use Approach Strength for injury rehab, post-surgery or medical programs, pregnancy programs, nutrition or diet plans, or weight-loss programs. "Back after a break" is for clients returning after **time off**. Clients returning from an injury or medical condition should be cleared by a qualified professional first.
+   5. **Client data.** You use clients' data only to train that client. You don't copy, export, screenshot, post, or share it, including with your gym, other trainers, or for marketing. **You don't require clients to share their check-ins** as a condition of training with you, and you respect their choices in Settings. You don't ask clients to put health details in the app. You keep your login private, and you don't let anyone else (including gym staff) use it.
+   6. **Your gym and our name.** You don't put the Approach Strength name on anything your gym prints, posts, or shares (flyers, signs, social posts, class schedules, websites, or member emails), and you don't present it as your gym's service. You tell clients about it one to one. You follow your gym's rules on phones and screens, and you show the team board only to your own session.
+   7. **Safety and incidents.** You follow your gym's and your profession's emergency and injury procedures. Approach Strength isn't an emergency or medical service. If a client is hurt during a session you ran with Approach Strength, you tell us at ryan@approachstrength.com within 72 hours (date, team, what session; no medical details).
+   8. **Private pilot.** Approach Strength's trainer features are in a private test. Don't invite other trainers or gyms without asking us first. We may change or end the trainer features at any time. If we end them, we'll give you notice when we can, so your clients can keep their history.
+   9. **Your duties stay yours.** Nothing in these Terms changes your duties to your clients, your gym, your certifying body, or the law. We don't monitor clients and can't do those things for you.
+
+   **4TA. Responsibility for claims (trainers).** To the extent the law allows, you agree to defend and indemnify Ryan Parker (and any business he forms to run Approach Strength) against claims, losses, and reasonable legal costs arising from (a) your breach of §4T, (b) training you programmed, ran, or supervised, or (c) your misuse of client data. This doesn't cover claims caused by a defect in the app itself or by our own negligence. You keep professional liability insurance that would respond to claims about your training while you use Approach Strength with clients. *(Attorney to review; see the drafting notes.)*
 5. **Boards.** Team boards rank effort, never strength or bodies. Don't screenshot or share boards outside the team.
-6. **Your content.** You own what you log. You let us store it and show it to you, your coach, and (for board items) your teammates, to run the app. Coaches own the programs they create.
+6. **Your content.** You own what you log. You let us store it and show it to you, your coach, and (for board items) your teammates, to run the app. Coaches and trainers own the programs they create.
 7. **Acceptable use.** No sharing others' data, no harassment, no trying to access other teams' data, no signing or filling in a consent form for someone else.
 8. **Ending use.** You can delete your account anytime. We can suspend accounts that break these terms or belong to someone under 13. We can suspend a coach account that breaks §4, which pauses that team.
 9. **Limits.** To the extent the law allows, Approach Strength is provided "as is," without warranties, and we aren't liable for indirect or consequential damages. Nothing in these Terms limits liability that can't be limited by law, including for gross negligence or willful misconduct. *(Attorney to finalize.)*
 10. **Contact:** ryan@approachstrength.com
 
 ---
+
+### Drafting notes on §4T and §4TA (Legal; not published)
+- **Source:** spec trainer-mode v0.3 §A5/§B9, TM-17, TM-19 (option B), adult training rules §9 (screening is the trainer's job).
+- **Why separate from §4:** §4 assumes a school or club, parent consent, and testing days. An independent trainer has none of those, but carries her own certification and insurance, which §4TA leans on. That makes 4TA more meaningful than §4A: a trainer's professional liability policy may actually respond (subject to its terms and any contractual-liability exclusion; attorney Q24a).
+- **4T.2** mirrors the TM-19 gate. The app enforces it with `trainer_verified_at` (compliance T3). Legal added insurer and expiry date so lapses can be caught.
+- **4T.5** (no required sharing) supports "freely given" consent for health data.
+- **In-app confirmations** (compliance T2) are the click-through for this section. The three checkbox texts are there.
+- **Not legal advice; unreviewed by an attorney (TM-17).**
 
 ### Drafting notes on §4 and §4A (Legal; not published)
 - **Source:** TM-13 (option B: coach clause plus the coach's own school/club approval, no insurance step). It follows the competitor pattern Market Research found (Volt has coaches indemnify it; TeamBuildr has customers indemnify it), but it's narrower and carves out the app's own defects and our negligence. Courts are more likely to enforce a balanced clause, and coaches are more likely to sign one.

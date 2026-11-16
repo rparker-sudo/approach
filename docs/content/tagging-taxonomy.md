@@ -1,6 +1,6 @@
 # Approach: Content Tagging Taxonomy
-Owner: Training Content / Sports Science (02) · **v1.1** · Tue Nov 10, 2026
-Status: **Draft for founder approval.** v1.1: 6 new mobility exercises (70 total), session `kind`, coach-set athlete level (G8), and testing tags moved to "in spec." Part A documents the tags **exactly as they exist in the v2.0 code** (`src/lib/types.ts`, `src/lib/exercises.ts`, `src/lib/generator.ts`), plus the 6 mobility exercises ready for v2.2 (`drill-library.md` §4). Part B lists proposed additions. Nothing in Part B gets built without Product (01) and Claude Code agreeing to the schema change.
+Owner: Training Content / Sports Science (02) · **v1.2** · Sun Nov 15, 2026
+Status: **Draft for founder approval.** v1.2 (11/15): **Part C, trainer mode**: the T-A1 hide list, `scope`, `whyGeneral`, new equipment, patterns, and the `cardio` category. v1.1: 6 new mobility exercises (70 total), session `kind`, coach-set athlete level (G8), and testing tags moved to "in spec." Part A documents the tags **exactly as they exist in the v2.0 code** (`src/lib/types.ts`, `src/lib/exercises.ts`, `src/lib/generator.ts`), plus the 6 mobility exercises ready for v2.2 (`drill-library.md` §4). Part B lists proposed additions. Nothing in Part B gets built without Product (01) and Claude Code agreeing to the schema change.
 
 **Source of truth for exercise data:** `src/lib/exercises.ts` (64 exercises in v2.0; 70 with the v2.2 additions). Readable index: `content/drill-library.md`. The role doc mentions a separate `drills.json`. I recommend Claude Code **generate** any JSON from `EXERCISES` rather than maintaining a second copy, so the two can't drift. (Engineering decision, flagged.)
 
@@ -110,3 +110,41 @@ This is the equipment-level selector coaches and athletes already use (`Equipmen
 | Resolved exercise | Log stores the exercise actually done after G8 resolution | Proposed for v2.2 (safety §2a) |
 
 No age-band tag is needed: every user is 13+ (D-005), and minor defaults apply to everyone.
+
+---
+
+## Part C: Trainer mode (general teams, 2.3.0)
+Spec: `product/specs/trainer-mode.md` §A3, §B4. Content: `content/general-library.md`, `content/programs/adult-goals.md`, `content/adult-training-rules.md`.
+
+### C1. T-A1: what to hide in general teams
+**Exercises hidden for being volleyball-only: none.** I went through all 74 exercises in the volleyball library (64 + 6 mobility + 4 home). Every one is a standard strength, power, core, prehab, or mobility exercise that a trainer could use with adults. Hiding any of them would only shrink the trainer's library. What's volleyball-specific is the **wording and the automation around them**, so that's what general teams hide or replace:
+
+| Hide or replace in general teams | How |
+|---|---|
+| **"Why" text that talks about volleyball** (27 exercises: approach, blocking, hitting, serving, setting, defense, arm swing) | Show `whyGeneral` instead (`general-library.md` §5). Cues, steps, and mistakes have no volleyball terms (checked; "big arm swing" in the broad jump cue means the jump's arm swing, so it stays). |
+| **Position care slots** (`CARE_BY_POSITION`) | Not used. General teams have no positions; care exercises are picked by the trainer. |
+| **Volleyball generator and its archetypes, `RX` by phase, `dayAdvice`, `captainLine`** | Not offered (spec A3). Goals (`adult-goals.md`) fill defaults instead. |
+| **Testing battery, approach touch, jump tests, "Above the net," Jump gains** | Hidden (spec A3, adult rules A2). The exercises themselves (e.g., `broad-jump`, `mb-overhead`) stay available as training exercises. |
+| **Fuel cards and the plate visual** | Hidden (spec A3). |
+| **Volleyball week day types** (practice, match, tournament) | Calendar offers only Session and Break (spec A3). |
+
+**Scope tag for the future:** add `scope: 'all' | 'general' | 'volleyball'` (default `'all'`) so any later volleyball-only exercise can be hidden from general teams with one tag. Today: **0 exercises are `'volleyball'`**; the **7 cardio exercises are `'general'`** (hidden in volleyball teams, since conditioning is undecided there).
+
+**Acceptance (for Product):**
+- [ ] A general team's exercise picker shows all 74 existing exercises (plus the 39 general ones), with `whyGeneral` text where it exists.
+- [ ] A volleyball team's picker never shows `scope: 'general'` exercises (the 7 cardio items).
+- [ ] No volleyball words (approach, block, hit, serve, attack, setting, defense, volleyball) appear in exercise text shown in a general team (string search on rendered how-to; "arm swing" is left out of the search because the broad jump cue uses it for the jump itself).
+
+### C2. New fields and values
+| Tag | Values | Where |
+|---|---|---|
+| `Exercise.scope` | `'all'` (default) · `'general'` · `'volleyball'` | C1 |
+| `Exercise.whyGeneral` | optional string | 27 exercises (`general-library.md` §5) |
+| `ExerciseCategory` | adds `'cardio'` | `general-library.md` §3 |
+| `Pattern` | adds `knee-ext`, `knee-flex`, `shoulder-iso`, `arm-flex`, `arm-ext`, `cardio` | `general-library.md` §3 |
+| `Equipment` | adds `leg-press`, `leg-curl-machine`, `leg-extension-machine`, `chest-press-machine`, `shoulder-press-machine`, `assisted-pullup-machine`, `sled`, `bike`, `rower`, `treadmill`, `elliptical`, `stair-climber`, `jump-rope` (general teams' gym profile only) | `general-library.md` §2 |
+| Gym equipment profile | per general team: subset of all 23 equipment items | spec B4 |
+| Cardio slot | `{ exerciseId, durationMin (5–60), intensity: 'easy' \| 'moderate' }`; log stores `minutesDone` only | `adult-training-rules.md` §6 |
+| `programs.goal` | `'strength'` · `'muscle'` · `'general'` · `'back_after_break'` | `adult-goals.md` §5 |
+| Warm-up | `'W1'` · `'W2'` · `'W3'` (static content) | `general-library.md` §6 |
+| Tier | the 39 general exercises are assigned in `general-library.md` §4a (cardio = `D`) | rest table unchanged |

@@ -1,5 +1,5 @@
-# Compliance: Hard Rules (v2.2 live → 2.2.1 + marketing site)
-Owner: Legal & Compliance (07) · Updated Sat Nov 14, 2026 (hand-off session with Ryan) · Not legal advice. **No attorney has reviewed this (TM-6). Legal still recommends one before any minor signs.**
+# Compliance: Hard Rules (v2.2 live → 2.2.1 + marketing site → 2.3.0 trainer mode)
+Owner: Legal & Compliance (07) · Updated Sun Nov 15, 2026 (§ Trainer mode for 2.3.0) · Not legal advice. **No attorney has reviewed this (TM-6). Legal still recommends one before any minor signs, and before the trainer's first client.**
 Source of truth: Approach project → `legal/compliance-v2.1.md`. `legal/data-requirements.md` holds the long-range rules for a public launch. This file is the subset that applies **now**. Every MUST is tested. Sections marked **v2.2** are new for Product's `product/specs/v2.2.md` (pass 1 unless noted).
 
 **Changes on 11/10:**
@@ -32,6 +32,10 @@ Source of truth: Approach project → `legal/compliance-v2.1.md`. `legal/data-re
 - **§ Age wording updated** for UX F1 v3.2 (age question on sign-up only, never on log-in). Approved.
 - **Marketing-site copy signed off** (`docs/copy/website-copy.md` v1.1, with Legal's edits).
 - § Level item 8 updated to D-031 (lower level), closing C20 for this file.
+
+**Changes on 11/15 (T-A2 / T-B4, no AI part):**
+- **§ Trainer mode** for 2.3.0: adults only, the TM-19 gate, new fields approved, consumer health data rules for adult clients, **no AI in 2.3.0** (TM-18), no co-branding at the gym, and accepted risks TM-17, TM-19, and R11 for adult clients.
+- Trainer Terms (§4T) and the adult-client privacy section (Part A2) are in `legal/soft-launch-notice.md`.
 
 **Contact email for all legal pages, the consent form, and the AD letter: `ryan@approachstrength.com`** (TM-10, D-033). The club address `Ryan@thehbcvbc.com` must not appear anywhere users can see. **C13 and C18 closed.**
 - MUST (2.2.1): legal pages are generated **only** from Legal's text in `docs/legal/`. Remove the build script's find-and-replace of the email (build review §5). No build step may edit legal wording.
@@ -89,12 +93,12 @@ Source of truth: Approach project → `legal/compliance-v2.1.md`. `legal/data-re
 
 ## Third parties
 - MUST NOT: ad SDKs, analytics that share data for the vendor's own use, tracking pixels (app, web pages, or emails), App Tracking Transparency.
-- Allowed vendors now: **Supabase, GitHub Pages, Zoho Mail** (approved 11/14, below). Adding any vendor needs a Legal review.
+- Allowed vendors now: **Supabase, GitHub Pages, Zoho Mail** (approved 11/14, below). Adding any vendor needs a Legal review. **No AI provider is approved** (§ Trainer mode, TM-18).
 
 ### Zoho Mail review (mailbox for `ryan@approachstrength.com`)
 **Verdict: approved for the contact mailbox, on either plan, with the conditions below. Legal recommends Mail Lite.** Plan (Ryan, 11/14): **paid-plan trial now; it reverts to Mail Free when the trial ends.** Legal's view on the record: Lite is still recommended (~$12/yr). Sign the DPA **during the trial**, and confirm it stays in force on Free; if it doesn't, that's the reason to keep Lite.
 
-*What this mailbox will hold:* parent and user emails, deletion and privacy requests, and **scans or photos of signed consent forms** (the coach note on form v2 says to email copies here). That makes it a store of minors' personal information and of the C12 proof records, not just a contact address.
+*What this mailbox will hold:* parent and user emails, deletion and privacy requests, **scans or photos of signed consent forms** (the coach note on form v2 says to email copies here), and from 11/15 the **trainer's TM-19 confirmation** (certification, insurance, own business). That makes it a store of minors' personal information and of the C12 proof records, not just a contact address.
 
 | Check | Finding (Zoho's own pages, 11/14) | OK? |
 |---|---|---|
@@ -110,7 +114,7 @@ Source of truth: Approach project → `legal/compliance-v2.1.md`. `legal/data-re
 1. Turn on **two-factor sign-in** for the Zoho admin and mailbox. Use a strong unique password, stored outside district systems.
 2. **Sign Zoho's DPA** from the admin console (or request it from Zoho legal) and save a copy with the Legal records.
 3. **No auto-forwarding** to any other address, especially district or club email. Read it only on personal devices.
-4. Make a folder or label "Consent records" for form scans. Never delete those before 5 years after the athlete's account closes. Delete other personal emails (e.g., finished deletion requests) after 12 months.
+4. Make a folder or label "Consent records" for form scans. Never delete those before 5 years after the athlete's account closes. Delete other personal emails (e.g., finished deletion requests) after 12 months. Keep the trainer's TM-19 email in a "Trainer records" folder (§ Trainer mode).
 5. Don't connect third-party add-ons or "AI assistants" that read mailbox content unless Legal reviews them (e.g., leave Zia off for consent-record mail if possible).
 6. The Privacy Notice lists **Zoho Mail (our email)** under service providers. Done in the notice.
 
@@ -169,6 +173,7 @@ The soft-launch team may come from the founder's own district (TM-5). These rule
 | **TM-8** (11/13) | No insurance, LLC, or quote gate before the first minor. Ryan: Approach is "just the vehicle" for programming he already does as coach | **Personal liability:** Ryan's role as the app's **owner** (the product's load and level logic, minors' data in his own Supabase account) is private business, likely outside district defense (Gov. Code §825 covers only acts within his job). With no entity, a claim about the product reaches personal assets. No general liability coverage (~$444/yr per Finance). Personal homeowner's or umbrella policies often exclude business activities. | Supervision lock, eligibility and level rules, no 1RM, G2/G5 caps, C12 proof records, coach-only load tests, the AD letter separating coaching from product. | Free quotes first (Finance drafts are ready). Then general liability coverage and an attorney consult before the first minor. Ask a broker whether a personal umbrella covers anything. Form an LLC (with a CPA) before outside coaches join. Training suggests load tests adult-only during the pilot (not adopted). |
 | **TM-9** (11/13) | Ryan coaches the soft-launch team himself | **R1 at its strongest:** a district employee using his own app with his own students, as both coach and owner. It raises the district IP claim (Q1), outside-business disclosure (Q2), FERPA/SOPIPA and district app review (Q17), and mandated-reporter duties through the app (Q4). His team can't validate the product (Market Research). | Founder-as-coach rules above; written AD/principal approval that separates coaching from the product; full disclosure of ownership; no district records, devices, or networks; feedback from outside coaches. | Send the AD letter (attorney review first if possible). No minors until it's signed, and until any district ed-tech review it requires is done. |
 | **R12 / TM-14** (11/14) | Keep "Approach Strength" and **publish the marketing site now** despite Branding's finding | A live, allowed federal application for **APPROACH** (Serial 97166472, Fullsteam, Class 42: workout scheduling and member software for sport clubs). "Strength" is descriptive, so the marks may be compared on "APPROACH." A public site with prices is public use in commerce, which raises the chance of a demand letter. A forced rename after families sign means re-collecting consent forms and reprinting. | ™ only, never ®; no filing; no paid ads, merch, or signage; a plain site with no sales; the bundle ID isn't locked yet. | A trademark attorney's opinion (free clinic/SBDC or flat fee) **before the App Store listing, any paid promotion, or the first outside coach's forms**. Branding recommended one before forms print. |
+| **TM-17 / TM-19 / R11-T** (11/15) | Trainer mode Phase A + B built and launched in one day as 2.3.0; the trainer's first clients this week. Gate = option B (trainer's written confirmation of certification, own professional liability insurance, own business), not C (also Ryan's GL quote and an attorney consult) | **Adult clients' consumer health data** (check-ins with a pain flag) in Ryan's Supabase, with no entity or insurance (R11 extended). Trainer Terms, this section, and Training's adult rules are **unreviewed** by an attorney or a CSCS. A gym is inside Fullsteam's APPROACH goods description (R12). One trainer is a sample of one. | Adults only; TM-19 gate enforced in the database; Trainer Terms §4T with indemnity backed by **her own** professional liability insurance; health-data opt-ins default off; no condition fields; no AI; no co-branding; private pilot. | Option C: Ryan's GL quote and a short attorney consult before the first client. At minimum, ask the trainer for her insurer's name and policy expiry date, and re-confirm at expiry. |
 
 ---
 
@@ -267,11 +272,13 @@ Applies to the apex site and any page outside `app.`. **Legal signed off `docs/c
 - MUST NOT: sign-up, waitlist, contact, newsletter, or demo-request **forms**, or **buy, checkout, or "start trial" buttons**, unless Legal reviews them first. Contact is a plain `mailto:ryan@approachstrength.com` link.
 - MUST: sign-in happens only on `app.` The marketing page has **Coach** and **Athlete** buttons that link to `app.` sign-in, and an **Administrator** button that opens the fake-data preview.
 - MUST: the footer links Privacy, Terms, and Parent consent form at their **current URLs** (`/privacy`, `/terms`, `/consent`). They never move, because printed forms point to them. The Privacy Notice states that the marketing site sets no cookies and uses no analytics.
+- MUST (2.3.0): the footer also links **"Consumer health data"** to `/privacy#health-data` (the consumer health data section in Part A2). Washington's My Health My Data Act expects a separate, prominent homepage link. Attorney to confirm whether a section is enough or a separate page is needed (Q24c).
 
 **Who it speaks to**
 - MUST: written for **coaches, athletic directors, and parents.** The athlete section addresses parents ("for your athlete"), not minors. No calls to action aimed at teens.
 - MUST NOT: photos or video of real athletes, teams, schools, or the founder's district. No school or club names, logos, mascots, or colors. Demo-mode screenshots with fake data, or licensed stock/illustrations with no identifiable minors.
 - MUST NOT: testimonials, quotes, ratings, star counts, user numbers, or "trusted by" logos unless they're real, the person agreed in writing, and Legal has reviewed them. **Nothing invented or "representative,"** and nothing from minors.
+- MUST NOT (private pilot, R12): any trainer or gym section, tier, or mention of trainer mode until the name question is settled (spec trainer-mode Rules).
 
 **Claims**
 - MUST NOT: injury-prevention, treatment, medical, or guaranteed-results claims ("prevent ACL tears," "add 4 inches to your vertical," "safe for all ages"). No "proven," "science-backed," "clinically," or "#1" unless a cited source supports the exact claim and Legal approves it.
@@ -298,11 +305,119 @@ Applies to the apex site and any page outside `app.`. **Legal signed off `docs/c
 - No cookies are set.
 - No forms, `<input>`, or buy buttons exist; no `<script>` tags.
 - Every price has the label, and every feature has a status label.
-- The legal links work.
+- The legal links work, including "Consumer health data" (2.3.0).
 - The claim-word search is clean.
 - The published text matches `docs/copy/website-copy.md` v1.1 (Legal's signed-off copy).
+
+---
+
+## Trainer mode (2.3.0: general teams, adult clients; T-A2 / T-B4, no AI)
+Applies to teams with `teams.kind = 'general'` (spec `product/specs/trainer-mode.md` v0.3). **Volleyball teams don't change:** every rule above still applies to them exactly as written. Wording for users is in `legal/soft-launch-notice.md`: **Terms §4T** (Trainer Terms) and **Privacy Part A2** (adult clients of a trainer). *Assumption:* the trainer has **no tie to Ryan's district or club** (meeting open question 1). If she does, stop and tell Legal before her first client (R1).
+
+### T1. Adults only
+- MUST: `join_team` and RLS reject `is_minor = true` for general teams (UI and API). Message: "This team is for adults 18 and older."
+- MUST: no parent consent, form v2, or consent tracker in general teams. Clients choose for themselves in **"Your choices"** (F8).
+- MUST: a member who's on a volleyball team as a minor can never be added to a general team (`is_minor` decides, not the team they came from).
+
+### T2. Trainer confirmations at team creation (in the app)
+Three **separate, unticked** checkboxes before a general team is created. All three are required:
+1. "I've read and accept the **Trainer Terms** (Terms §4T)." *(link)*
+2. "My clients are adults (18+), and I'm responsible for the programs I give them, including screening clients before they train."
+3. "I won't put the Approach Strength name on anything my gym prints, posts, or shares."
+
+**Record (new fields, approved):** `teams.trainer_terms_version text`, `teams.trainer_terms_accepted_at timestamptz`, `teams.trainer_terms_accepted_by uuid`, `teams.trainer_confirmations jsonb` (the three items, each with a timestamp). Readable by that trainer and the service role only. If Legal changes §4T, the trainer must accept again before posting new programs (version check).
+
+### T3. The TM-19 gate (MUST before the first client)
+1. The trainer emails `ryan@approachstrength.com` confirming in writing:
+   - **her current certification** (name and issuing body);
+   - **her own professional liability insurance** (Legal also asks for the **insurer's name and the policy's expiry date**);
+   - **that she trains clients through her own business.**
+2. Ryan checks that the email covers all three, **logs the date received** in a private Legal record (date, team id, what was confirmed, expiry date), and files the email in Zoho → "Trainer records."
+3. Ryan sets **`teams.trainer_verified_at`** and **`teams.trainer_verified_by`** with the service role (Supabase dashboard or an admin script).
+   - These fields are **writable only by the service role**. No RLS policy lets any user, including the trainer, write them (API test as the trainer must fail).
+   - Readable by that team's trainer (to show the "open" state) and the service role.
+4. While `trainer_verified_at` is null:
+   - `join_team` rejects every join (function check, not only UI);
+   - the join code shows "This trainer's team isn't open yet.";
+   - the trainer's Clients screen shows "Your team opens once Ryan confirms your details by email."
+5. **Not stored in the app:** certification numbers, insurance details, or the email itself.
+6. **Lapse:** at the insurance expiry date, Ryan asks for a renewed confirmation. If it isn't received within 14 days, or the trainer says her insurance or certification has lapsed, Ryan **clears `trainer_verified_at`**: no new clients can join, and the trainer can't post new programs. Existing clients keep access to their own history. (→ **Product (01):** add "can't post while unverified" to spec A5.)
+7. **Retention:** keep the TM-19 email and log for **5 years after the team closes**, as the C12-style proof record for trainer mode.
+
+### T4. New server fields: approved for 2.3.0
+| Field | Verdict | Conditions |
+|---|---|---|
+| `teams.kind` (`'volleyball' \| 'general'`) | ✅ | Existing teams = `volleyball`. Can't be changed after a team has members (prevents switching a minors' team to general). |
+| `programs.target_user_id` (nullable) | ✅ | RLS: a client sees only programs targeted at **them**, their group, or the whole team. A client never sees another client's targeted program, even its title (API test). |
+| Free-named groups (`groups.name`) | ✅ | Helper text: "Use a class time or first name. Don't include health details." Group names are visible to members of that group. |
+| `teams.trainer_verified_at`, `teams.trainer_verified_by` | ✅ | Service-role write only (T3). |
+| `teams.trainer_terms_*`, `teams.trainer_confirmations` | ✅ | T2. |
+| Program goal (`Strength`, `Muscle`, `General fitness`, `Back after a break`) | ✅ | No weight-loss, body-composition, injury, or "return to training" goals. "Back after a break" shows the time-off description (spec B3). |
+| Gym equipment profile (per team) | ✅ | Gym equipment only; no personal data. Clients' home equipment stays on the device. |
+| Cardio logs: minutes only (+ Easy/Moderate as prescribed) | ✅ | No heart rate, pace, distance, speed, calories, or device data (adult rules A4). |
+| Templates (trainer-private) | ✅ | No client data inside a template; duplicating to a client copies the plan, not another client's logs. |
+| **Anything else** | ❌ until reviewed | Same rule as volleyball (G-5): Claude Code stops for Legal on any new table or column not listed here. |
+
+### T5. Adult clients' check-ins are consumer health data
+Check-ins (sleep, soreness, energy, **pain yes/no**) from adult clients are treated as **consumer health data** under laws like Washington's My Health My Data Act and Nevada SB 370 (attorney Q14, Q24b). For general teams:
+- MUST: check-ins are **off by default**. The client turns them on in "Your choices" (an affirmative opt-in to **collect**).
+- MUST: **sharing with the trainer** is a **separate** toggle, also **off by default**, available only once check-ins are on. Copy: "Share my check-ins with my trainer. Your trainer will see your sleep, soreness, energy, and whether you reported pain. Other clients never will."
+- MUST: the trainer **can't** require sharing, turn it on, or see which clients have it off beyond "No check-in shared." Trainer Terms §4T.5 forbids making it a condition of training.
+- MUST: turning either toggle off takes effect immediately. Turning sharing off **hides past shared check-ins** from the trainer too.
+- MUST: clients can **delete their check-in history** from Settings (all entries). → **Product/UX:** add "Delete my check-ins" to Settings → Your data if not built.
+- MUST: the trainer dashboard's **"Pain reported today"** flag appears only when sharing is on, with no detail, and uses the G3 wording on the client side. No body-part question, no swap, no suggested session (adult rules A9).
+- MUST NOT: any condition-specific field or option: injuries, pain areas, medical conditions, medications, pregnancy, rehab, health history, PAR-Q style questions (adult rules A7). **Screening is the trainer's job, outside the app** (Terms §4T.3).
+- MUST: the workout-note field in general teams shows helper text: "Your trainer sees your notes. Don't include health or injury details." *(Notes stay free text, as built for volleyball; a pick-list is the 2.3.1 AI rule, not a 2.3.0 change.)*
+- MUST NOT: sell, use for ads, or share health data with anyone but the client's own trainer (when the client shares) and our processors.
+- **Volleyball adults (flag, not a 2.3.0 gate):** "Your choices" for adult volleyball athletes defaults check-ins **on and shared** (v2.1 P1.4). Under the same laws that's weaker than an opt-in. → **Product (01):** switch adult defaults to **off** in the next volleyball patch. Minors are unaffected; their parent ticks boxes 2–3.
+
+### T6. Visibility in general teams
+- MUST: a client sees only their own data, programs targeted at them, their group's and team-wide programs, and (if the trainer turns the board on and the client agrees) the board.
+- MUST: the trainer sees each client's programs, logs, notes, PRs, level, adjustments, and shared check-ins. **The dashboard never ranks clients** against each other (spec B6).
+- MUST: **effort board off by default**; for clients, the **boards** choice in "Your choices" also defaults **off** in general teams. Rack-partner names follow § Rack-partner names (board toggle).
+- MUST NOT: messaging, chat, comments, feeds, or client directories. Clients can't see who else is on the trainer's team except through the board or rack cards they've opted into.
+- MUST NOT: any access for the gym (owner or staff accounts, exports, or shared logins). The trainer may not give anyone else her login (Terms §4T.5).
+
+### T7. No AI in 2.3.0 (TM-18)
+- MUST NOT: any call to an AI or LLM provider, AI SDK, or Edge Function that sends data to one, or any "AI" label, toggle, or placeholder in the UI. No `ai_assisted` column yet.
+- MUST: the build's dependency check shows **no AI-provider packages** (e.g., OpenAI, Anthropic, Google AI SDKs) in `package.json` or Edge Functions. *(Using Claude Code to write the code is fine; this rule is about the shipped app.)*
+- **Before 2.3.1 (B10):** Legal reviews and approves the provider as a **new subprocessor**: DPA, no training on our data, no retention of prompts beyond abuse checks, US data location, and the B10.2/B10.3 data rules (library IDs and pick-lists only; no client data). The Privacy Notice is updated **before** the feature ships, and the marketing site's never-show list stays.
+
+### T8. Gym, name, and private pilot (R12)
+- MUST: the trainer's confirmation 3 (T2) and Terms §4T.6: no Approach Strength name on anything the gym prints, posts, or shares; clients hear about it from the trainer one to one.
+- MUST: no trainer or gym content on the marketing site, no outreach to other trainers or gyms, and no gym logos or names in the app (team names chosen by the trainer are fine).
+- MUST: the board is shown only on the trainer's own device or a screen she controls, visible to her class only. Gym-owned screens only with the gym's permission.
+
+### T9. Deletion and retention (general teams)
+- Client leaves or is removed: the trainer loses access to that client's data **immediately**. The client keeps their own history (I2).
+- Client deletes their account: removed within 30 days. **No proof record is kept for adult clients** (no consent form or testing day), except the trainer's own records outside the app.
+- Trainer deletes the team: clients keep their own logs; programs posted by the trainer are removed. The TM-19 record is kept 5 years (T3.7).
+
+### T10. Acceptance (Legal's checks for `reports/v2.3.0-acceptance.md`)
+- [ ] A minor can't join a general team (UI and API); `teams.kind` can't change once a team has members.
+- [ ] The three trainer confirmations are separate, unticked, required, and recorded with the Terms version.
+- [ ] With `trainer_verified_at` null, joins fail (API); the trainer can't set it (API as the trainer); after a service-role update, joins work.
+- [ ] A client can't read another client's targeted program (API).
+- [ ] Check-ins and sharing default **off** for new general-team clients; turning sharing off hides past check-ins from the trainer (API).
+- [ ] "Pain reported today" appears only with sharing on, with no detail.
+- [ ] No condition-specific, weight-loss, or body-composition fields exist; cardio stores minutes only (schema check).
+- [ ] Notes helper text appears in general teams.
+- [ ] Effort board and the clients' boards choice default off in general teams; the dashboard has no ranking.
+- [ ] No messaging or chat; no gym access.
+- [ ] No AI packages, calls, or UI (dependency and network check).
+- [ ] Privacy Part A2 and Terms §4T are live at `/privacy#health-data` and `/terms#trainer-terms`, generated only from `docs/legal/`; the footer has "Consumer health data."
+- [ ] Volleyball teams unchanged (re-run the v2.2 checks).
+
+### T11. Gates before the trainer's first client (Legal's part)
+1. Terms §4T and Privacy Part A2 are **live** on `approachstrength.com` (not just in docs).
+2. The trainer has accepted the T2 confirmations in the app.
+3. The TM-19 email is received with all three items plus insurer and expiry, logged, and `trainer_verified_at` is set.
+4. The trainer confirms she has **no tie to Ryan's district or club** (or Legal has reviewed one).
+*Recommended, not gates:* Ryan's GL quote and a short attorney consult (option C), CSCS review of the adult rules.
 
 ## Still open for Legal
 - Zoho conditions 1–3 (two-factor, DPA, no forwarding): Ryan to confirm.
 - Trademark attorney opinion before the App Store, paid promotion, or the first outside coach's forms (R12).
 - The AD/principal approval must be signed before the first minor.
+- Trainer: her TM-19 email and the district/club-tie answer (T3, T11).
+- 2.3.1 AI provider review (T7) when Product hands off B10.

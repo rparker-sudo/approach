@@ -364,7 +364,8 @@ export default function Settings() {
         <Text style={{ fontSize: 12, color: colors.faint }}>Version {(Constants.expoConfig?.version ?? '1.0.0').replace(/\.0$/, '')}</Text>
       </Card>
 
-      <Body muted style={{ fontSize: 12 }}>{NUTRITION_DISCLAIMER}</Body>
+      {/* F34: no Fuel in general teams, so no nutrition disclaimer. */}
+      {general ? null : <Body muted style={{ fontSize: 12 }}>{NUTRITION_DISCLAIMER}</Body>}
     </Screen>
   );
 }

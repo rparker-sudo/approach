@@ -88,7 +88,7 @@ export default function ClientToday() {
             <Label>{programLine(program, day, false)}</Label>
             {program.groupName ? <Text style={{ fontSize: 13, color: colors.muted }}>{program.groupName}</Text> : null}
             <H2>{session.name}</H2>
-            <Text style={{ fontSize: 15, color: colors.muted }}>{`about ${formatMinutes(resolved.estMinutes)}`}</Text>
+            <Text style={{ fontSize: 15, color: colors.muted }}>{formatMinutes(resolved.estMinutes)}</Text>
             {resolved.block.deload ? <Text style={{ fontSize: 13, color: colors.muted }}>Lighter week: fewer sets.</Text> : null}
             {resolved.light ? <Note>Your trainer lightened today&apos;s session. Same exercises, fewer sets, easy effort.</Note> : null}
             {session.location === 'home' && !data.homeEquipmentAsked ? (

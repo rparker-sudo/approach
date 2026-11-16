@@ -9,10 +9,12 @@ rparker-sudo/approachstrength-site). The app's own public/privacy.html etc. are 
 Rules (Legal; docs/legal/soft-launch-notice.md): the build publishes Legal's text exactly. There is
 no find-and-replace on legal wording here. The script only:
   - converts the Markdown to HTML (headings, lists, tables, bold, italics, signature lines),
-  - picks the published sections (Part A, Part B, the printable form) and leaves out Legal's
+  - picks the published sections (Part A with Part A2, Part B, the printable form) and leaves out Legal's
     drafting notes and the "(Attorney to ...)" review markers, which are internal notes,
   - fills the "[publish date]" placeholder,
-  - adds an id="coach-terms" anchor on Terms §4 (markup only) for the in-app Coach Terms link.
+  - adds an id="coach-terms" anchor on Terms §4 (markup only) for the in-app Coach Terms link,
+  - turns Legal's anchor markup {#health-data} (Part A2) and {#trainer-terms} (§4T) into id attributes (2.3.0;
+    markup only, the words around it are untouched).
 It stops if the sources fail the 2.2.1 stop rules (contact email and the "Approach Strength" name).
 Plain HTML and CSS: no scripts, no third-party requests, self-hosted fonts.
 """
@@ -22,7 +24,8 @@ import re
 import sys
 from pathlib import Path
 
-PUBLISH_DATE = 'November 15, 2026'
+# The date the current text goes live (2.3.0: Privacy Part A2 and Terms §4T, notice v2.5).
+PUBLISH_DATE = 'November 16, 2026'
 CONTACT = 'ryan@approachstrength.com'
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -47,6 +50,16 @@ def inline(text: str) -> str:
 
 ITEM = re.compile(r'^(\d+)\.\s+(.*)$')
 
+# Legal's anchor markup, e.g. "## Part A2: ... {#health-data}" or "**4T. Trainer Terms** {#trainer-terms}." (markup only).
+ANCHOR = re.compile(r'\s*\{#([a-z0-9-]+)\}')
+
+
+def take_anchor(text: str) -> tuple[str, str]:
+    m = ANCHOR.search(text)
+    if not m:
+        return text, ''
+    return text[: m.start()] + text[m.end():], f' id="{m.group(1)}"'
+
 
 def md_to_html(md: str, indent: str = '    ') -> str:
     out: list[str] = []
@@ -56,7 +69,12 @@ def md_to_html(md: str, indent: str = '    ') -> str:
 
     def flush():
         if para:
-            out.append(indent + '<p>' + '<br />'.join(inline(x) for x in para) + '</p>')
+            parts = []
+            for x in para:
+                # The anchor goes where Legal put it: at the start of that line (an empty span, markup only).
+                x, a = take_anchor(x)
+                parts.append((f'<span{a}></span>' if a else '') + inline(x))
+            out.append(indent + '<p>' + '<br />'.join(parts) + '</p>')
             para.clear()
 
     while i < len(lines):
@@ -69,7 +87,8 @@ def md_to_html(md: str, indent: str = '    ') -> str:
         if s.startswith('#'):
             flush()
             level = len(s) - len(s.lstrip('#'))
-            out.append(f'{indent}<h{level}>{inline(s[level:].strip())}</h{level}>')
+            text, ids = take_anchor(s[level:].strip())
+            out.append(f'{indent}<h{level}{ids}>{inline(text)}</h{level}>')
             i += 1
             continue
         if s.startswith('|'):
@@ -125,7 +144,8 @@ def md_to_html(md: str, indent: str = '    ') -> str:
                     else:
                         break
                 # Anchor for in-app links (2.2.1 §8). Markup only; the item's wording is untouched.
-                anchor = ' id="coach-terms"' if item.startswith('**Coach Terms.**') else ''
+                item, anchor = take_anchor(item)
+                anchor = anchor or (' id="coach-terms"' if item.startswith('**Coach Terms.**') else '')
                 li = f'{indent}  <li{anchor}>{inline(item)}'
                 if nested:
                     li += '\n' + md_to_html('\n'.join(nested), indent + '    ') + '\n' + indent + '  '
@@ -188,7 +208,7 @@ HEADER = header()
 
 FOOTER = """  <footer class="site-footer">
     <div class="wrap">
-      <nav aria-label="Footer"><a href="/privacy">Privacy</a><span aria-hidden="true"> · </span><a href="/terms">Terms</a><span aria-hidden="true"> · </span><a href="/consent">Parent consent form</a><span aria-hidden="true"> · </span><a href="mailto:{email}">{email}</a></nav>
+      <nav aria-label="Footer"><a href="/privacy">Privacy</a><span aria-hidden="true"> · </span><a href="/privacy#health-data">Consumer health data</a><span aria-hidden="true"> · </span><a href="/terms">Terms</a><span aria-hidden="true"> · </span><a href="/consent">Parent consent form</a><span aria-hidden="true"> · </span><a href="mailto:{email}">{email}</a></nav>
       <p class="owner">© 2026 Ryan Parker · Approach Strength™ · Free during the pilot.</p>
     </div>
   </footer>""".format(email=CONTACT)

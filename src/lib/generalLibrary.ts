@@ -338,6 +338,12 @@ export const WHY_GENERAL: Record<string, string> = {
   'thoracic-rotation': 'Upper-back rotation.',
 };
 
+/**
+ * Existing exercises whose "why" mentions volleyball but have no `whyGeneral` in general-library.md §5. General teams show no
+ * "why" line for these until Training supplies one (flagged in reports/v2.3.0-acceptance.md; taxonomy C1).
+ */
+export const WHY_HIDDEN_GENERAL = new Set(['doorframe-row']);
+
 /** Gym equipment profile (F40): the 10 existing items plus these 13, grouped. */
 export const GENERAL_EQUIPMENT: { id: Equipment; label: string; group: 'Machines' | 'Cardio' }[] = [
   { id: 'leg-press', label: 'Leg press', group: 'Machines' },

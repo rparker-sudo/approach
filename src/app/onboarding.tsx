@@ -221,8 +221,8 @@ export default function Onboarding() {
 
           {step === 'join' && (
             <>
-              <H1>Enter your team code</H1>
-              <Body muted>Your coach has a 6-character code for your team.</Body>
+              <H1>{team?.kind === 'general' ? 'Enter your code' : 'Enter your team code'}</H1>
+              <Body muted>{team?.kind === 'general' ? 'Your trainer has a 6-character code.' : 'Your coach has a 6-character code for your team.'}</Body>
               {team ? (
                 <Card>
                   <Label>Joined</Label>

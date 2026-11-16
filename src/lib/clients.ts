@@ -58,7 +58,9 @@ export function clientRow(team: Team, member: Member, programs: Program[], logs:
   const checkin = member.perms.shareCheckins ? (ci ? 'Checked in today' : 'No check-in today') : 'No check-in shared';
   const flags: ClientFlag[] = [];
   if (member.perms.shareCheckins && ci?.pain) flags.push({ label: 'Pain reported today', tone: 'warning', line: `Check in with ${first} in person.` });
-  const active = mine.some((p) => weekIndex(p, now) != null);
+  // Only once a program has been running for 7+ days (a client who started this week isn't flagged).
+  const weekAgo = new Date(now.getTime() - 7 * DAY);
+  const active = mine.some((p) => weekIndex(p, now) != null && weekIndex(p, weekAgo) != null);
   if (active && (!last || now.getTime() - new Date(last.date).getTime() >= 7 * DAY)) flags.push({ label: 'No session in 7 days', tone: 'warning' });
   if (primary && endsSoon(primary, now)) flags.push({ label: 'Program ends in 2 weeks', tone: 'muted' });
   if (primary?.goal === 'back_after_break') {

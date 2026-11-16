@@ -1,5 +1,5 @@
 import { TIER_IDS } from './rest';
-import { GENERAL_EXERCISES, WHY_GENERAL } from './generalLibrary';
+import { GENERAL_EXERCISES, WHY_GENERAL, WHY_HIDDEN_GENERAL } from './generalLibrary';
 import type { Equipment, Exercise, ExerciseCategory, HowTo, Pattern } from './types';
 
 /**
@@ -520,6 +520,7 @@ export const exercisePool = (general: boolean): Exercise[] => (general ? GENERAL
 
 /** The "why" line for the team in view: `whyGeneral` in general teams when it exists, else `why`. */
 export function whyFor(ex: Exercise, general: boolean): string {
+  if (general && WHY_HIDDEN_GENERAL.has(ex.id)) return '';
   return (general && (ex.whyGeneral ?? WHY_GENERAL[ex.id])) || ex.howTo.why;
 }
 

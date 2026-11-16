@@ -5,8 +5,10 @@
 
 Compares the visible text of each page (between the site header and footer) with the matching section of
 docs/legal/, after removing Markdown syntax and normalizing whitespace. Allowed differences, and only these:
-"[publish date]" is filled in, Legal's "(Attorney to ...)" review markers are left out, and the consent page's
-printing instruction line is site chrome. Exits 1 on any mismatch and prints where it starts.
+"[publish date]" is filled in, Legal's "(Attorney to ...)" review markers are left out, Legal's anchor markup
+({#health-data}, {#trainer-terms}) becomes an id, and the consent page's printing instruction line is site chrome.
+2.3.0: also checks that Part A2 is at /privacy#health-data, §4T at /terms#trainer-terms, and that every page's
+footer links "Consumer health data" to /privacy#health-data. Exits 1 on any mismatch and prints where it starts.
 """
 import html
 import re
@@ -22,6 +24,7 @@ PRINT_LINE = 'Print this page (or save it as a PDF), have a parent or guardian c
 
 def md_words(md: str, date: str) -> str:
     md = re.sub(r'\s*\*\(Attorney to [^)]*\)\*', '', md)
+    md = re.sub(r'\s*\{#[a-z0-9-]+\}', '', md)
     md = md.replace('[publish date]', date)
     md = re.sub(r'^\s*---\s*$', ' ', md, flags=re.M)
     md = re.sub(r'^\s*\|?\s*:?-{3,}.*$', ' ', md, flags=re.M)  # table separator rows
@@ -66,6 +69,26 @@ ok &= compare('privacy.html', section(NOTICE, '## Part A: Privacy Notice', '## P
 ok &= compare('terms.html', section(NOTICE, '## Part B: Terms (Soft Launch)', '### Drafting notes'), '## Part B: Terms (Soft Launch)', '# Terms (Soft Launch)')
 form = section(FORM, '## Approach Strength: Volleyball Fitness', '## Notes for the attorney')
 ok &= compare('consent.html', form, '', '')
+# 2.3.0 anchors (compliance T10): Part A2 and §4T, by id, holding the right text.
+priv = (SITE / 'privacy.html').read_text()
+terms = (SITE / 'terms.html').read_text()
+if not re.search(r'<h2 id="health-data">Part A2: Adult clients of a personal trainer</h2>', priv):
+    print('FAIL privacy.html: Part A2 is not at #health-data')
+    ok = False
+else:
+    print('PASS privacy.html#health-data is Part A2')
+if not re.search(r'<span id="trainer-terms"></span><strong>4T\. Trainer Terms</strong>', terms):
+    print('FAIL terms.html: §4T is not at #trainer-terms')
+    ok = False
+else:
+    print('PASS terms.html#trainer-terms is §4T')
+pages = sorted(p.name for p in SITE.glob('*.html'))
+missing = [n for n in pages if '<a href="/privacy#health-data">Consumer health data</a>' not in (SITE / n).read_text().split('<footer', 1)[-1]]
+if missing:
+    print('FAIL footer "Consumer health data" missing on: ' + ', '.join(missing))
+    ok = False
+else:
+    print(f'PASS footer "Consumer health data" → /privacy#health-data on all {len(pages)} pages')
 for n in ('privacy.html', 'terms.html', 'consent.html', 'index.html', '404.html'):
     t = (SITE / n).read_text().lower()
     if 'thehbcvbc' in t or '<script' in t or '<form' in t or '<input' in t:

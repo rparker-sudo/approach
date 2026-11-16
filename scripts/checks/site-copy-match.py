@@ -140,7 +140,9 @@ ALT = [strip_md(re.sub(r'^- [^:]+: "|"$', '', l)) for l in section(COPY, '## 8. 
 # UI labels the design doc names (design §1.4, §5.2, §5.3, §9) and data-table vocabulary on /admin-preview.
 UI = ['Skip to content', 'Menu', 'Log in', 'Show the numbers', 'Sample data', 'Preview', 'Sample organization', 'teams', 'coaches', 'athletes',
       'Team', 'Athletes', 'Season phase', 'Program', 'Volleyball program', 'Example only', 'coach account', 'coach accounts', 'Consistency',
-      'Team goal', 'sessions', 'Testing days run', 'Supervision confirmations on file', 'Week', 'of', '%', '/', '·', '→', '✓', 'i', 'Approach Strength']
+      'Team goal', 'sessions', 'Testing days run', 'Supervision confirmations on file', 'Week', 'of', '%', '/', '·', '→', '✓', 'i', 'Approach Strength',
+      # 2.3.0: the one website text change allowed this release, the footer link compliance T10 requires (Legal's words).
+      'Consumer health data']
 DESIGN_ALL = norm(section(DESIGN, '## 5. Administrator preview', '## 6. Screenshots'))
 PAGES = {
     'index.html': ('## 2. Home', '## 3. Features'),

@@ -1,12 +1,14 @@
 # Approach Strength — build snapshot
 
-*As of November 15, 2026 (v2.2.1, built on branch `v2.2.1` from `docs/specs/v2.2.1.md` v1.1). Facts only. Items marked **(unverified)** could not be confirmed from the code or from the owner. **(pending)** = waits for the owner's dashboard step or the live test.*
+*As of November 16, 2026 (v2.3.0, built on branch `v2.3.0` from `docs/specs/trainer-mode.md` v0.3; not deployed yet). Facts only. Items marked **(unverified)** could not be confirmed from the code or from the owner. **(pending)** = waits for the owner's dashboard step or the live test.*
 
-**What it is:** a weight-training, nutrition and planning app for volleyball athletes and coaches. Product name **Approach Strength** (since 2.2.1, D-035). Home-screen short name: "Approach". App: https://app.approachstrength.com. Website: https://approachstrength.com.
+**What it is:** a weight-training, nutrition and planning app for volleyball athletes and coaches, and (from 2.3.0) for personal trainers with adult clients ("general" teams). Product name **Approach Strength** (since 2.2.1, D-035). Home-screen short name: "Approach". App: https://app.approachstrength.com. Website: https://approachstrength.com.
 
 ---
 
 ## 1. Version and changes
+
+**2.3.0 (trainer mode, no AI):** built on branch `v2.3.0` (app) and `v2.3.0` (site repo) from the hand-off `e034bdb` (docs of Sun Nov 15, 2026). Acceptance report: `reports/v2.3.0-acceptance.md`. **Not deployed yet** (waits for Ryan's approval and Legal's G3/G4 wording). Migrations `009_trainer_a.sql`, `010_trainer_b.sql`. Summary in `CHANGELOG.md`; details and every judgment call in §8 ("2.3.0").
 
 **Current version:** 2.2.1 (`app.json`, `package.json`). Branch `v2.2.1` from the hand-off commit `e2bde34` (docs of Sat Nov 14, 2026). Acceptance report: `reports/v2.2.1-acceptance.md`. **Deployed November 15, 2026** (owner approved; tag `v2.2.1`).
 
@@ -163,7 +165,23 @@
 
 Flags: **AGE** · **HEALTH/WELLNESS** · **BODY METRICS** · **LOCATION** · **PHOTO/VIDEO** · **CREDENTIALS** · **FREE TEXT**.
 
-### Stored on the server (Supabase), after migrations 002–008
+### Stored on the server (Supabase), after migrations 002–010
+
+**2.3.0 (migrations 009, 010).** Every new field maps to a compliance T4 row:
+
+| New field / object | T4 row | Who can read / write |
+|---|---|---|
+| `teams.kind` ('volleyball' \| 'general', default volleyball) | `teams.kind` | members read; set only at creation (general only via `create_general_team`); a trigger blocks changes once the team has members |
+| `teams.trainer_terms_version`, `trainer_terms_accepted_at`, `trainer_terms_accepted_by`, `trainer_confirmations` (jsonb: the three confirmations, each with a timestamp) | `teams.trainer_terms_*`, `teams.trainer_confirmations` | no column grant; the trainer reads them via `my_team_status`; written by `create_general_team` / `accept_trainer_terms` |
+| `teams.trainer_verified_at`, `trainer_verified_by` (text) | `teams.trainer_verified_at/_by` | no grant; a trigger allows changes only from the service role (README SQL); the trainer reads them via `my_team_status` |
+| `team_programs.target_user_id` (uuid, nullable; `group_key = 'client:<uid>'`) | `programs.target_user_id` | general-team clients read only team-wide, their group's, or their own targeted program |
+| `team_groups.name` (existing) in general teams | free-named groups | a general-team client reads only their own group |
+| `team_programs.program` JSON: `general`, `goal`, `weeks` (rpe, deload, schedule), `startDate`, `templateOf`; session `warmup`; exercise `cardio` {minutes, intensity} | program goal; cardio | as `team_programs` |
+| `workout_logs.entries` JSON: `minutesDone` for cardio (no sets, HR, pace, distance or calories) | cardio logs: minutes only | as `workout_logs` |
+| `teams.gym_equipment` (text[], known equipment ids only; general teams only) | gym equipment profile | members read; the trainer writes |
+| policy "athlete deletes own check-ins" + `delete_my_checkins()` | (T5 MUST: delete check-in history) | own rows only |
+
+New RPCs: `create_general_team`, `my_team_status`, `accept_trainer_terms`, `current_trainer_terms`, `general_team_open`, `general_team_can_post`, `team_kind`, `my_group`, `delete_my_checkins`. Changed: `join_team` (adults only and verified for general teams; returns `kind`), `team_programs`/`team_groups` select policies (general scoping), program insert/update (general: verified, current Terms, target is a member), `test_sessions`/`test_results` inserts (volleyball only), `record_consent` (not in general teams). Templates are **not** on the server (device only). No `ai_assisted` column.
 
 **2.2.1 (migration 008):** `profiles` adds **`coach_terms_version`** (text, `2026-11-14`) and **`coach_terms_accepted_at`** (timestamptz): written only by `accept_coach_terms` (own row, coach accounts) or at coach sign-up from the checkbox (`handle_new_user`); not in the column select grant (others can't read them; the user reads them with `my_coach_terms`); a trigger stops anyone clearing them. New RPCs `current_coach_terms`, `coach_terms_ok`, `my_coach_terms`, `accept_coach_terms`. Changed: `record_consent` and the `test_sessions` insert policy need the current Coach Terms; `member_levels(t, ex)` returns `adjusted` instead of `swap_level`; `team_effort` drops `ranked`. No other new tables or fields.
 
@@ -198,6 +216,7 @@ Flags: **AGE** · **HEALTH/WELLNESS** · **BODY METRICS** · **LOCATION** · **P
 | `volley-strength/data/v1` | profile, programs, logs (now with `kind`, `location`, per-exercise `stationId`), body weight, touch log, readiness log, last known permissions, strength estimates, solo jump tests, theme; **new:** last known level per team, lift-program team, home equipment, harder-version answers, testing checklist read (coach, per team), last rack name, leave notice, home hint seen | BODY METRICS, HEALTH/WELLNESS, AGE, FREE TEXT |
 | `approach/not-eligible/v1`, `approach/workout-draft/…`, Supabase session | as in 2.1 | — / FREE TEXT / CREDENTIALS |
 | `volley-strength/data/v1` (2.2.1 additions) | `profile.hasAccount` (this device was signed in, so an expired session goes to Log in), `coachTermsPrompted` (account ids shown the one-time Coach Terms sheet) | — |
+| `volley-strength/data/v1` (2.3.0 additions) | `templates` (trainer's program templates: plan only, never logs), `openSeen` (general teams already shown "Your team is open") | — |
 | `load-and-launch/demo-server/v1` (demo only) | demo server, now also levels, lift program, racks, station runs | CREDENTIALS, HEALTH/WELLNESS, AGE |
 
 ---
@@ -249,6 +268,21 @@ $0 now. Future: Apple Developer Program $99/year; Supabase Pro about $25/month i
 ---
 
 ## 8. Known gaps, judgment calls and checks
+
+**2.3.0 judgment calls and gaps (for the planning team; also in `reports/v2.3.0-acceptance.md`):**
+- **Pending Legal:** G3 pain card (`PAIN_TRAINER`) and G4 head-injury line (`HEAD_INJURY_TRAINER`) for general teams use the design §S1b text, one constant each in `src/lib/general.ts`. Not to be deployed until Legal approves or supplies text.
+- **Known conflicts built as settled in CLAUDE.md:** class board **off** by default for clients (compliance T6 over F33); combined-cap block across all programs posted to a client (Product to confirm); an unverified trainer can build but not post; removing gym equipment warns and each client switches to the closest exercise (Product to confirm); "lowest level among targets" for a group's weekly cap; youth pairing/station rules are warnings in general teams.
+- **General library kept apart from the volleyball library:** the 32 non-cardio general exercises are `scope: 'all'` as the doc says, but volleyball teams keep their 2.2.1 library (generator, picker, resolution) so volleyball programs don't change. Flag for Training/Product: decide whether volleyball pickers should show them.
+- **Doorframe Row:** its "why" mentions hitting and has no `whyGeneral`; general teams show no "why" line for it until Training supplies one.
+- **Neutral strings (design §S2) changed for everyone:** "I'm a coach or trainer", "I'm an athlete or client", "Coach and trainer accounts are for adults 18 and older.", the signed-out Team card, the delete-account body. Strings inside volleyball team screens are unchanged.
+- **Create team** now asks the type first (F31), so volleyball coaches have one extra tap ("Volleyball team", Next).
+- **Templates and drafts** live on the trainer's phone (T4 allows a server table; device storage collects less). Logging out removes team drafts from the device (as team programs always were).
+- **Multi-team clients:** a client who is also on a volleyball team follows one team's program (TM-2 as built); "Your choices" saves apply to every team (as built). General-team defaults are all off.
+- **Calendar for general teams:** next 2 weeks (sessions from each program's week view) and breaks; Add → Session opens the program's week view. Date-specific extra sessions aren't built.
+- **Combined checks** compare programs week by week from each program's own week 1 (not by calendar overlap): conservative.
+- **Demo mode** has no service role: tests open a demo general team by setting `verifiedAt` in demo storage.
+- **"Paused" vs "not open"** on the trainer's screen: a team that was open on this device and is now cleared shows "paused" (the server doesn't keep a history).
+- **New UX copy not in the docs (Branding to review):** Today "No session today / Rest, move easy…", progress "Personal bests / Only you and your trainer see these.", settings safety line for adults, "Tell your trainer in person about any pain.", trainer board/calendar/racks lines, the ClientsScreen programs helper, gym equipment save toast as designed.
 
 **2.2.1 judgment calls (for the planning team / Legal):**
 - **Legal pages:** published from `docs/legal/` with no wording changes. The script leaves out Legal's drafting notes (after "### Drafting notes") and the two italic review markers "(Attorney to finalize.)" and "(Attorney to review; see the drafting note below.)", as 2.2.0 did for the first. It fills "[publish date]" with November 15, 2026 and adds `id="coach-terms"` to Terms §4. `scripts/checks/legal-pages-match.py` compares every published word with the docs (whitespace normalized). **Legal to confirm that leaving out the review markers is right.**

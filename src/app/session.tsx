@@ -30,6 +30,7 @@ export default function SessionScreen() {
   const [floorNote, setFloorNote] = useState<Record<number, string>>({});
   const [selected, setSelected] = useState<number[]>([]);
   const [groupMsg, setGroupMsg] = useState<string | null>(null);
+  const [groupWarn, setGroupWarn] = useState<string | null>(null);
   const { members } = useTeams();
 
   if (!program || !session) return <Screen><Body muted>Session not found.</Body></Screen>;
@@ -127,13 +128,15 @@ export default function SessionScreen() {
     setSelected((sel) => (sel.includes(i) ? sel.filter((x) => x !== i) : [...sel, i]));
   }
   function groupSelected() {
-    const res = groupRows(session!.exercises, selected, program!.equipment);
+    const res = groupRows(session!.exercises, selected, program!.equipment, !!program!.general);
     if (res.reason) {
       setGroupMsg(res.reason);
       return;
     }
     update({ ...session!, exercises: res.list! });
     setSelected([]);
+    // General teams: the youth rule shows as a warning (amber), the block is made.
+    if (res.warning) setGroupWarn(res.warning);
   }
   function move(i: number, dir: -1 | 1) {
     const j = i + dir;
@@ -404,6 +407,7 @@ export default function SessionScreen() {
         </Card>
       ) : null}
 
+      {groupWarn ? <Text accessibilityRole="alert" style={{ fontSize: 13, color: colors.warningText }}>{`Warning: ${groupWarn}`}</Text> : null}
       <Text style={{ fontSize: 14, fontWeight: '600', color: minutes > target ? colors.warningText : colors.ink }}>
         {`${formatMinutes(minutes)} · target ${target}${minutes > target ? ' ●' : ''}`}
       </Text>

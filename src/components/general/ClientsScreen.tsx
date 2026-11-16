@@ -11,6 +11,7 @@ import { shareClientInvite } from '../../lib/share';
 import { useStore } from '../../lib/store';
 import { ALL, isDraftKey, summarizeReadiness, useTeams } from '../../lib/team';
 import EffortBoard from '../EffortBoard';
+import StationControls from '../StationControls';
 import { BoardColor } from '../TeamSettingsCard';
 import Sheet from '../Sheet';
 import { Body, Button, Card, Checkbox, Chip, ChipRow, colors, display, Field, H2, Icon, Label, Note, Pill, Row, StatusChip, Text, Toggle } from '../ui';
@@ -268,7 +269,8 @@ export default function ClientsScreen({ team }: { team: Team }) {
             </Row>
           </Card>
 
-          {/* ---------- Class board, racks ---------- */}
+          {/* ---------- Stations (as built), class board, racks ---------- */}
+          <StationControls team={team} />
           <Button
             kind="secondary"
             title="Open class board"

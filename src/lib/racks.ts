@@ -41,11 +41,12 @@ export function rackCountFor(athletes: number, by: 'count' | 'size', value: numb
 }
 
 /** "16 athletes → 5 racks of 3–4" */
-export function sizeSummary(athletes: number, racks: number): string {
-  if (!athletes) return 'No athletes selected.';
+export function sizeSummary(athletes: number, racks: number, general = false): string {
+  const word = general ? 'client' : 'athlete';
+  if (!athletes) return `No ${word}s selected.`;
   const lo = Math.floor(athletes / racks);
   const hi = Math.ceil(athletes / racks);
-  return `${athletes} athlete${athletes === 1 ? '' : 's'} → ${racks} rack${racks === 1 ? '' : 's'} of ${lo === hi ? lo : `${lo}–${hi}`}`;
+  return `${athletes} ${word}${athletes === 1 ? '' : 's'} → ${racks} rack${racks === 1 ? '' : 's'} of ${lo === hi ? lo : `${lo}–${hi}`}`;
 }
 
 const lvl = (a: RackAthlete) => a.level ?? 2;

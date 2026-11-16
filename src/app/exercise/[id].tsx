@@ -33,7 +33,7 @@ export default function ExerciseScreen() {
         ))}
       </Section>
 
-      <Section title="Coaching cues">
+      <Section title={general ? "Cues" : "Coaching cues"}>
         {ex.howTo.cues.map((c, i) => (
           <Text key={i} style={{ lineHeight: 22 }}>• {c}</Text>
         ))}

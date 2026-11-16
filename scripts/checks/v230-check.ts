@@ -9,12 +9,15 @@ const path = require('path') as { join: (...p: string[]) => string; resolve: (..
 import { EXERCISES, GENERAL_POOL, exercisePool, getExercise, whyFor, equipmentLabel, fits } from '../../src/lib/exercises';
 import { GENERAL_EQUIPMENT, GENERAL_EXERCISES, WARMUPS, WHY_GENERAL } from '../../src/lib/generalLibrary';
 import {
-  ADULT_GOAL_RX, BACK_AFTER_BREAK_RAMP, adultWave, cardioProblems, clampCardio, countsTowardCap, defaultWeeks, generalEffortProblem,
+  ADULT_GOAL_RX, BACK_AFTER_BREAK_RAMP, adultWave, endsSoon, endDate, cardioProblems, clampCardio, countsTowardCap, defaultWeeks, generalEffortProblem,
   GOALS, HEAD_INJURY_TRAINER, LEGAL, PAIN_TRAINER, postChecks, programChecks, shiftBeginner, STRENGTH_CAP, terms,
 } from '../../src/lib/general';
 import { newGeneralProgram } from '../../src/lib/starter';
 import { resolveExercise, resolveSession } from '../../src/lib/resolve';
 import { tierOf } from '../../src/lib/rest';
+import { groupRows } from '../../src/lib/groups';
+import { suggestWeight } from '../../src/lib/progression';
+import type { WorkoutLog } from '../../src/lib/types';
 import type { Program, Session } from '../../src/lib/types';
 
 let f = 0;
@@ -128,6 +131,35 @@ ok(w3.exercises.some((e) => e.role === 'power'), 'Back after a break week 3: pow
 const noBar = resolveSession({ ...base, equipment: ['dumbbells', 'bench', 'leg-press'], sessions: [ses] }, ses, { level: 3, logs: [] }, day('2026-11-23'));
 ok(fits(getExercise(noBar.exercises[0].exerciseId), ['dumbbells', 'bench', 'leg-press']), `gym profile limits resolution (${noBar.exercises[0].exerciseId})`);
 ok(resolveExercise(getExercise('pullup'), 1, ['pullup-bar', 'bands', 'assisted-pullup-machine'], GENERAL_POOL)?.id === 'assisted-pullup', 'general: pull-up → assisted pull-up when it fits');
+
+/* ---------- Spec A6 smoke: rest floors, supersets, circuits, stations, home, progression, in a general team ---------- */
+const smoke: Session = { id: 'sm', name: 'sm', focus: '', format: 'stations', stations: [{ id: 'st1', name: 'Rack', groups: ['A'], minutes: 8 }, { id: 'st2', name: 'Bench', groups: ['B'], minutes: 8 }], exercises: [
+  { exerciseId: 'back-squat', sets: 3, reps: '5', effort: 'RPE 7', role: 'main', restSec: 30, restSetByCoach: true },
+  { exerciseId: 'db-bench', sets: 3, reps: '8–10', effort: 'RPE 7', role: 'secondary', group: 'A' },
+  { exerciseId: 'db-row', sets: 3, reps: '8–10', effort: 'RPE 7', role: 'secondary', group: 'A' },
+  { exerciseId: 'db-lateral-raise', sets: 2, reps: '12', effort: 'RPE 7', role: 'accessory', group: 'B' },
+  { exerciseId: 'db-curl', sets: 2, reps: '12', effort: 'RPE 7', role: 'accessory', group: 'B' },
+  { exerciseId: 'plank', sets: 2, reps: '30 s', effort: 'Controlled', role: 'core', group: 'B' },
+] };
+const sp = { ...base, sessions: [smoke], equipment: ['barbell', 'dumbbells', 'bench', 'cable', 'bands'] } as Program;
+const rs = resolveSession(sp, smoke, { level: 2, logs: [] }, day('2026-11-23'));
+ok(rs.exercises[0].restSecResolved >= 120, `rest floor: tier A at ≥ 2:00 even when the trainer typed 0:30 (${rs.exercises[0].restSecResolved}s)`);
+ok(rs.exercises.filter((e) => e.group === 'A').length === 2 && rs.exercises.filter((e) => e.group === 'B').length === 3, 'superset (A) and circuit (B) kept');
+ok(rs.exercises.filter((e) => e.group).every((e) => e.stationId), 'stations: every block is placed at its station');
+const youth = groupRows([smoke.exercises[0], { exerciseId: 'box-jump', sets: 3, reps: '3', effort: 'Max effort', role: 'power' }], [0, 1], sp.equipment, true);
+ok(!!youth.list && !!youth.warning, 'contrast pair: a warning (not a block) in general teams');
+ok(!!groupRows([smoke.exercises[0], { exerciseId: 'box-jump', sets: 3, reps: '3', effort: 'Max effort', role: 'power' }], [0, 1], sp.equipment).reason, 'contrast pair: still blocked for volleyball teams');
+const homeS: Session = { ...smoke, id: 'h', location: 'home', format: undefined, stations: undefined, exercises: smoke.exercises.map((e) => ({ ...e, group: undefined })) };
+const rh = resolveSession({ ...sp, sessions: [homeS] }, homeS, { level: 2, logs: [], homeEquipment: ['dumbbells'] }, day('2026-11-23'));
+ok(rh.home && rh.exercises.every((e) => fits(getExercise(e.exerciseId), ['dumbbells'])), 'home workout: each exercise fits the client home equipment (device only)');
+const lg = (w: number, reps: number, date: string): WorkoutLog => ({ id: date, date, programId: 'p', sessionId: 'x', sessionName: 'x', entries: [{ exerciseId: 'db-bench', sets: [1, 2, 3].map(() => ({ weight: String(w), reps: String(reps), done: true })) }] });
+const sg = suggestWeight([lg(40, 10, '2026-11-20T10:00:00Z')], { exerciseId: 'db-bench', sets: 3, reps: '8–10', effort: 'RPE 7' }, sp.equipment);
+ok(sg?.reason === 'up' && sg.weight === 42.5, `progression (G5): top of the range on every set → about +10%, capped (40 → 42.5 lb dumbbell) (${sg?.weight})`);
+
+/* ---------- B2/F39e program end ---------- */
+const ending = { ...prog('end', 3), startDate: '2026-11-02' } as Program; // 4 weeks: last week starts Nov 23, ends Nov 29
+ok(endDate(ending) === '2026-11-29', `program end date (${endDate(ending)})`);
+ok(endsSoon(ending, day('2026-11-16')) && !endsSoon({ ...ending, startDate: '2027-01-04' }, day('2026-11-16')) && !endsSoon(ending, day('2026-12-01')), '"Program ends in 2 weeks": within 14 days of the last week, not after it ends');
 
 /* ---------- Volleyball unchanged ---------- */
 ok(exercisePool(false) === EXERCISES, 'volleyball teams use the 2.2.1 library');

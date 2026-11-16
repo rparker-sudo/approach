@@ -113,7 +113,7 @@ export default function RacksScreen() {
           <Label>{by === 'size' ? (g ? 'Clients per rack' : 'Athletes per rack') : 'Racks'}</Label>
           <Stepper value={value} min={by === 'size' ? 2 : 1} max={by === 'size' ? 6 : 12} onChange={setValue} />
         </Row>
-        <Text style={{ fontSize: 15, fontWeight: '600' }}>{sizeSummary(chosen.length, count)}</Text>
+        <Text style={{ fontSize: 15, fontWeight: '600' }}>{sizeSummary(chosen.length, count, g)}</Text>
         <View style={{ gap: 2 }}>
           {RACK_HINTS.map((h) => (
             <Text key={h} style={{ fontSize: 13, color: colors.muted }}>{`• ${h}`}</Text>

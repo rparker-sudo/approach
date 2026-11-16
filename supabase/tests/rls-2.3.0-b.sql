@@ -62,3 +62,8 @@ set role authenticated;
 \echo == V volleyball unchanged: the volleyball coach still edits settings (expect 0 errors)
 select pg_temp.u(:'CA'); update teams set practice_min = 100 where id = :'A';
 reset role; select practice_min, gym_equipment is null as no_gym from teams where id = :'A';
+
+\echo == A6 the effort board is off by default in a general team, and the trainer can turn it on (expect 0 errors)
+reset role; select effort_board as default_on from teams where id = :'g'; set role authenticated;
+select pg_temp.u(:'TR'); update teams set effort_board = true where id = :'g';
+reset role; select effort_board as now_on from teams where id = :'g';

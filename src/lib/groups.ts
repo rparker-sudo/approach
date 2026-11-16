@@ -237,17 +237,23 @@ export function autoGroup(session: Session, opts: { target: number; enabled: boo
   return { ...session, exercises: list };
 }
 
-/** Coach: group rows into one block (pair or circuit). Returns the new list, or a reason. */
-export function groupRows(list: ProgramExercise[], rows: number[], gym?: Equipment[]): { list?: ProgramExercise[]; reason?: string } {
+/**
+ * Coach: group rows into one block (pair or circuit). Returns the new list, or a reason.
+ * 2.3.0 general teams (adult rules §5): the youth items (power or heavy lifts in a pair or circuit, contrast pairs) become a
+ * warning: the block is made and `warning` carries the same line. Every other rule still blocks.
+ */
+export function groupRows(list: ProgramExercise[], rows: number[], gym?: Equipment[], general = false): { list?: ProgramExercise[]; reason?: string; warning?: string } {
   const sorted = [...rows].sort((a, b) => a - b);
   if (sorted.length > 4) return { reason: CIRCUIT_REASONS.size };
   const reason = blockReason(sorted.map((i) => getExercise(list[i].exerciseId)), gym);
-  if (reason) return { reason };
+  const youth = [PAIR_REASONS.power, PAIR_REASONS.heavy, CIRCUIT_REASONS.heavy];
+  if (reason && !(general && youth.includes(reason))) return { reason };
+  const warning = reason ?? undefined;
   const g = nextLetter(list);
   const picked = sorted.map((i) => ({ ...list[i], group: g, autoGroup: false }));
   const rest = list.filter((_, i) => !sorted.includes(i));
   rest.splice(Math.min(sorted[0], rest.length), 0, ...picked);
-  return { list: rest };
+  return warning ? { list: rest, warning } : { list: rest };
 }
 
 /** Coach: ungroup a block (rows keep their order). */

@@ -4,6 +4,22 @@ Version numbers: whole numbers (1.0, 2.0) for big changes, decimals (1.1, 1.2) f
 The number is in `app.json` (`expo.version`, written as 1.1.0 for 1.1) and shows in the app under Settings.
 Each version has a matching GitHub tag (`v1.0`, `v1.1`, …) and download (`approach-1.0.zip`).
 
+## 2.3.0 — trainer mode (adult clients), no AI
+Built from `docs/specs/trainer-mode.md` v0.3 (Phase A, then Phase B). Supabase migrations `009_trainer_a.sql` and `010_trainer_b.sql` (run once each, in order, after 008; both safe to re-run). Acceptance report: `reports/v2.3.0-acceptance.md`. **Volleyball teams don't change.**
+
+- **Two kinds of team.** Create team asks **Volleyball team** or **Training clients (adults 18+)**. A training-clients ("general") team needs three separate confirmations (Trainer Terms §4T, adults and responsibility, no co-branding), recorded with the Terms version and time. The type can't change once a team has members.
+- **TM-19 gate.** A new general team is closed until Ryan verifies the trainer (service-role SQL in the README; no in-app control). While closed, clients can't join and the trainer can't post (the server enforces both); she can build programs. Clearing verification pauses the team; existing clients keep training.
+- **Adults only.** Minors can't join a general team (server and app). No parent consent, testing days, touch, jump tests, "Above the net," Jump gains, positions, Fuel, practices/matches, or the volleyball generator in general teams.
+- **Programs for one client, a group, or everyone.** Free-named groups (one per client); multi-week programs (1–16 weeks) with goals **Strength, Muscle, General fitness, Back after a break**, a week strip, per-week effort (capped at RPE 8), deloads, copy to days/weeks, templates (on the trainer's phone), duplicate to another client, program-end banner. Posting checks every client's combined weekly total (caps 4/5/6 by level, a day off) and blocks over-cap posts.
+- **Adult rules** in the builder and `resolveSession`: RPE 8 ceiling; failure, max, AMRAP and "for time" blocked in heavy/compound rows; beginners one RPE lower by default; the Back after a break ramp (level 1 in week 1, no power in weeks 1–2, starting weights about 20% lower); youth pairing/station rules become warnings.
+- **General library:** 39 exercises (machines, cables, barbell basics, isolation, 7 cardio), 13 gym equipment items, sport-neutral "why" text, warm-ups W1–W3. The **gym equipment profile** limits the builder and each client's version. **Cardio** is duration only (5–60 min, Easy or Moderate); logs keep minutes only.
+- **Trainer screens:** Clients dashboard (program and week, sessions done/planned, last session, shared check-in, text flags; sorted by name, date or flags, never ranked), client detail, Class board, racks and stations as built, calendar with sessions and breaks only.
+- **Client screens:** Today lists every session due from all their programs, with goal and week; "Your choices" with check-ins, sharing and the class board **off** by default; notes helper text; Delete my check-ins; turning sharing off hides past check-ins from the trainer.
+- **Wording:** Trainer/Client in general teams; neutral sign-up cards ("I'm a coach or trainer," "I'm an athlete or client").
+- **Website:** `/privacy` (Part A2 at `#health-data`) and `/terms` (§4T at `#trainer-terms`) regenerated from the v2.5 notice; footer link **Consumer health data** on every page.
+- **Pending Legal:** the trainer versions of the G3 pain card and G4 head-injury line (one constant each).
+- Checks: `scripts/checks/v230-check.ts`, `supabase/tests/rls-2.3.0-a.sql`, `rls-2.3.0-b.sql`.
+
 ## 2.2.1 — app.approachstrength.com, Approach Strength, Coach Terms, Log in
 Built from `docs/specs/v2.2.1.md` v1.1. Supabase migration `008` (run once, after 007). Acceptance report: `reports/v2.2.1-acceptance.md`.
 

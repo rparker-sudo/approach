@@ -7,6 +7,7 @@ import { showAlert } from '../lib/dialog';
 import { autoAssign } from '../lib/racks';
 import { stationTime, STATION_TRANSITION_SEC, runState, StationRun } from '../lib/stations';
 import { useTeams } from '../lib/team';
+import { isGeneral, scheduleFor, weekIndex } from '../lib/general';
 import type { Session } from '../lib/types';
 import { useTeamProgramFor } from './EffortBoard';
 import { Banner, Button, Card, colors, Row, Text } from './ui';
@@ -21,8 +22,12 @@ export default function StationControls({ team }: { team: Team }) {
   const programFor = useTeamProgramFor(team.id);
   const program = programFor(null);
   const day = dateKey(today());
-  const plan = program ? planForDate(program, today()) : null;
-  const session: Session | undefined = program?.sessions.find((s) => s.id === plan?.sessionId);
+  // 2.3.0: a general team's whole-team program follows its week view (no volleyball calendar).
+  const general = isGeneral(team);
+  const gw = program && general ? weekIndex(program, today()) : null;
+  const plan = program && !general ? planForDate(program, today()) : null;
+  const sessionId = general ? (program && gw != null ? scheduleFor(program, gw)[(today().getDay() + 6) % 7] : null) : plan?.sessionId;
+  const session: Session | undefined = program?.sessions.find((s) => s.id === sessionId);
   const [run, setRun] = useState<StationRun | null>(null);
   const [racks, setRacks] = useState<Rack[]>([]);
   const [now, setNow] = useState(() => Date.now());
@@ -85,7 +90,7 @@ export default function StationControls({ team }: { team: Team }) {
     try {
       await backend.saveRacks(team.id, base);
       setReload((n) => n + 1);
-      showAlert('Racks updated', `${missing.length} athlete${missing.length === 1 ? '' : 's'} added to racks.`);
+      showAlert('Racks updated', `${missing.length} ${general ? 'client' : 'athlete'}${missing.length === 1 ? '' : 's'} added to racks.`);
     } catch (e) {
       showAlert("Couldn't update racks", e instanceof Error ? e.message : 'Try again.');
     } finally {
@@ -100,7 +105,7 @@ export default function StationControls({ team }: { team: Team }) {
         {run?.endedAt ? <Text style={{ fontSize: 13, color: colors.muted }}>Stations ended.</Text> : null}
         {missing.length ? (
           <>
-            <Text style={{ fontSize: 14, color: colors.warningText }}>{`${missing.length} athlete${missing.length === 1 ? " isn't" : "s aren't"} on a rack.`}</Text>
+            <Text style={{ fontSize: 14, color: colors.warningText }}>{`${missing.length} ${general ? 'client' : 'athlete'}${missing.length === 1 ? " isn't" : "s aren't"} on a rack.`}</Text>
             <Button kind="secondary" title="Add the rest to racks (balanced)" disabled={busy} onPress={fillRacks} />
           </>
         ) : null}

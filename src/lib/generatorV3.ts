@@ -75,8 +75,8 @@ export function clubInSeason(events: { date: string; type: string; teamName?: st
 }
 
 /* ---------- §7 templates ---------- */
-type Slot = { role: SlotRole; id: string; method?: Method; note?: string };
-type Day = { name: string; focus: string; slots: Slot[]; heavyLegs?: boolean };
+export type Slot = { role: SlotRole; id: string; method?: Method; note?: string };
+export type Day = { name: string; focus: string; slots: Slot[]; heavyLegs?: boolean };
 const A = (id: string, note?: string): Slot => ({ role: 'power', id, ...(note ? { note } : {}) });
 const B = (id: string, method?: Method): Slot => ({ role: 'main', id, ...(method ? { method } : {}) });
 const C = (id: string): Slot => ({ role: 'secondary', id });
@@ -95,32 +95,33 @@ const CIRCUIT: Record<string, string[]> = {
 };
 const circuit = (...kinds: string[]) => kinds.flatMap((k) => CIRCUIT[k]).map(E);
 
-const T4: Day[] = [
-  { name: 'Day 1 Lower: squat', focus: 'Lower: squat', heavyLegs: true, slots: [A('hang-clean'), A('depth-drop'), B('back-squat'), C('split-squat'), C('copenhagen'), D('ghr'), Core('pallof'), ...circuit('knee', 'ankle')] },
+export const T4: Day[] = [
+  // 2.4.1 Part C: §7a Day 1 A-block as written, "Hang Power Clean + Depth Drop → Box Jump".
+  { name: 'Day 1 Lower: squat', focus: 'Lower: squat', heavyLegs: true, slots: [A('hang-clean'), A('depth-drop'), A('box-jump'), B('back-squat'), C('split-squat'), C('copenhagen'), D('ghr'), Core('pallof'), ...circuit('knee', 'ankle')] },
   { name: 'Day 2 Upper: horizontal', focus: 'Upper: horizontal', slots: [A('mb-chest-pass'), A('mb-rotational'), B('bench'), C('db-row'), C('landmine-press'), D('face-pull'), D('chin-up'), ...circuit('shoulder')] },
   { name: 'Day 3 Lower: hinge', focus: 'Lower: hinge', heavyLegs: true, slots: [A('hang-high-pull'), A('hurdle-hop'), B('trap-bar-deadlift'), C('lateral-squat'), C('db-rdl'), D('nordic'), Core('ab-rollout'), ...circuit('hamstring', 'adductor')] },
   { name: 'Day 4 Upper: vertical', focus: 'Upper: vertical', slots: [A('push-press'), A('mb-overhead'), B('weighted-pullup'), C('db-incline-press'), C('chest-supported-row'), D('rear-delt-fly'), Core('suitcase-carry'), ...circuit('shoulder', 'hand')] },
 ];
-const T3: Day[] = [
+export const T3: Day[] = [
   { name: 'Day 1 Lower + power', focus: 'Lower + power', heavyLegs: true, slots: [A('hang-clean'), A('box-jump'), B('back-squat'), C('split-squat'), C('nordic'), Core('pallof'), ...circuit('knee', 'ankle')] },
   { name: 'Day 2 Upper', focus: 'Upper', slots: [A('mb-overhead'), B('bench'), C('weighted-pullup'), C('db-row'), D('face-pull'), D('landmine-press'), ...circuit('shoulder')] },
   { name: 'Day 3 Total: hinge', focus: 'Total: hinge', heavyLegs: true, slots: [A('hang-high-pull'), A('hurdle-hop'), B('trap-bar-deadlift'), C('lateral-squat'), C('db-incline-press'), D('chin-up'), Core('suitcase-carry'), ...circuit('hamstring', 'adductor')] },
 ];
-const T2: Day[] = [
+export const T2: Day[] = [
   { name: 'Day 1 Total: squat', focus: 'Total: squat', heavyLegs: true, slots: [A('hang-clean'), A('box-jump'), B('back-squat'), C('bench'), C('db-row'), D('db-rdl'), Core('pallof'), ...circuit('shoulder', 'knee').slice(0, 3)] },
   { name: 'Day 2 Total: hinge', focus: 'Total: hinge', heavyLegs: true, slots: [A('push-press'), A('mb-rotational'), B('trap-bar-deadlift'), C('split-squat'), C('weighted-pullup'), D('copenhagen'), D('face-pull'), ...circuit('ankle', 'hamstring')] },
 ];
-const T5_DAY5: Day = { name: 'Day 5 Power + care', focus: 'Power + care', slots: [A('clean-pull'), A('lateral-hurdle-hop'), A('mb-overhead'), A('mb-rotational'), A('mb-chest-pass'), A('trap-bar-jump'), ...circuit('shoulder', 'knee', 'ankle', 'adductor')] };
-const PRE3: Day[] = [
+export const T5_DAY5: Day = { name: 'Day 5 Power + care', focus: 'Power + care', slots: [A('clean-pull'), A('lateral-hurdle-hop'), A('mb-overhead'), A('mb-rotational'), A('mb-chest-pass'), A('trap-bar-jump'), ...circuit('shoulder', 'knee', 'ankle', 'adductor')] };
+export const PRE3: Day[] = [
   { name: 'Day 1 Lower', focus: 'Lower', heavyLegs: true, slots: [{ ...A('hang-clean'), method: 'cluster' }, A('depth-jump', DEPTH_BOX_NOTE), B('back-squat'), C('lateral-squat'), C('copenhagen'), ...circuit('knee', 'ankle')] },
   { name: 'Day 2 Upper', focus: 'Upper', slots: [A('push-press'), A('mb-overhead'), B('bench'), C('weighted-pullup'), C('face-pull'), D('rear-delt-fly'), ...circuit('shoulder')] },
   { name: 'Day 3 Total', focus: 'Total', heavyLegs: true, slots: [A('jump-shrug'), A('single-leg-hop-stick'), B('trap-bar-deadlift'), C('split-squat'), C('db-row'), Core('pallof'), ...circuit('hamstring', 'hand')] },
 ];
-const IN2: Day[] = [
+export const IN2: Day[] = [
   { name: 'Day 1 Heavy', focus: 'Heavy', heavyLegs: true, slots: [A('hang-clean'), A('box-jump'), B('back-squat'), C('bench'), C('chin-up'), E('spanish-squat'), E('er-90-90-iso')] },
   { name: 'Day 2 Fast', focus: 'Fast', slots: [A('mb-overhead'), A('pogo'), B('trap-bar-jump'), C('db-row'), C('landmine-press'), E('soleus-calf-raise'), E('nordic')] },
 ];
-const POST: Day[] = [
+export const POST: Day[] = [
   { name: 'Restore A', focus: 'Full body', slots: [A('pogo'), A('line-hops'), B('goblet-squat', 'tempo'), C('split-squat'), C('db-row'), D('glute-bridge'), ...circuit('shoulder', 'ankle')] },
   { name: 'Restore B', focus: 'Full body', slots: [A('skater-hop'), B('rdl', 'tempo'), C('lateral-lunge'), C('pushup'), Core('dead-bug'), ...circuit('knee', 'adductor')] },
   { name: 'Restore C', focus: 'Full body', slots: [A('pogo'), B('db-bench', 'tempo'), C('step-up'), C('inverted-row'), Core('side-plank'), ...circuit('hamstring', 'hand')] },
@@ -142,6 +143,15 @@ const VERTICAL = new Set(['box-jump', 'depth-drop', 'depth-jump', 'hurdle-hop', 
 const LATERAL = new Set(['lateral-bound', 'skater-hop', 'lateral-hurdle-hop', 'line-hops']);
 export const isVertical = (id: string) => VERTICAL.has(id);
 export const isLateral = (id: string) => LATERAL.has(id);
+
+/** §8b care picks by position (the E-block leads with these). */
+export const POSITION_CARE: Record<string, string[]> = {
+  'Middle Blocker': ['spanish-squat', 'soleus-calf-raise'],
+  'Outside Hitter': ['band-er', 'er-90-90-iso', 'spanish-squat'],
+  Opposite: ['band-er', 'er-90-90-iso', 'spanish-squat'],
+  Setter: ['wrist-roller', 'band-er'],
+  'Libero / DS': ['copenhagen', 'soleus-calf-raise'],
+};
 
 /** Position changes picks, not the plan: plyo and durability emphasis, and the "Other" adjustments. */
 export function emphasize(day: Day, position: ProgramPosition, dayIndex: number): Day {
@@ -224,7 +234,7 @@ export function placeDays(week: DayType[], days: Day[], phase: Phase, club: bool
 }
 
 /* ---------- build ---------- */
-const rowOf = (s: Slot): ProgramExercise => ({
+export const rowOf = (s: Slot): ProgramExercise => ({
   exerciseId: s.id,
   sets: 3,
   reps: '5',
@@ -270,7 +280,12 @@ export function generateProgramV3(input: GeneratorInput & { clubInSeason?: boole
 }
 
 /* ---------- §5 prescriptions ---------- */
-export type V3Ctx = { level: 1 | 2 | 3; confirmed: boolean; minor: boolean; phase: Phase; position: ProgramPosition; dayIndex: number };
+/**
+ * `level`: the level the prescription is written for (the athlete's, or 3 when "Adjust to level" is off).
+ * `gateLevel`: the athlete's own level, always. The §9 athlete gates (contrast, cluster, wave, depth jumps) use it, so turning
+ * level adjust off never unlocks advanced methods (2.4.1 B5, D-054).
+ */
+export type V3Ctx = { level: 1 | 2 | 3; gateLevel?: 1 | 2 | 3; confirmed: boolean; minor: boolean; phase: Phase; position: ProgramPosition; dayIndex: number };
 export type Rx = { sets: number; reps: string; effort: string; pct?: number; method: Method; restSec: number; contacts?: number };
 
 const OLY: Record<BlockType, [number, string, string]> = {
@@ -323,8 +338,10 @@ export function prescribe(pe: ProgramExercise, exerciseId: string, block: BlockT
   const ex = getExercise(exerciseId);
   const deload = week === 4 && block !== 'maintain';
   const wk = deload ? 0 : Math.min(2, week - 1);
-  const advancedOk = ctx.level === 3 && ctx.confirmed;
-  const qualify = (m: Method): Method => (ADVANCED_METHODS.has(m) && !advancedOk ? (ctx.level === 1 ? 'straight' : m === 'contrast' || m === 'wave' ? 'top_backoff' : 'straight') : ctx.level === 1 && m === 'top_backoff' ? 'straight' : m);
+  const advancedOk = (ctx.gateLevel ?? ctx.level) === 3 && ctx.confirmed;
+  // R-2 case 1 (2.4.1): an athlete who doesn't qualify gets straight sets with the same sets × reps (contrast pair → two
+  // straight-set exercises; cluster triples → straight sets of 3; wave → straight sets at the middle wave value).
+  const qualify = (m: Method): Method => (ADVANCED_METHODS.has(m) && !advancedOk ? 'straight' : ctx.level === 1 && m === 'top_backoff' ? 'straight' : m);
   let rx: Rx;
   const role = pe.role ?? 'accessory';
   if (role === 'power') {
@@ -343,8 +360,12 @@ export function prescribe(pe: ProgramExercise, exerciseId: string, block: BlockT
     const [s, r] = block === 'maintain' ? (maintainDay === 1 ? [2, '5'] : [3, '3']) : m.sr[Math.min(m.sr.length - 1, wk)];
     const pct = block === 'maintain' ? (maintainDay === 1 ? 70 : 80) : m.pct[wk];
     const effort = block === 'maintain' ? (maintainDay === 1 ? 'RPE 6' : 'RPE 7') : m.rpe;
-    const method = qualify((pe.method as Method) ?? m.method);
-    rx = { sets: s, reps: r, effort, ...(TESTED.has(exerciseId) ? { pct } : {}), method: ctx.level === 1 && method !== 'tempo' ? (block === 'restore' ? 'tempo' : 'straight') : method, restSec: 180 };
+    // 2.4.1 Part C: wave loading (§6) in Strength-Power weeks 2–3, B-block: 3 waves of 5-3-2 for advanced athletes with a
+    // coach-confirmed level. R-2: everyone else gets straight sets, same number of sets, reps = the middle wave value (3).
+    const wave = block === 'strength_power' && !deload && (week === 2 || week === 3);
+    const method = qualify(wave ? 'wave' : (pe.method as Method) ?? m.method);
+    const [ws, wr] = wave ? (method === 'wave' ? [3, '5-3-2'] : [3, '3']) : [s, r];
+    rx = { sets: ws, reps: wr, effort, ...(TESTED.has(exerciseId) ? { pct } : {}), method: ctx.level === 1 && method !== 'tempo' ? (block === 'restore' ? 'tempo' : 'straight') : method, restSec: 180 };
   } else if (role === 'secondary' && (ISO.has(exerciseId) || exerciseId === 'copenhagen' || exerciseId === 'short-lever-copenhagen')) {
     // Holds in a C slot keep time notation (§5e): 2–3 × 15–20 s each side.
     rx = { sets: Math.min(3, SEC[block][0]), reps: '20s each', effort: 'Controlled', method: 'iso', restSec: 60 };

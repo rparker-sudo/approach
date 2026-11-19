@@ -1,3 +1,4 @@
+import { FLAGS } from '../../src/lib/flags';
 import { generateProgram, weekSummary, HOME_EXCLUDED } from '../../src/lib/generator';
 import { weekPlan, mondayOf, addDays } from '../../src/lib/calendar';
 import { resolveSession } from '../../src/lib/resolve';
@@ -26,13 +27,21 @@ const lights = pb.filter((d) => name(d.sessionId)?.light).length;
 ok(full === 3 && lights === 1, `beginner: 3 full + 1 light (${full}+${lights})`);
 // H6 pool
 const homeEx = p.sessions.filter((s) => s.location === 'home').flatMap((s) => s.exercises.map((e) => g(e.exerciseId)));
-ok(homeEx.every((e) => !HOME_EXCLUDED.has(e.id) && e.pattern !== 'olympic' && e.pattern !== 'jump' && fits(e, [])), 'home defaults: bodyweight, no excluded/olympic/jumps');
+// 2.4.1 (generator v3, home-and-mobility §3b): home defaults are bodyweight; a sturdy step (box) is allowed for the Copenhagen.
+// 2.4.1 (generator v3, home-and-mobility §3b): what a bodyweight-only athlete gets at home is bodyweight (a sturdy step is
+// allowed for the Copenhagen); care work moved from the weight room is resolved per athlete like any home item.
+const homeGot = FLAGS.generatorV3
+  ? p.sessions.filter((s) => s.location === 'home' && !s.light && !s.mobility).flatMap((s) => resolveSession(p, s, { level: 2, logs: [], homeEquipment: [] }, new Date(2026, 10, 17)).exercises.map((e) => g(e.exerciseId)))
+  : homeEx;
+ok(homeGot.every((e) => !HOME_EXCLUDED.has(e.id) && e.pattern !== 'olympic' && e.pattern !== 'jump' && (fits(e, []) || (FLAGS.generatorV3 && fits(e, ['box'])))), 'home defaults: bodyweight (v3: what a bodyweight athlete gets), no excluded/olympic/jumps');
 // Two athletes, different equipment, same slot
 const hs = p.sessions.find((s) => s.location === 'home' && !s.light)!;
 const a1 = resolveSession(p, hs, { level: 2, logs: [], homeEquipment: [] });
 const a2 = resolveSession(p, hs, { level: 2, logs: [], homeEquipment: ['dumbbells', 'bench', 'bands', 'pullup-bar'] });
 ok(a1.exercises.some((e, i) => a2.exercises[i] && e.exerciseId !== a2.exercises[i].exerciseId), `different equipment → different exercises (${a1.exercises.map((e) => e.exerciseId).join(',')} vs ${a2.exercises.map((e) => e.exerciseId).join(',')})`);
-ok(a2.exercises.every((e, i) => e.sets === a1.exercises[i].sets && e.reps === a1.exercises[i].reps), 'coach sets/reps unchanged');
+// Compared slot by slot (the written exercise). v3 (R-2): an item one athlete already does in another slot isn't repeated.
+const slot = (e: { teamExerciseId?: string; exerciseId: string }) => e.teamExerciseId ?? e.exerciseId;
+ok(a2.exercises.every((e) => { const o = a1.exercises.find((x) => slot(x) === slot(e)); return !o || (e.sets === o.sets && e.reps === o.reps); }) && a1.exercises.every((e) => a2.exercises.some((x) => slot(x) === slot(e))), 'coach sets/reps unchanged');
 const b = resolveSession(p, hs, { level: 1, logs: [], homeEquipment: ['dumbbells', 'kettlebells', 'bands', 'pullup-bar', 'bench', 'box'] });
 ok(b.exercises.every((e) => g(e.exerciseId).level <= 1), 'beginner never gets level 2–3 at home');
 const ls = p.sessions.find((s) => s.light)!;
@@ -42,7 +51,9 @@ ok(lr.estMinutes >= 10 && lr.estMinutes <= 22, `light day about 15–20 min (${l
 // Jumps at home: only when on, off/pre, level 1
 const pj = generateProgram({ position: 'Setter', phase: 'off', experience: 'advanced', volleyballWeek: wk, liftDaysPerWeek: 4, weightRoomDays: [1], homeJumps: true });
 const jumpsAtHome = pj.sessions.filter((s) => s.location === 'home').flatMap((s) => s.exercises.map((e) => g(e.exerciseId))).filter((e) => e.pattern === 'jump');
-ok(jumpsAtHome.length > 0 && jumpsAtHome.every((e) => ['pogo', 'squat-jump', 'broad-jump'].includes(e.id)), `home jumps only level-1 list (${jumpsAtHome.map((e) => e.id)})`);
+// 2.4.1 v3 programs: home-and-mobility §3b's level 1 list (Pogo Hops, Squat Jump, Line Hops, Skater Hop, CMJ); 2.3.0: home-workouts H7.
+const homeJumpList = FLAGS.generatorV3 ? ['pogo', 'squat-jump', 'line-hops', 'skater-hop', 'cmj'] : ['pogo', 'squat-jump', 'broad-jump'];
+ok(jumpsAtHome.length > 0 && jumpsAtHome.every((e) => homeJumpList.includes(e.id) && e.level === 1), `home jumps only level-1 list (${jumpsAtHome.map((e) => e.id)})`);
 const pin = generateProgram({ position: 'Setter', phase: 'in', experience: 'advanced', volleyballWeek: wk, liftDaysPerWeek: 3, weightRoomDays: [1], homeJumps: true });
 ok(!pin.sessions.flatMap((s) => s.exercises).some((e) => s(e)), 'no home jumps in-season');
 function s(e: any) { return g(e.exerciseId).pattern === 'jump' && pin.sessions.find((x) => x.exercises.includes(e))!.location === 'home'; }

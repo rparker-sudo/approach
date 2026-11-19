@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import AttendanceCheck from '../../components/AttendanceCheck';
 import CapNotice from '../../components/CapNotice';
+import NextBlockNotice from '../../components/NextBlockNotice';
 import { ConsentBanner } from '../../components/Consent';
 import RackCard from '../../components/RackCard';
 import StationsCard from '../../components/StationsCard';
@@ -10,7 +11,7 @@ import HomeEquipmentSheet from '../../components/HomeEquipmentSheet';
 import ReadinessCard from '../../components/ReadinessCard';
 import ScreenHeader from '../../components/ScreenHeader';
 import Sheet from '../../components/Sheet';
-import VersionLine, { DroppedLine } from '../../components/VersionLine';
+import VersionLine, { DroppedLine, NotesLines } from '../../components/VersionLine';
 import TeamHome from '../../components/TeamHome';
 import ClientToday from '../../components/general/ClientToday';
 import { useGeneralView } from '../../lib/useGeneral';
@@ -174,6 +175,7 @@ function Today() {
       ) : null}
       <Text style={{ fontSize: 20, fontWeight: '600' }}>{captainLine(activeProgram, day)}</Text>
       {showCheckIn ? <ReadinessCard /> : null}
+      <NextBlockNotice program={activeProgram} />
       {activeProgram.teamId ? null : <CapNotice program={activeProgram} />}
       {activeProgram.teamId ? <AttendanceCheck program={activeProgram} /> : null}
       {/* F21: no rack card on a home day. */}
@@ -255,6 +257,7 @@ function Today() {
                 <Text style={{ fontSize: 13, color: colors.muted }}>+ {todaySession!.exercises.length - 4} more</Text>
               ) : null}
               <DroppedLine count={todaySession!.dropped} />
+        <NotesLines notes={todaySession!.notes} />
             </View>
             {session.location === 'home' && !data.homeHintSeen ? (
               <Text style={{ fontSize: 13, color: colors.muted }}>Clear some space, wear sneakers, and stop if anything hurts.</Text>

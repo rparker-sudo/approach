@@ -1,6 +1,8 @@
 import { ALL_EQUIPMENT, CATALOG_V3_IDS, EXERCISES, fits, getExercise } from './exercises';
 import { FLAGS } from './flags';
 import { clubInSeason, generateProgramV3 } from './generatorV3';
+import { generateWeekV3, kindsFor } from './weekV3';
+import type { DayKind } from './homeV3';
 import { lengthTarget, restFor, RestContext, withFloor } from './rest';
 import { autoGroup } from './groups';
 import type {
@@ -41,6 +43,8 @@ export type GeneratorInput = {
   supersets?: boolean;
   /** 2.4.0 generator v3 (§2): the athlete's combined calendar (club matches switch the off-season to Maintain). */
   events?: { date: string; type: string; teamName?: string }[];
+  /** 2.4.1 Part D: the Week setup card (Off · Weight room · Home workout · Mobility per weekday, Monday first). Input only. */
+  kinds?: DayKind[];
 };
 
 const isMatch = (d: DayType) => d === 'game' || d === 'tournament';
@@ -749,13 +753,7 @@ export function captainLine(program: Program, date: Date): string {
 /** generator v3 entry: club-season switch from the combined calendar; school + home weeks keep v3 days, extra days at home. */
 function generateV3(input: GeneratorInput): Program {
   const club = input.phase === 'off' && !!input.events && clubInSeason(input.events, new Date());
-  const p = generateProgramV3({ ...input, clubInSeason: club });
-  if (!input.weightRoomDays?.length) return p;
-  // Lift days that aren't weight-room days become home sessions (each athlete gets the Home/bodyweight rung, §8).
-  const room = new Set(input.weightRoomDays);
-  const sessions = p.sessions.map((s) => {
-    const day = p.liftSchedule.indexOf(s.id);
-    return day >= 0 && !room.has(day) ? { ...s, location: 'home' as const } : s;
-  });
-  return { ...p, sessions, weightRoomDays: [...input.weightRoomDays], ...(input.homeJumps ? { homeJumps: true } : {}) };
+  // 2.4.1 Part D: team weeks are built from the week setup (each day as its kind; no gym session is relabeled as home, D2.8).
+  if (input.kinds?.length || input.weightRoomDays?.length) return generateWeekV3({ ...input, kinds: kindsFor(input), clubInSeason: club });
+  return generateProgramV3({ ...input, clubInSeason: club });
 }

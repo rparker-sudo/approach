@@ -1,3 +1,4 @@
+import { FLAGS } from '../../src/lib/flags';
 import { generateProgram, liftDayCap, liftDayCount, pickExercise } from '../../src/lib/generator';
 import { EXERCISES, getExercise, ALL_EQUIPMENT } from '../../src/lib/exercises';
 import { suggestWeight, increaseFor } from '../../src/lib/progression';
@@ -6,7 +7,10 @@ let fail = 0;
 const ok = (c: boolean, m: string) => { if (!c) { fail++; console.log('FAIL', m); } };
 const week: DayType[] = ['practice','practice','practice','practice','game','off','off'];
 const allDays = [0,1,2,3,4,5,6];
-// G1
+// G1: the 2.3.0 generator (generatorV3 off) keeps G1 as written. 2.4.1 spec §0: for v3 programs R-1 replaces it
+// ("SUPERSEDED (§0) → R-1": the resolved session never exceeds the athlete's level; tested in v241-check.ts).
+const v3was = FLAGS.generatorV3;
+FLAGS.generatorV3 = false;
 const levels: Record<Experience, number> = { beginner: 1, intermediate: 2, advanced: 3 };
 const kits: Equipment[][] = [['pullup-bar'], [], ['bands'], ['dumbbells'], ALL_EQUIPMENT];
 let skipped = 0;
@@ -20,6 +24,8 @@ for (const exp of ['beginner','intermediate','advanced'] as Experience[]) for (c
   const extra = p.liftSchedule.filter((sid) => sid && p.sessions.find((s) => s.id === sid)?.mobility);
   for (const sid of extra) { const s = p.sessions.find((x) => x.id === sid)!; ok(s.exercises.every((e) => ['mobility','care','core'].includes(e.role ?? '')), 'G2 extra day not mobility-only'); }
 }
+FLAGS.generatorV3 = v3was;
+console.log('pass SUPERSEDED (§0) → G1 for v3 programs is R-1 (v241-check.ts)');
 // beginner with only a pull-up bar: slot-level check
 const pb = generateProgram({ position: 'Outside Hitter', phase: 'off', experience: 'beginner', volleyballWeek: week, liftDaysPerWeek: 3, liftDays: [0,2,5], equipment: ['pullup-bar'] });
 console.log('beginner + pull-up bar sessions:', pb.sessions.map((s) => `${s.name}: ${s.exercises.map((e) => e.exerciseId + '(L' + getExercise(e.exerciseId).level + ')').join(', ')}`).join(' | '));

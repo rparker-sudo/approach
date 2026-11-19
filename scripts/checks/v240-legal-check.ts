@@ -33,7 +33,9 @@ const legacy = (p: Program): Program => ({ ...p, sessions: p.sessions.map(({ sou
 const setSes = (p: Program, i: number, s: Session): Program => ({ ...p, sessions: p.sessions.map((x, k) => (k === i ? s : x)) });
 
 /* ================= F1 · ruling #1b: legacy session.source ================= */
-ok(FLAGS.generatorV3 === false && FLAGS.catalogV3 === true && FLAGS.rackRotation === true, 'flags as built: generatorV3 off, catalogV3 and rackRotation on');
+ok(FLAGS.generatorV3 === true && FLAGS.catalogV3 === true && FLAGS.rackRotation === true, '2.4.1 flags: generatorV3 on by default (D-059), catalogV3 and rackRotation on');
+// Ruling #1b is about sessions saved by the 2.3.x generators: simulate them with the 2.3.0 generator (generatorV3 off).
+FLAGS.generatorV3 = false;
 
 // Every 2.3.x generator output (the live generator, flag off) carries none of the coach traces.
 const positions: ProgramPosition[] = [...POSITIONS, 'All positions'];
@@ -108,6 +110,8 @@ ok(/#1b|ruling #1b/.test(read('build-snapshot.md')), 'build-snapshot.md document
 // #1c: never on boards.
 const boardFiles = ['src/app/board/[teamId].tsx', 'src/components/RotationRing.tsx'].map(read).join('\n');
 ok(!/\.source\b|sourceOf/.test(boardFiles), '#1c: session.source is not shown on boards');
+
+FLAGS.generatorV3 = true;
 
 /* ================= F2 · ruling #2: keyed level-adjust keys ================= */
 clearLevelOffKeys();

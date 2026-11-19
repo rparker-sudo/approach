@@ -13,7 +13,7 @@ import { formatRest , homeAllowed } from '../lib/generator';
 import { repRange, suggestWeight, Suggestion , harderSuggestion } from '../lib/progression';
 import { resolveFor , athleteLevel } from '../lib/athlete';
 import type { ResolvedExercise } from '../lib/resolve';
-import VersionLine, { DroppedLine } from '../components/VersionLine';
+import VersionLine, { DroppedLine, NotesLines } from '../components/VersionLine';
 import HomeLogo from '../components/HomeLogo';
 import { EXTRA_RECOVERY_SESSIONS, RECOVERY_NOTE, recoveryProgram } from '../lib/recovery';
 import { blocksOf, labelOf } from '../lib/groups';
@@ -553,6 +553,7 @@ export default function Workout() {
         {day.easing.active ? <Pill text="Easing back in this week" /> : null}
       </Row>
       <DroppedLine count={day.dropped} />
+        <NotesLines notes={day.notes} />
       {stationsOn && rs && rs.phase !== 'done' ? (
         rackIndex == null ? (
           <Note>You&apos;re not on a rack today. Follow the standard order.</Note>

@@ -47,8 +47,8 @@ export function ladderOf(id: string): { ladder: Ladder; rung: number } | null {
 
 /**
  * The athlete's rung for an exercise: itself when at or below their level; else the next rung down that fits; the
- * home/bodyweight rung last (or for home sessions). Olympic slots never give a beginner a throw: §2a ("Hang Power Clean → a
- * level 1 jump") is kept by using the home/bodyweight jump rung. Null = not in a ladder (caller falls back).
+ * home/bodyweight rung last (or for home sessions). Olympic slots give a beginner the med-ball throw when a med ball fits,
+ * else the level 1 jump (2.4.1 B2). Null = not in a ladder (caller falls back).
  */
 export function ladderResolve(ex: Exercise, level: 1 | 2 | 3, equipment: Equipment[], pool: Exercise[], opts: { home?: boolean } = {}): Exercise | null | undefined {
   const found = ladderOf(ex.id);
@@ -59,9 +59,9 @@ export function ladderResolve(ex: Exercise, level: 1 | 2 | 3, equipment: Equipme
   };
   const { ladder, rung } = found;
   const rungs = opts.home ? [ladder.rungs[3]] : ladder.rungs.slice(rung, 3).map((r, k) => (k === 0 ? r.slice(r.indexOf(ex.id)) : r));
-  for (const [k, r] of rungs.entries()) {
-    const isEntry = !opts.home && rung + k === 2;
-    if (ladder.olympic && isEntry && level === 1) continue;
+  for (const r of rungs) {
+    // 2.4.1 B2 (build answer 3; safety §2a step 5 of 11/19): a beginner's Olympic slot resolves to the entry rung, a med-ball
+    // throw, when a med ball fits; otherwise down to the level 1 jump (home/bodyweight rung).
     for (const id of r) {
       const e = ok(id);
       if (e) return e;

@@ -55,7 +55,7 @@ const wantMain: Record<string, string[]> = { '2': ['back-squat', 'trap-bar-deadl
 const tplOk = Object.entries(wantMain).every(([n, ids]) => templateFor('off', Number(n), 'advanced').map((d) => d.slots.find((s) => s.role === 'main')!.id).join() === ids.join());
 const t4 = templateFor('off', 4, 'advanced');
 const d1slots = t4[0].slots.map((s) => s.id).join();
-ok(tplOk && d1slots.startsWith('hang-clean,depth-drop,back-squat,split-squat,copenhagen,ghr,pallof'), `templates match §7 slot for slot at the top rung (4-day Day 1: ${d1slots})`);
+ok(tplOk && d1slots.startsWith('hang-clean,depth-drop,box-jump,back-squat,split-squat,copenhagen,ghr,pallof'), `templates match §7 slot for slot at the top rung (4-day Day 1: ${d1slots})`);
 ok(templateFor('off', 5, 'advanced').length === 5 && templateFor('off', 5, 'intermediate').length === 4, 'the 5-day template is offered only to advanced athletes');
 ok(templateFor('pre', 3, 'advanced').map((d) => d.slots.find((s) => s.role === 'main')!.id).join() === 'back-squat,bench,trap-bar-deadlift' && templateFor('in', 2, 'advanced').map((d) => d.name).join() === 'Day 1 Heavy,Day 2 Fast' && templateFor('post', 2, 'advanced')[0].slots.find((s) => s.role === 'main')!.method === 'tempo', 'preseason 3-day, in-season Heavy/Fast, post-season Restore (tempo main lifts)');
 const inWeeks: DayType[][] = [['off', 'practice', 'game', 'practice', 'practice', 'game', 'off'], ['practice', 'game', 'off', 'practice', 'practice', 'off', 'tournament'], ['game', 'off', 'off', 'practice', 'game', 'off', 'off']];
@@ -103,7 +103,8 @@ for (const L of LADDERS) {
   const fitsGym = (id: string) => getExercise(id).equipment.some((st) => st.every((i) => gym.includes(i)));
   const want = (lv: 1 | 2 | 3) => {
     if (ex.level <= lv) return top;
-    const rungs = [L.rungs[0].slice(1), L.rungs[1], L.olympic && lv === 1 ? [] : L.rungs[2], L.rungs[3]];
+    // 2.4.1 B2: Olympic slots give beginners the entry throw when a med ball fits (no longer skipped).
+    const rungs = [L.rungs[0].slice(1), L.rungs[1], L.rungs[2], L.rungs[3]];
     for (const r of rungs) for (const id of r) if (getExercise(id).level <= lv && fitsGym(id)) return id;
     return null;
   };
@@ -145,7 +146,7 @@ const tg = newGeneralProgram({ id: 'tg', teamId: 'g', teamName: 'G', groupKey: '
 ok(tg.sessions.every((s) => resolveSession(tg, s, ath(3), new Date(`${tg.startDate}T12:00:00`)).exercises.every((e) => !/RPE (9|10)/.test(e.effort))), 'trainer goal defaults never exceed RPE 8');
 const fs = resolveExercise(getExercise('front-squat'), 1, gym)?.id;
 const hpc = resolveExercise(getExercise('hang-clean'), 1, gym);
-ok(fs === 'goblet-squat' && hpc?.pattern === 'jump' && hpc.level === 1, 'safety §2a: Front Squat → Goblet Squat; Hang Power Clean → a level 1 jump (beginner)');
+ok(fs === 'goblet-squat' && hpc?.pattern === 'throw' && hpc.level === 1, 'SUPERSEDED (§0, B2) → safety §2a (11/19): Front Squat → Goblet Squat; Hang Power Clean → a med-ball throw (beginner, med ball fits)');
 ok(p12.sessions.every((s) => resolveSession(p12, s, ath(1), at(0)).exercises.every((e) => getExercise(e.exerciseId).level <= 1)), 'safety §2a: a beginner never sees a level 2–3 exercise in a generated session');
 ok(p12.sessions.every((s) => resolveSession(p12, s, ath(3), at(0)).exercises.every((e) => e.restSecResolved >= (REST_FLOOR[tierOf(getExercise(e.exerciseId))] ?? 0) && restSecFor(e, {}) >= 0)), 'v2.2 pass 1 resolution: floors and ceilings hold on generated sessions');
 

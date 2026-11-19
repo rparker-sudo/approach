@@ -1,16 +1,18 @@
-import { addDays, dateKey, fromKey, today as todayDate } from './calendar';
+import { addDays, dateKey, dayTypeOn, fromKey, today as todayDate } from './calendar';
 import { ALL_EQUIPMENT, EXERCISES, exercisePool, fits, getExercise, registerCustomExercises } from './exercises';
 import { GENERAL_EASIER } from './generalLibrary';
 import { BACK_AFTER_BREAK_RAMP, clampCardio, programWeeks, RPE_CEILING, shiftBeginner, weekIndex, withWeekRpe } from './general';
 import { BEGINNER_EFFORT, homeAllowed, pickExercise, restSecFor } from './generator';
 import { FLAGS } from './flags';
-import { ladderResolve } from './ladders';
+import { LADDERS, ladderResolve } from './ladders';
 import { contactsOf, DEPTH_CONTACT_CAP, DEPTH_JUMPS, isVertical, PLYO_CAP, PLYO_CONTACTS, planWeek, prescribe, verticalFactor } from './generatorV3';
 import { blockRests, blocksOf } from './groups';
 import { BlockInfo, lighten, sessionForDate } from './progression';
 import { addBack, estimateSession, fitSession, targetFor, undoneTrims, type FitCtx, type Target } from './fit';
 import { warmupFor, type WarmupCtx } from './warmup';
 import { sourceOf } from './source';
+import { homeTypeOf, isV3Mobility, MOBILITY_MINUTES } from './homeV3';
+import { AFTER_MATCH_LINE, homeRxV3, MOBILITY_EFFORT_LINE } from './weekV3';
 import { levelOffKey } from './levelKeys';
 import type { LevelTable } from './backend/types';
 import type { Equipment, Exercise, Phase, Program, ProgramExercise, ProgramPosition, Session, SessionSource, SessionWarmup, WorkoutLog } from './types';
@@ -49,6 +51,8 @@ export function coachEdit(session: Session): Session {
  * otherwise the session override (on or off); otherwise the program setting (default on).
  */
 export function levelAdjustFor(program: Pick<Program, 'levelAdjust' | 'levelAdjustOffFor' | 'teamId'>, session: Pick<Session, 'levelAdjust'> | null | undefined, userId?: string | null): boolean {
+  // R-1 (2.4.1): Approach-generated personal and solo programs always adjust (there's no coach to turn it off).
+  if (!program.teamId) return true;
   const key = userId ? levelOffKey(program.teamId, userId) : null;
   if (key && program.levelAdjustOffFor?.includes(key)) return false;
   if (session && typeof session.levelAdjust === 'boolean') return session.levelAdjust;
@@ -124,6 +128,8 @@ export type ResolvedSession = {
   levelAdjust: boolean;
   /** 2.4.0: the warm-up card (null = none). */
   warmup: (SessionWarmup & { source: 'approach' | 'edited' | 'template' }) | null;
+  /** 2.4.1: session notes for the athlete (R-2 "1 jump set dropped…"; runtime only, never stored). */
+  notes?: string[];
   /** 2.4.0: the session's target length (date → weekday → program → phase). */
   target: Target;
   /** 2.4.0: generated sessions under ~25 min (§4a Express). */
@@ -287,7 +293,12 @@ export function resolveSession(program: Program, session: Session, athlete: Athl
   const v3 = approach && !!program.block;
   const v3w = v3 ? planWeek(program, date) : null;
   let written: ProgramExercise[] = v3 ? (day.light ? lighten(session.exercises, 'light') : session.exercises) : day.exercises;
-  if (v3 && v3w) written = applyV3(program, session, written, v3w, athlete, adjust);
+  let plyoCap = Infinity;
+  // 2.4.1 Part D: the v3 mobility day has its own resolution (§4b); the light day is as written (H2, RPE ≤ 6); home workouts
+  // take the §3c home prescriptions after each athlete's home exercise is chosen (below); weight-room days take applyV3.
+  if (v3 && v3w && isV3Mobility(session)) return resolveMobilityV3(program, session, athlete, date, day.block, source, adjust);
+  const homeType = v3 ? homeTypeOf(session) : null;
+  if (v3 && v3w && !session.light && !homeType) ({ list: written, cap: plyoCap } = applyV3(program, session, written, v3w, athlete, adjust, date));
   let compactWarmup = false;
   let express = false;
   if (approach && !lightHome && !session.mobility) {
@@ -297,6 +308,7 @@ export function resolveSession(program: Program, session: Session, athlete: Athl
     compactWarmup = fit.compactWarmup;
     express = fit.express;
   }
+  if (v3 && !homeType && !session.light && !session.mobility) written = practiceLoad(written, program, date);
   for (const pe of written) {
     const original = getExercise(pe.exerciseId);
     // Every program resolves to the athlete's level (team programs per G8; personal and shared programs as a backstop to G1),
@@ -306,8 +318,14 @@ export function resolveSession(program: Program, session: Session, athlete: Athl
     let resolved: Exercise | null;
     if (!adjust) resolved = original;
     else if (home && !approach && fits(original, equipment) && original.level <= athlete.level) resolved = original;
+    else if (home && homeType) resolved = homeResolveV3(original, pe.role, athlete.level, equipment, jumps, usedHome);
     else if (home && v3 && FLAGS.catalogV3) resolved = ladderResolve(original, athlete.level, equipment, exercisePool(false), { home: true }) ?? resolveHomeExercise(original, pe.role, athlete.level, equipment, jumps, usedHome);
     else resolved = home ? resolveHomeExercise(original, pe.role, athlete.level, equipment, jumps, usedHome) : resolveExercise(original, athlete.level, equipment);
+    // B5 (D-054): level adjust off on an Approach session still keeps the athlete gates: no L3 Olympic lift below level 3
+    // (the athlete gets the L2 derivative or the B2 pick).
+    if (!adjust && approach && resolved && resolved.pattern === 'olympic' && resolved.level === 3 && athlete.level < 3) {
+      resolved = ladderResolve(resolved, athlete.level, equipment, exercisePool(false)) ?? resolveExercise(resolved, athlete.level, equipment);
+    }
     // §9 (generated): depth jumps only for advanced athletes with a coach-confirmed level; otherwise the next rung.
     if (v3 && resolved && DEPTH_JUMPS.has(resolved.id) && !(athlete.level === 3 && athlete.levelConfirmed)) resolved = getExercise('depth-drop');
     // Harder version the athlete accepted (only at or below their level, and allowed here).
@@ -334,7 +352,12 @@ export function resolveSession(program: Program, session: Session, athlete: Athl
         effort = capEffort(effort, 6);
       }
     }
-    const next: ProgramExercise = { ...pe, exerciseId: resolved.id, effort };
+    let next: ProgramExercise = { ...pe, exerciseId: resolved.id, effort };
+    if (homeType && v3w) {
+      const rx = homeRxV3(next, resolved.id, homeType, v3w.block, v3w.week, (adjust ? athlete.level : 3) as Level);
+      if (!rx) continue;
+      next = { ...rx, effort: capEffort(rx.effort, 7) };
+    }
     out.push({
       ...next,
       ...(resolved.id !== original.id ? { teamExerciseId: original.id } : {}),
@@ -353,6 +376,25 @@ export function resolveSession(program: Program, session: Session, athlete: Athl
       out.splice(0, out.length, ...rest);
     }
   }
+  const notes: string[] = [];
+  // Home jumps (H7, §3b): level 1 only, ≤ 20 contacts, and the R-4 practice-load cut.
+  if (homeType) {
+    const jumpsAt = out.map((pe, i) => (isPlyo(pe.exerciseId) ? i : -1)).filter((i) => i >= 0);
+    const cut = practiceCut(program, date);
+    let total = jumpsAt.reduce((n, i) => n + contactsOf(out[i].sets, out[i].reps), 0);
+    const limit = Math.floor(Math.min(20, total) * (1 - cut));
+    for (const i of [...jumpsAt].reverse()) {
+      while (total > limit && out[i].sets > 1) {
+        total -= contactsOf(1, out[i].reps);
+        out[i] = { ...out[i], sets: out[i].sets - 1 };
+      }
+    }
+  }
+  // R-2 case 3: the contact cap after the switch (generated v3 sessions), with the session note.
+  if (v3 && Number.isFinite(plyoCap)) {
+    const n = capAfterSwitch(out as ProgramExercise[], plyoCap);
+    if (n) notes.push(jumpSetsNote(n));
+  }
   // Rest: straight-set rest (generated: within floors; coach-built: as typed), then blocks (15 s transitions, rest after the round).
   const rests = blockRests(out, out.map((pe) => restSecFor(pe, restCtx)), restCtx);
   out.forEach((pe, i) => (pe.restSecResolved = rests[i]));
@@ -365,7 +407,7 @@ export function resolveSession(program: Program, session: Session, athlete: Athl
   const wctx = { ...fitCtx.warmup, compact: compactWarmup };
   const warmup = warmupFor(mine, wctx);
   const estMinutes = estimateSession(mine, { ...fitCtx, warmup: wctx }, { rests });
-  return { session: day.session, exercises: out, dropped, swaps, block: day.block, light: day.light, easing, estMinutes, home, lightHome, source, levelAdjust: adjust, warmup, target, express };
+  return { session: day.session, exercises: out, dropped, swaps, block: day.block, light: day.light, easing, estMinutes, home, lightHome, source, levelAdjust: adjust, warmup, target, express, notes };
 }
 
 /** F51d / F51g athlete Today: "About 52 min" (+ " (planned for 45)" when a set target differs by 5+), "Express · " first. */
@@ -490,11 +532,17 @@ function resolveGeneral(program: Program, session: Session, athlete: AthleteCont
     let { sets, reps, effort } = pe;
     const strength = isStrength(pe, resolved);
     const mainish = pe.role === 'main' || pe.role === 'secondary';
-    if (ramp && strength) {
+    // 2.4.1 B6 (D-056): the goal's ramp and waves fill defaults. Goal-default ('approach') sessions follow them; in a
+    // trainer-built session a typed value reaches the client as typed, and only an empty effort is filled.
+    if (ramp && strength && approach) {
       sets = pe.role === 'main' ? ramp.mainSets : Math.min(sets, ramp.otherSets);
       reps = ramp.reps;
       effort = ramp.effort;
-    } else if (plan?.rpe != null && mainish && !deload) {
+    } else if (ramp && strength && !effort?.trim()) {
+      effort = ramp.effort;
+    } else if (plan?.rpe != null && mainish && !deload && (approach || !ramp || !effort?.trim())) {
+      // The week's RPE is the trainer's own week setting (F39) and applies to every session; in the ramp weeks of "Back after
+      // a break" it's the goal's default, so a trainer-typed effort wins there (D-056).
       effort = withWeekRpe(effort, plan.rpe);
     }
     if (approach && strength && athlete.level === 1 && !ramp && adjust) effort = shiftBeginner(effort);
@@ -552,29 +600,35 @@ export function clampCardioFree(rx: { minutes: number; intensity: 'easy' | 'mode
  * (contrast/cluster/wave: advanced + coach-confirmed only; beginners straight or tempo). Plyo contacts stay under the
  * phase cap (setter −20%, libero/DS −30% vertical); depth jumps ≤ 20 contacts.
  */
-function applyV3(program: Program, session: Session, list: ProgramExercise[], w: ReturnType<typeof planWeek>, athlete: AthleteContext, adjust: boolean): ProgramExercise[] {
+function applyV3(program: Program, session: Session, list: ProgramExercise[], w: ReturnType<typeof planWeek>, athlete: AthleteContext, adjust: boolean, date: Date): { list: ProgramExercise[]; cap: number } {
   const level = (adjust ? athlete.level : 3) as Level;
-  const ctx = { level, confirmed: !!athlete.levelConfirmed, minor: athlete.minor !== false, phase: program.phase, position: program.position, dayIndex: 0 };
+  // B5 (D-054): the §9 athlete gates always use the athlete's own level, even with level adjust off.
+  const ctx = { level, gateLevel: athlete.level, confirmed: !!athlete.levelConfirmed, minor: athlete.minor !== false, phase: program.phase, position: program.position, dayIndex: 0 };
   const maintainDay = Math.max(0, program.sessions.filter((s) => !s.mobility).findIndex((s) => s.id === session.id)) % 2;
   const out = list.map((pe) => {
     const rx = prescribe(pe, pe.exerciseId, w.block, w.week, ctx, maintainDay);
-    return { ...pe, sets: rx.sets, reps: rx.reps, effort: rx.effort, method: rx.method, restSec: rx.restSec, restSetByCoach: true, ...(rx.pct != null ? { pct: rx.pct } : { pct: undefined }) };
+    // §2a: an in-season third weight-room day is a second Day 2 Fast at 2 sets; §2d: care shrunk to 1 round (plan sets 1).
+    const sets = /\(2 sets\)$/.test(session.name) ? Math.min(rx.sets, 2) : pe.role === 'care' && pe.sets === 1 ? 1 : rx.sets;
+    return { ...pe, sets, reps: rx.reps, effort: rx.effort, method: rx.method, restSec: rx.restSec, restSetByCoach: true, ...(rx.pct != null ? { pct: rx.pct } : { pct: undefined }) };
   });
   // Plyo contact budget for the session (§5a top of range, deload −50%), never above the §9 phase cap.
-  const jumps = out.map((pe, i) => (getExercise(pe.exerciseId).pattern === 'jump' && !getExercise(pe.exerciseId).weighted ? i : -1)).filter((i) => i >= 0);
+  const jumps = out.map((pe, i) => (isPlyo(pe.exerciseId) ? i : -1)).filter((i) => i >= 0);
+  const base = Math.min(PLYO_CAP[program.phase], PLYO_CONTACTS[w.block]);
+  const cap = base * (w.deload ? 0.5 : 1);
   if (jumps.length) {
-    const base = Math.min(PLYO_CAP[program.phase], PLYO_CONTACTS[w.block]);
-    const cap = base * (w.deload ? 0.5 : 1);
     const per = Math.max(3, Math.floor(base / jumps.length));
     for (const i of jumps) {
       const id = out[i].exerciseId;
       const each = /each/.test(out[i].reps) || getExercise(id).pattern === 'single-leg' || ['lateral-bound', 'skater-hop', 'single-leg-box-jump', 'single-leg-hop-stick'].includes(id);
       const factor = isVertical(id) ? verticalFactor(program.position) : 1;
-      let budget = Math.floor(per * factor);
+      let budget = per;
       if (DEPTH_JUMPS.has(id) || id === 'depth-drop') budget = Math.min(budget, DEPTH_CONTACT_CAP);
       if (w.deload) budget = Math.floor(budget * 0.5);
       const sets = out[i].sets >= 2 ? Math.min(out[i].sets, 4) : 3;
-      const reps = Math.max(1, Math.floor(budget / sets / (each ? 2 : 1)));
+      // Reps per set stay in the plyo range (program-design §5a examples: Box Jump 3 × 3, Pogo Hops × 10); position emphasis
+      // (§8b: setter −20%, libero/DS −30% vertical) then scales the contacts.
+      const capped = Math.min(MAX_PLYO_REPS[id] ?? 5, Math.floor(budget / sets / (each ? 2 : 1)));
+      const reps = Math.max(1, Math.round(capped * factor));
       out[i] = { ...out[i], sets, reps: each ? `${reps} each` : String(reps) };
     }
     // Final guard: total contacts ≤ the cap.
@@ -586,5 +640,127 @@ function applyV3(program: Program, session: Session, list: ProgramExercise[], w:
       }
     }
   }
-  return out;
+  return { list: out, cap };
+}
+
+/** Most reps per set for a plyo (each side for one-sided jumps). */
+const MAX_PLYO_REPS: Record<string, number> = {
+  'box-jump': 3, 'depth-jump': 3, 'depth-drop': 3, 'single-leg-box-jump': 3, 'seated-box-jump': 3,
+  pogo: 10, 'line-hops': 10, 'lateral-bound': 4, 'skater-hop': 4, 'single-leg-hop-stick': 4, 'lateral-hurdle-hop': 5, 'hurdle-hop': 5,
+};
+
+/** Plyometric (unloaded jump) rows: the ones that count plyo contacts. */
+const isPlyo = (id: string) => getExercise(id).pattern === 'jump' && !getExercise(id).weighted;
+
+/**
+ * R-4 (2.4.1): practice load from the athlete's combined calendar, applied after Fit to time. A practice day cuts plyo
+ * contacts 30%; the day after a match or tournament cuts them 50%. Sets go first from the lowest-priority plyo slot (the last
+ * one); the main plyo (the first) never goes below 1 set. Approach's sessions only.
+ */
+export function practiceLoad(list: ProgramExercise[], program: Program, date: Date): ProgramExercise[] {
+  const cut = practiceCut(program, date);
+  const jumps = list.map((pe, i) => (isPlyo(pe.exerciseId) ? i : -1)).filter((i) => i >= 0);
+  if (!cut || !jumps.length) return list;
+  const out = [...list];
+  let total = jumps.reduce((n, i) => n + contactsOf(out[i].sets, out[i].reps), 0);
+  const target = Math.floor(total * (1 - cut));
+  const drop = new Set<number>();
+  for (const i of [...jumps].reverse()) {
+    const min = i === jumps[0] ? 1 : 0;
+    while (total > target && out[i].sets > min) {
+      total -= contactsOf(1, out[i].reps);
+      out[i] = { ...out[i], sets: out[i].sets - 1 };
+    }
+    if (out[i].sets === 0) drop.add(i);
+  }
+  return out.filter((_, i) => !drop.has(i));
+}
+
+/** R-4: 0.5 the day after a match or tournament, 0.3 on a practice day, else 0 (the athlete's combined calendar). */
+export function practiceCut(program: Program, date: Date): number {
+  const isMatchDay = (t: string) => t === 'game' || t === 'tournament';
+  if (isMatchDay(dayTypeOn(program, addDays(date, -1)))) return 0.5;
+  if (dayTypeOn(program, date) === 'practice') return 0.3;
+  return 0;
+}
+
+/**
+ * R-2 case 3 (2.4.1): after the switch to each athlete's rung, a one-sided ("each") rung can push the session over the plyo
+ * contact cap. Drop one set at a time from the lowest-priority plyo slot until it fits, never below 1 set of the main plyo.
+ * Returns the number of sets dropped (shown as the session note).
+ */
+export function capAfterSwitch(out: ProgramExercise[], cap: number): number {
+  const jumps = out.map((pe, i) => (isPlyo(pe.exerciseId) ? i : -1)).filter((i) => i >= 0);
+  let total = jumps.reduce((n, i) => n + contactsOf(out[i].sets, out[i].reps), 0);
+  let dropped = 0;
+  for (const i of [...jumps].reverse()) {
+    while (total > cap && out[i].sets > 1) {
+      total -= contactsOf(1, out[i].reps);
+      out[i] = { ...out[i], sets: out[i].sets - 1 };
+      dropped++;
+    }
+  }
+  return dropped;
+}
+
+/** The R-2 session note. */
+export const jumpSetsNote = (n: number) => `${n} jump set${n === 1 ? '' : 's'} dropped to stay under today's jump limit`;
+
+/* ---------- 2.4.1 Part D: v3 home and mobility resolution ---------- */
+const HOME_LADDER_ORDER = ['Horizontal press', 'Horizontal pull', 'Vertical press', 'Vertical pull', 'Anti-extension', 'Rotation / anti-rotation', 'Unilateral squat', 'Unilateral hinge', 'Lateral', 'Hamstring eccentric', 'Adductor', 'Knee / tendon'];
+
+/**
+ * §3a/§3b: a home-workout slot resolves to the best exercise for the athlete's home equipment and level: walk the slot's
+ * ladder from the top rung down, never above the athlete's level, never H6 equipment (barbell, trap bar, cable, Olympic, box
+ * jumps, Nordics). Home jumps stay level 1 for everyone. Beginners press from an incline (Incline Push-Up). An adductor slot
+ * without a step or bench is a Side Plank. Care and core items use the home pool (2.2 behavior).
+ */
+function homeResolveV3(original: Exercise, role: ProgramExercise['role'], level: Level, equipment: Equipment[], jumps: boolean, used: Set<string>): Exercise | null {
+  if (original.pattern === 'jump') return jumps && original.level === 1 ? original : null;
+  const ladder = HOME_LADDER_ORDER.map((n) => LADDERS.find((l) => l.slot === n)!).find((l) => l?.rungs.some((r) => r.includes(original.id)));
+  if (ladder) {
+    for (const id of ladder.rungs.flat()) {
+      const e = EXERCISES.find((x) => x.id === id);
+      if (!e || used.has(e.id) || e.level > level || !fits(e, equipment) || !homeAllowed(e, false)) continue;
+      if (level === 1 && e.id === 'pushup' && ladder.slot === 'Horizontal press') return getExercise('incline-pushup');
+      return e;
+    }
+    if (ladder.slot === 'Adductor') return getExercise('side-plank');
+  }
+  // Care and core items: the written item when it fits at home (2.2 coach-session behavior), else the home pool.
+  if (!used.has(original.id) && original.level <= level && fits(original, equipment) && homeAllowed(original, false)) return original;
+  return resolveHomeExercise(original, role, level, equipment, false, used);
+}
+
+/**
+ * §4 mobility day: M1 breathe · M2 flow (4 items off/preseason, 3 in-season, 6 post-season with 45 s holds; rotating week to
+ * week) · M3 position care (2 rounds; 1 in-season) · M4 core · Close (not in-season). On a match or tournament day: the 12-min
+ * "After your match" version (M1, 3 flow items, M4). No load, no jumps, RPE ≤ 5, no warm-up card, no weight suggestions.
+ */
+function resolveMobilityV3(program: Program, session: Session, athlete: AthleteContext, date: Date, block: BlockInfo, source: SessionSource, adjust: boolean): ResolvedSession {
+  const t = dayTypeOn(program, date);
+  const matchDay = t === 'game' || t === 'tournament';
+  const phase = program.phase;
+  const rows = session.exercises;
+  const breathe = rows.filter((r) => r.exerciseId === 'crocodile-breathing');
+  const flow = rows.filter((r) => r.role === 'mobility' && r.exerciseId !== 'crocodile-breathing');
+  const care = rows.filter((r) => r.role === 'care');
+  const core = rows.filter((r) => r.role === 'core');
+  const n = matchDay ? 3 : phase === 'in' ? 3 : phase === 'post' ? 6 : 4;
+  const start = fromKey(program.blockStart ?? program.createdAt.slice(0, 10));
+  const wk = Math.max(0, Math.floor((date.getTime() - start.getTime()) / (7 * 864e5)));
+  const picked = flow.length ? Array.from({ length: Math.min(n, flow.length) }, (_, k) => flow[(wk * n + k) % flow.length]) : [];
+  const hold45 = (r: ProgramExercise) => (phase === 'post' && /s\b|s each/.test(r.reps) ? { ...r, reps: r.reps.replace(/\d+s/, '45s') } : r);
+  const stepOk = (athlete.homeEquipment ?? []).some((e) => e === 'box' || e === 'bench');
+  const careRows = matchDay ? [] : care.map((r) => ({ ...(r.exerciseId === 'short-lever-copenhagen' && !stepOk ? { ...r, exerciseId: 'side-plank' } : r), sets: phase === 'in' ? 1 : 2 }));
+  const close = matchDay || phase === 'in' ? [] : breathe.slice(1, 2);
+  const list: ProgramExercise[] = [...breathe.slice(0, 1), ...picked.map(hold45), ...careRows, ...core, ...close].map((r) => ({ ...r, effort: 'Easy' }));
+  const out: ResolvedExercise[] = list.map((r) => ({ ...r, restSecResolved: 0 }));
+  const minutes = MOBILITY_MINUTES[matchDay ? 'matchDay' : phase];
+  const target = targetFor(program, session, date);
+  return {
+    session, exercises: out, dropped: 0, swaps: [], block, light: false, easing: { active: false }, estMinutes: minutes, home: true, lightHome: false,
+    source, levelAdjust: adjust, warmup: null, target: { ...target, minutes: target.source === 'phase' ? minutes : target.minutes }, express: false,
+    notes: [...(matchDay ? [AFTER_MATCH_LINE] : []), MOBILITY_EFFORT_LINE],
+  };
 }

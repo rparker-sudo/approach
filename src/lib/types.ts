@@ -444,6 +444,8 @@ export type AppData = {
   openSeen?: string[];
   /** 2.3.1: every custom exercise this device has seen, so history keeps its name after a program changes (device only). */
   customSeen?: Record<string, Exercise>;
+  /** 2.4.1 R-5 (device only, G-3): which generator this device last saw for each program ('v2' = 2.3.0, 'v3' = has `block`). */
+  generatorSeen?: Record<string, 'v2' | 'v3'>;
 };
 
 export type LocalTeamCalendar = {

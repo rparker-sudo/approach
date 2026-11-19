@@ -19,7 +19,7 @@ import { blockRests, blocksOf, groupRows, labelOf, straightRests, ungroup } from
 import { estimateSession, fitSession, targetFor, type FitCtx } from '../lib/fit';
 import { SESSION_TYPE_LABEL, sessionType, warmupMinutes } from '../lib/warmup';
 import StationsEditor from '../components/StationsEditor';
-import VersionLine, { DroppedLine } from '../components/VersionLine';
+import VersionLine, { DroppedLine, NotesLines } from '../components/VersionLine';
 import type { Exercise, ExerciseCategory, ProgramExercise, Session, SlotRole } from '../lib/types';
 
 const CATS: ExerciseCategory[] = ['power', 'lower', 'upper', 'core', 'prehab'];
@@ -98,6 +98,7 @@ export default function SessionScreen() {
           );
         })}
         <DroppedLine count={resolved.dropped} />
+        <NotesLines notes={resolved.notes} />
       </Screen>
     );
   }
@@ -264,7 +265,8 @@ export default function SessionScreen() {
         </Body>
       ) : null}
       {fitted?.express ? <Pill text="Express" /> : null}
-      {/* F46b (spec §1.2; CLAUDE.md known conflict 3): stays enabled when the program setting is off. */}
+      {/* F46b (spec §1.2; CLAUDE.md known conflict 3): stays enabled when the program setting is off. 2.4.1 R-1: team programs only. */}
+      {program.teamId ? (
       <Card>
         <Row style={{ justifyContent: 'space-between', minHeight: 44 }}>
           <Text style={{ fontSize: 15, fontWeight: '600', flex: 1 }}>Adjust to level</Text>
@@ -279,6 +281,7 @@ export default function SessionScreen() {
           </Text>
         ) : null}
       </Card>
+      ) : null}
       {!session.light && !session.mobility ? <WarmupRow session={session} ctx={wctx} teamId={program.teamId} general={general} onChange={update} /> : null}
       {fitted ? <FitBanner session={session} target={target.minutes} ctx={fitCtx} onChange={update} /> : null}
       {program.teamId ? <StationsEditor program={program} session={session} onChange={edit} /> : null}

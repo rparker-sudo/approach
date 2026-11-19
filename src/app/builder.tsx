@@ -11,6 +11,13 @@ import { useStore } from '../lib/store';
 import { ALL, teamProgramId, useTeams } from '../lib/team';
 import type { DayType, Equipment, Experience, Phase, ProgramPosition } from '../lib/types';
 import { goBack } from '../lib/nav';
+import WeekSetupCard from '../components/WeekSetupCard';
+import { FLAGS } from '../lib/flags';
+import { setupFromProgram, type DayKind } from '../lib/homeV3';
+import { sourceOf } from '../lib/source';
+import { showAlert } from '../lib/dialog';
+import { addDays, dateKey, mondayOf } from '../lib/calendar';
+import { weekdayIndex } from '../lib/util';
 
 export default function Builder() {
   const { data } = useStore();
@@ -21,7 +28,7 @@ export default function Builder() {
 function BuilderForm() {
   const { programId, teamId, groupKey: groupParam } = useLocalSearchParams<{ programId?: string; teamId?: string; groupKey?: string }>();
   const { data, saveProgram, setProfile } = useStore();
-  const { teams, groups, members } = useTeams();
+  const { teams, groups, members, coachExtras } = useTeams();
   const profile = data.profile!;
   const coach = profile.role === 'coach';
   const team = teams.find((t) => t.id === teamId);
@@ -65,6 +72,11 @@ function BuilderForm() {
   const [roomDays, setRoomDays] = useState<number[]>(existing?.weightRoomDays ?? [1, 3]);
   const [total, setTotal] = useState(() => (existing?.weightRoomDays ? existing.liftSchedule.filter((sid) => sid && !existing.sessions.find((x) => x.id === sid)?.light && !existing.sessions.find((x) => x.id === sid)?.mobility).length : 4));
   const [homeJumps, setHomeJumps] = useState(!!existing?.homeJumps);
+  // 2.4.1 Part D (UX F56): team programs set each weekday's kind before the build.
+  const weekSetup = !!team && FLAGS.generatorV3;
+  const asBuilt = existing && weekSetup ? setupFromProgram(existing) : null;
+  const [kinds, setKinds] = useState<DayKind[]>(() => asBuilt ?? WEEKDAYS.map((_, i) => (liftDays.includes(i) ? 'room' : 'off')));
+  const [sessionMinutes, setSessionMinutes] = useState<number | null>(existing?.sessionMinutes ?? null);
   const [supersets, setSupersets] = useState<boolean | null>(existing?.supersets ?? null);
   const [showFewer, setShowFewer] = useState(false);
   const jumpsAllowed = phase === 'off' || phase === 'pre';
@@ -77,21 +89,61 @@ function BuilderForm() {
     phase,
     experience,
     volleyballWeek: week,
-    liftDaysPerWeek: homeMode ? Math.min(total, cap) : liftDays.length,
-    ...(homeMode ? { weightRoomDays: roomDays, homeJumps } : { liftDays }),
+    liftDaysPerWeek: weekSetup ? Math.max(1, kinds.filter((k) => k === 'room' || k === 'home').length) : homeMode ? Math.min(total, cap) : liftDays.length,
+    ...(weekSetup ? { kinds, homeJumps } : homeMode ? { weightRoomDays: roomDays, homeJumps } : { liftDays }),
     equipment,
     ...(supersets != null ? { supersets } : {}),
   });
-  const preview = team && homeMode ? weekSummary(generateProgram(input())) : null;
+  const preview = team && homeMode && !weekSetup ? weekSummary(generateProgram(input())) : null;
   const fewer = team && preview?.beginners ? (members[team.id] ?? []).filter((m) => (m.level ?? 2) === 1) : [];
 
   function build() {
-    const generated = generateProgram(input());
+    if (weekSetup && existing) {
+      showAlert('Rebuild the week from these days?', "Approach Strength's sessions are rebuilt. Sessions you've edited keep your edits.", [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Rebuild', onPress: buildNow },
+      ]);
+      return;
+    }
+    buildNow();
+  }
+
+  function buildNow() {
+    const generated0 = generateProgram(input());
+    // F56f / known conflict 5: on a rebuild, a session the coach edited ('coach') keeps its edits when its day keeps its kind;
+    // and the change starts with the next week that hasn't started (this week's remaining days keep the old sessions).
+    let generated = generated0;
+    if (weekSetup && existing) {
+      const sessions = [...generated0.sessions];
+      const liftSchedule = [...generated0.liftSchedule];
+      const old = existing.liftSchedule;
+      kinds.forEach((k, i) => {
+        const prev = existing.sessions.find((x) => x.id === old[i]);
+        if (prev && asBuilt?.[i] === k && sourceOf(existing, prev) === 'coach') {
+          const replaced = liftSchedule[i];
+          liftSchedule[i] = prev.id;
+          if (!sessions.some((x) => x.id === prev.id)) sessions.push(prev);
+          if (replaced && !liftSchedule.includes(replaced)) sessions.splice(sessions.findIndex((x) => x.id === replaced), 1);
+        }
+      });
+      const monday = mondayOf(new Date());
+      const keep: Record<string, string | null> = {};
+      for (let i = weekdayIndex(new Date()); i < 7; i++) {
+        const key = dateKey(addDays(monday, i));
+        if (old[i] !== liftSchedule[i]) keep[key] = old[i];
+      }
+      for (const id of Object.values(keep)) {
+        const prev = id ? existing.sessions.find((x) => x.id === id) : null;
+        if (prev && !sessions.some((x) => x.id === prev.id)) sessions.push(prev);
+      }
+      generated = { ...generated0, sessions, liftSchedule, overrides: keep };
+    }
     let program = existing ? { ...generated, id: existing.id } : generated;
+    if (weekSetup) program = { ...program, ...(sessionMinutes != null ? { sessionMinutes } : { sessionMinutes: undefined }) };
     if (existing) {
       // Keep the season calendar. Date choices that pointed at old sessions go back to automatic; chosen rest days stay.
-      const overrides = Object.fromEntries(Object.entries(existing.overrides ?? {}).filter(([, v]) => v === null));
-      program = { ...program, events: existing.events, overrides, lightDates: existing.lightDates, customExercises: existing.customExercises };
+      const overrides = { ...Object.fromEntries(Object.entries(existing.overrides ?? {}).filter(([, v]) => v === null)), ...(program.overrides ?? {}) };
+      program = { ...program, events: existing.events, overrides, lightDates: existing.lightDates, customExercises: existing.customExercises, minutesByWeekday: existing.minutesByWeekday, levelAdjust: existing.levelAdjust, levelAdjustOffFor: existing.levelAdjustOffFor };
     }
     if (team) {
       // The coach's working copy of the team workout. Posting sends it to the roster.
@@ -120,7 +172,7 @@ function BuilderForm() {
 
   return (
     <Screen>
-      {existing ? (
+      {existing && !weekSetup ? (
         <Card>
           <Body>
             Rebuilding replaces the sessions in this program with a fresh plan. Any exercise changes you made by hand will be
@@ -173,14 +225,32 @@ function BuilderForm() {
         <EquipmentPicker value={equipment} onChange={setEquipment} />
       </Card>
 
-      {team ? (
+      {weekSetup ? (
+        <WeekSetupCard
+          kinds={kinds}
+          onChange={setKinds}
+          asBuilt={asBuilt}
+          week={week}
+          events={data.teamCalendars?.[team!.id]?.events ?? existing?.events ?? []}
+          phase={phase}
+          homeJumps={homeJumps}
+          onHomeJumps={setHomeJumps}
+          sessionMinutes={sessionMinutes}
+          onSessionMinutes={setSessionMinutes}
+          minutesByWeekday={existing?.minutesByWeekday}
+          input={input()}
+          otherTeamAthletes={coachExtras[team!.id]?.followingOther?.length ?? 0}
+          onBuild={build}
+        />
+      ) : null}
+      {team && !weekSetup ? (
         <ChipRow>
           <Chip label="Weight room only" selected={!homeMode} onPress={() => setHomeMode(false)} />
           <Chip label="Weight room + home" selected={homeMode} onPress={() => setHomeMode(true)} />
         </ChipRow>
       ) : null}
 
-      {team && homeMode ? (
+      {weekSetup ? null : team && homeMode ? (
         <Card>
           <H2>Week setup</H2>
           <Label>Weight room days</Label>
@@ -237,12 +307,12 @@ function BuilderForm() {
         </Card>
       )}
 
-      <Button
+      {weekSetup ? null : <Button
         title={existing ? 'Rebuild program' : team ? 'Build team workout' : 'Build program'}
         icon="wand.and.stars"
         disabled={homeMode ? total < 1 : liftDays.length === 0}
         onPress={build}
-      />
+      />}
     </Screen>
   );
 }

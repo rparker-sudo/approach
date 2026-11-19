@@ -1,3 +1,4 @@
+import NextBlockNotice from '../../components/NextBlockNotice';
 import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import ProgramDetail from '../../components/ProgramDetail';
@@ -50,7 +51,9 @@ export default function ProgramTab() {
               );
             }
             return (
-              <Pressable key={t.id} accessibilityRole="button" onPress={() => router.push(`/team/${t.id}`)}>
+              <View key={t.id} style={{ gap: 8 }}>
+              {teamPrograms.map((p) => <NextBlockNotice key={`n-${p.id}`} program={p} />)}
+              <Pressable accessibilityRole="button" onPress={() => router.push(`/team/${t.id}`)}>
                 <Card>
                   <Row style={{ justifyContent: 'space-between' }}>
                     <View style={{ flex: 1, gap: 6 }}>
@@ -75,6 +78,7 @@ export default function ProgramTab() {
                   </Row>
                 </Card>
               </Pressable>
+              </View>
             );
           })
         )}

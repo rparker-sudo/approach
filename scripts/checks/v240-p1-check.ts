@@ -1,3 +1,4 @@
+import { FLAGS } from '../../src/lib/flags';
 // 2.4.0 Training v3 Part 1 (docs/specs/training-v3.md v1.0 §1.1–§1.5): coach freedom, generated sessions keep the rules,
 // the level toggle, warm-ups (warmups.md §9), session length (program-design §4a). Logic only; the UI is checked in the browser.
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -184,7 +185,11 @@ ok(v3.length === 15 && v3.every((e) => tierOf(e) === (tierOk[e.id] ?? 'D') && e.
 const CLAIMS = /\b(prevent\w*|injury[- ]proof|injury|safe for|guarantee\w*|proven|science-backed|clinically|rehab\w*|treat\w*|cure\w*|heal\w*|weight loss|fat loss|burn fat|calorie\w*|tone|toning|durability|recover\w*)\b/i;
 const v3text = v3.map((e) => [e.name, e.cue, e.howTo.why, ...e.howTo.steps, ...e.howTo.cues, ...e.howTo.mistakes].join(' ')).join(' ');
 ok(!CLAIMS.test(v3text), `claim-word search clean on the 15 (${(v3text.match(CLAIMS) ?? []).join(', ')})`);
-ok(!generateProgram({ position: 'Middle Blocker', phase: 'pre', experience: 'advanced', volleyballWeek: wk, liftDaysPerWeek: 4 }).sessions.some((s) => s.exercises.some((e) => CATALOG_V3_IDS.has(e.exerciseId))), 'the 2.3.0 generator never picks catalog v3 exercises (unchanged until generatorV3)');
+const v3was1 = FLAGS.generatorV3;
+FLAGS.generatorV3 = false;
+const gen230 = generateProgram({ position: 'Middle Blocker', phase: 'pre', experience: 'advanced', volleyballWeek: wk, liftDaysPerWeek: 4 });
+FLAGS.generatorV3 = v3was1;
+ok(!gen230.sessions.some((s) => s.exercises.some((e) => CATALOG_V3_IDS.has(e.exerciseId))), 'the 2.3.0 generator never picks catalog v3 exercises (unchanged until generatorV3)');
 
 /* ================= §1.4 Session length ================= */
 const lp: Program = { ...gen, sessionMinutes: 45, minutesByWeekday: [null, 30, null, null, null, null, null], liftSchedule: [gs.id, gs.id, null, null, null, null, null] };

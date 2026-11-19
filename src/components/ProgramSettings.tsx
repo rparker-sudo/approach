@@ -62,6 +62,9 @@ export default function ProgramSettings({ program }: { program: Program }) {
   return (
     <Card style={{ gap: 10 }}>
       <Label>Program settings</Label>
+{/* 2.4.1 R-1: personal and solo programs always adjust to level (no toggle). */}
+      {program.teamId ? (
+        <>
       <Row style={{ justifyContent: 'space-between', minHeight: 44 }}>
         <Text style={{ fontSize: 15, fontWeight: '600', flex: 1 }}>{`Adjust exercises to each ${who}'s level`}</Text>
         <Toggle accessibilityLabel={`Adjust exercises to each ${who}'s level`} value={on} onValueChange={(v) => save({ levelAdjust: v ? undefined : false })} />
@@ -69,6 +72,8 @@ export default function ProgramSettings({ program }: { program: Program }) {
       <Text style={{ fontSize: 13, color: colors.muted }}>
         {on ? `${general ? 'Clients' : 'Athletes'} get the version of each exercise that fits their level. Sets, reps, and rest stay the same.` : 'Everyone gets exactly what you write.'}
       </Text>
+        </>
+      ) : null}
 
       <Text style={{ fontSize: 15, fontWeight: '600' }}>Session length</Text>
       <LengthPicker value={program.sessionMinutes ?? null} phaseLabel={phaseLabel} defaultLabel={phaseLabel} onChange={(v) => save({ sessionMinutes: v ?? undefined })} />

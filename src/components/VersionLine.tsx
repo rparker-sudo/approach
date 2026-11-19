@@ -51,3 +51,15 @@ export function DroppedLine({ count }: { count: number }) {
   if (!count) return null;
   return <Text style={{ fontSize: 13, color: colors.muted }}>{`${count} exercise${count === 1 ? '' : 's'} left out for your level.`}</Text>;
 }
+
+/** 2.4.1: the resolver's session notes (R-2 "1 jump set dropped…", the mobility day's effort line, "After your match."). */
+export function NotesLines({ notes }: { notes?: string[] }) {
+  if (!notes?.length) return null;
+  return (
+    <>
+      {notes.map((n) => (
+        <Text key={n} style={{ fontSize: 13, color: colors.muted }}>{n}</Text>
+      ))}
+    </>
+  );
+}

@@ -1,4 +1,5 @@
 import type { EffortInput } from './backend/types';
+import { isV3Mobility } from './homeV3';
 import { addDays, breakOn, dateKey, fromKey, mondayOf, planForDate, today as todayDate } from './calendar';
 import type { Program } from './types';
 
@@ -69,7 +70,8 @@ export function scheduledDays(program: Program, since: Date, until: Date): strin
     const p = planForDate(program, d);
     if (!p.sessionId || p.test) continue;
     const s = program.sessions.find((x) => x.id === p.sessionId);
-    if (s && !s.mobility) out.push(p.date);
+    // 2.4.1: a week-setup mobility day is a prescribed session (like the light day, TM-4); the 2.3.0 extra-mobility day isn't.
+    if (s && (!s.mobility || isV3Mobility(s))) out.push(p.date);
   }
   return out;
 }

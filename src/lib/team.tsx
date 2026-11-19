@@ -35,6 +35,7 @@ import { isLow } from './readiness';
 import { levelTable } from './resolve';
 import { withTeamWarmup } from './warmupTeam';
 import { useStore } from './store';
+import { needsV3Rollover, rolloverV3 } from './rollover';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { allLevelOffKeys, clearLevelOffKeys, restoreLevelOffKeys, type LevelKeyRow } from './levelKeys';
 import type { AppData, CalendarEvent, LocalTeamCalendar, Position, Program, ReadinessEntry, TestBattery } from './types';
@@ -365,6 +366,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const [syncing, setSyncing] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   const accountRef = useRef<Account | null>(account);
+  const postProgramRef = useRef<((teamId: string, groupKey: string) => Promise<void>) | null>(null);
   const dataRef = useRef(data);
   const teamsRef = useRef<Team[]>(teams);
   const membersRef = useRef<Record<string, Member[]>>(members);
@@ -467,6 +469,17 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       setTestSessions(Object.fromEntries(ids.map((id) => [id, sessions.find((x) => x.teamId === id)])));
       setAttendance(Object.fromEntries(ids.map((id, i) => [id, att[i]])));
       if (acct.role === 'coach') {
+        // 2.4.1 R-5: a posted 2.3.0-generated team program whose block has ended continues with a v3 block; the coach's app
+        // rebuilds and posts it (no action needed). Coach-built programs are never touched (needsV3Rollover).
+        for (const tp of tps) {
+          if (!needsV3Rollover(tp.program)) continue;
+          const local = dataRef.current.programs.find((x) => x.id === teamProgramId(tp.teamId, tp.groupKey));
+          const base = local && !local.unposted ? local : { ...tp.program, id: teamProgramId(tp.teamId, tp.groupKey), teamId: tp.teamId, groupKey: tp.groupKey };
+          const next = rolloverV3(base);
+          mutate((d) => ({ ...d, programs: d.programs.some((x) => x.id === next.id) ? d.programs.map((x) => (x.id === next.id ? { ...next, unposted: true } : x)) : [...d.programs, { ...next, unposted: true }] }));
+          dataRef.current = { ...dataRef.current, programs: dataRef.current.programs.some((x) => x.id === next.id) ? dataRef.current.programs.map((x) => (x.id === next.id ? { ...next, unposted: true } : x)) : [...dataRef.current.programs, { ...next, unposted: true }] };
+          await postProgramRef.current?.(tp.teamId, tp.groupKey).catch(() => {});
+        }
         const since = new Date(Date.now() - LOG_WINDOW_DAYS * 864e5).toISOString();
         const [m, l, r, tr] = await Promise.all([
           Promise.all(ids.map((id) => backend.listMembers(id))),
@@ -613,6 +626,10 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     },
     [mutate],
   );
+  useEffect(() => {
+    postProgramRef.current = postProgram;
+  }, [postProgram]);
+
 
   /** Update the coach's local team calendar and copy it onto every program of that team. */
   const writeCalendar = useCallback(

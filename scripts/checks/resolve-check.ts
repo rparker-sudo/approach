@@ -9,7 +9,10 @@ let fail = 0; const ok = (c: boolean, m: string) => { if (!c) { fail++; console.
 const ALL = ['barbell','dumbbells','kettlebells','bench','bands','cable','pullup-bar','plyo-box','med-ball','trap-bar'] as any;
 ok(resolveExercise(getExercise('front-squat'), 1, ALL)?.id === 'goblet-squat', 'Front Squat → Goblet Squat (beginner)');
 const hc = resolveExercise(getExercise('hang-clean'), 1, ALL);
-ok(!!hc && hc.pattern === 'jump' && hc.level === 1, `Hang Power Clean → level 1 jump (${hc?.id})`);
+// 2.4.1 spec §0 (build answer 3; safety §2a step 5 of 11/19): beginners get a med-ball throw when a med ball fits, else a level 1 jump.
+const noMb = ALL.filter((e: string) => e !== 'med-ball');
+const hcNoMb = resolveExercise(getExercise('hang-clean'), 1, noMb);
+ok(!!hc && hc.pattern === 'throw' && hc.level === 1 && !!hcNoMb && hcNoMb.pattern === 'jump' && hcNoMb.level === 1, `SUPERSEDED (§0, B2) → Hang Power Clean → med-ball throw with a med ball (${hc?.id}), level 1 jump without (${hcNoMb?.id})`);
 // safety-guidelines §2a step 5 ("Olympic lifts resolve to a jump for anyone below advanced"). With catalogV3 on, spec §2.1/§3
 // and program-design §8a give intermediates L2 derivatives instead (not listed in spec §0.3; raised with Ryan in the report).
 if (FLAGS.catalogV3) ok(resolveExercise(getExercise('hang-clean'), 2, ALL)?.id === 'hang-high-pull', 'CONFLICT (spec §2.1/§8a vs safety §2a step 5; catalogV3 on) → Hang Power Clean → Hang High Pull for intermediate');
@@ -21,7 +24,11 @@ for (const ex of EXERCISES) {
 }
 ok(true, 'bands program never resolves above level 1');
 // session: advanced team program, beginner athlete
+// G8 stays the 2.3.0 generator's check (spec §0: R-2 replaces it for v3 programs; tested in v241-check).
+const v3was = FLAGS.generatorV3;
+FLAGS.generatorV3 = false;
 const prog = { ...generateProgram({ position: 'Middle Blocker', phase: 'off', experience: 'advanced', volleyballWeek: ['practice','practice','practice','practice','practice','off','off'] as any, liftDaysPerWeek: 4, liftDays: [0,1,3,4] }), teamId: 't1' };
+FLAGS.generatorV3 = v3was;
 const sess = prog.sessions[0];
 const r = resolveSession(prog, sess, { level: 1, logs: [] }, new Date(2026, 10, 16));
 ok(r.exercises.every((e) => getExercise(e.exerciseId).level <= 1), `beginner never sees level 2–3 (${r.swaps.length} swaps, ${r.dropped} dropped)`);

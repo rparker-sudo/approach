@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { needsV3Rollover, rolloverV3 } from './rollover';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppData, BodyLog, Profile, Program, ReadinessEntry, TouchLog, WorkoutLog } from './types';
 import { uid } from './util';
@@ -62,7 +63,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const parsed = JSON.parse(raw) as AppData;
           // 2.1: free-text pain notes are no longer kept, even on the device.
           const readinessLog = parsed.readinessLog?.map(({ painNote: _n, ...r }: ReadinessEntry & { painNote?: string }) => r);
-          setData({ ...EMPTY, ...parsed, ...(readinessLog ? { readinessLog } : {}) });
+          // 2.4.1 R-5: a personal 2.3.0-generated program whose block has ended continues with a v3 block (never mid-block).
+          const programs = (parsed.programs ?? []).map((pr) => (!pr.teamId && needsV3Rollover(pr) ? rolloverV3(pr) : pr));
+          setData({ ...EMPTY, ...parsed, programs, ...(readinessLog ? { readinessLog } : {}) });
         }
       })
       .catch(() => {});

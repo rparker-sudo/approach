@@ -1,6 +1,8 @@
 import type { CalendarEvent, DayType, Experience, Program, Session, TestBattery } from './types';
 import { WEEKDAYS } from './types';
 import { sourceOf } from './source';
+import { getExercise } from './exercises';
+import { CAP_REPLACE_ORDER, homeTypeOf, isSetupProgram } from './homeV3';
 
 /**
  * Turns a program's default week + calendar dates + per-date overrides into
@@ -148,9 +150,17 @@ export function weekPlan(program: Program, monday: Date, athleteExperience?: Exp
   }));
 
   // 1. A lift that lands on a match/tournament day moves to the nearest good free day.
+  const setup = isSetupProgram(program);
   for (let i = 0; i < 7; i++) {
     const sid = plan[i].sessionId;
     if (!sid || !isMatch(types[i])) continue;
+    // 2.4.1 week setup (H4, §2e): a home workout on a match or tournament day is Off; mobility stays (the 12-min version).
+    const s0 = session(sid);
+    if (setup && s0?.mobility) continue;
+    if (setup && s0?.location === 'home') {
+      plan[i] = { ...plan[i], sessionId: null, source: 'auto', note: `${MATCH_WORD[types[i]]} day: no home workout` };
+      continue;
+    }
     plan[i].sessionId = null;
     const heavy = isHeavyLegs(session(sid));
     let best = -1;
@@ -179,13 +189,18 @@ export function weekPlan(program: Program, monday: Date, athleteExperience?: Exp
     const s = session(plan[i].sessionId);
     if (!s || !isHeavyLegs(s) || !isMatch(nextType(i))) continue;
     const j = plan.findIndex(
-      (p, k) => k !== i && p.sessionId && !isHeavyLegs(session(p.sessionId)) && !isMatch(nextType(k)),
+      (p, k) => k !== i && p.sessionId && !isHeavyLegs(session(p.sessionId)) && !isMatch(nextType(k)) && (!setup || isRoom(session(p.sessionId))),
     );
     if (j < 0) continue;
     const light = plan[j].sessionId;
     plan[j] = { ...plan[j], sessionId: plan[i].sessionId, source: 'auto', note: `Swapped with ${WEEKDAYS[i]}: legs stay fresh for the ${MATCH_WORD[nextType(i)]}` };
     plan[i] = { ...plan[i], sessionId: light, source: 'auto', note: `Lighter lift: ${MATCH_WORD[nextType(i)]} tomorrow` };
   }
+
+  // 2.4.1 week setup, per athlete: one weight-room day alternates its two sessions week by week (§2a), and a home H-Lower /
+  // H-Total the day before a match or next to a lower-heavy weight-room day becomes upper body or care (§2e: content, never
+  // a day move).
+  if (setup) setupContent(program, plan, types, nextType, monday);
 
   // Coach-lightened dates.
   for (const p of plan) if (program.lightDates?.includes(p.date)) p.light = true;
@@ -219,6 +234,7 @@ export function weekPlan(program: Program, monday: Date, athleteExperience?: Exp
   // 6. C14 / G2: lift-day cap and at least one day with nothing scheduled. Mobility-only sessions don't count toward the cap.
   // 2.4.0 (spec §0.3, §1.1 item 5): generated weeks only. A coach-built program keeps every day the coach chose.
   if (!generatedWeek(program)) return plan;
+  if (setup) return setupCaps(program, plan, athleteExperience);
   const exp =
     athleteExperience && EXP_RANK[athleteExperience] < EXP_RANK[program.experience] ? athleteExperience : program.experience;
   const cap = capFor(exp, program.phase);
@@ -243,6 +259,95 @@ export function weekPlan(program: Program, monday: Date, athleteExperience?: Exp
   if (!plan.some((p) => !p.sessionId && !p.test)) {
     const p = order.find((x) => x.sessionId && !x.test);
     if (p) drop(p, 'Rest day: at least one day a week with no training');
+  }
+  return plan;
+}
+
+/* ---------- 2.4.1 week setup (spec D2.5; home-and-mobility-v3 §2e, §5.3) ---------- */
+const isRoom = (s: Session | undefined) => !!s && !s.location && !s.mobility && !s.light;
+/** A weight-room session with a squat or hinge B-block (H5). */
+const roomLowerHeavy = (s: Session | undefined) => isRoom(s) && s!.exercises.some((e) => e.role === 'main' && getExercise(e.exerciseId).category !== 'upper');
+
+function setupContent(program: Program, plan: DayPlan[], types: DayType[], nextType: (i: number) => DayType, monday: Date) {
+  const session = (id: string | null) => program.sessions.find((s) => s.id === id);
+  // One weight-room day: the template's two sessions alternate week by week from the block start.
+  const rooms = program.sessions.filter(isRoom);
+  const scheduled = new Set(program.liftSchedule.filter((x): x is string => !!x && isRoom(session(x))));
+  if (rooms.length === 2 && scheduled.size === 1) {
+    const start = fromKey(program.blockStart ?? program.createdAt.slice(0, 10));
+    const odd = Math.floor((monday.getTime() - mondayOf(start).getTime()) / (7 * 864e5)) % 2 === 1;
+    const alt = rooms.find((r) => !scheduled.has(r.id));
+    if (odd && alt) for (const p of plan) if (p.sessionId && scheduled.has(p.sessionId)) p.sessionId = alt.id;
+  }
+  // Part C: in-season bye week (no match or tournament Mon–Sun on the athlete's calendar): the second Day 2 Fast becomes Day 3.
+  const bye = program.sessions.find((s) => s.name === 'Day 3 (bye week)');
+  if (bye && !types.some((t) => isMatch(t))) {
+    const fast2 = program.sessions.find((s) => / \(2 sets\)$/.test(s.name) && s.name.startsWith('Day 2'));
+    if (fast2) for (const p of plan) if (p.sessionId === fast2.id) Object.assign(p, { sessionId: bye.id, note: 'Bye week: Day 3' });
+  }
+  const upperOrCare = program.sessions.filter((s) => ['H-Upper', 'H-Durability'].includes(homeTypeOf(s) ?? ''));
+  const light = program.sessions.find((s) => s.light);
+  for (let i = 0; i < 7; i++) {
+    const t = homeTypeOf(session(plan[i].sessionId));
+    if (t !== 'H-Lower' && t !== 'H-Total') continue;
+    const beforeMatch = isMatch(nextType(i));
+    const nextToHeavy = (i > 0 && roomLowerHeavy(session(plan[i - 1].sessionId))) || (i < 6 && roomLowerHeavy(session(plan[i + 1].sessionId)));
+    if (!beforeMatch && !nextToHeavy) continue;
+    const used = new Set(plan.map((p) => p.sessionId));
+    const swap = upperOrCare.find((s) => !used.has(s.id)) ?? upperOrCare[0] ?? light;
+    plan[i] = swap
+      ? { ...plan[i], sessionId: swap.id, source: 'auto', note: beforeMatch ? `${MATCH_WORD[nextType(i)]} tomorrow: upper body or care at home` : 'Legs stay fresh: upper body or care at home' }
+      : { ...plan[i], sessionId: null, source: 'auto', note: 'Rest day: legs stay fresh' };
+  }
+}
+
+/**
+ * Per-athlete limits for a week-setup program (spec D2.5, home-and-mobility §5.3). Weight room + home workouts count toward the
+ * R6 cap; mobility never does and is never dropped for the cap.
+ *  1. One home workout becomes the light day (order H-Durability → H-Lower → H-Total → H-Upper); 2. further home workouts are
+ *  Off (same order); 3. weight-room days alone over the cap: the last one in template order is the light day (if unused), then
+ *  Off; 4. H3: no fully Off day → the lowest-priority non-weight-room session is Off (home in cap order, then light, mobility last).
+ */
+function setupCaps(program: Program, plan: DayPlan[], athleteExperience?: Experience): DayPlan[] {
+  const session = (id: string | null) => program.sessions.find((s) => s.id === id);
+  const exp = athleteExperience && EXP_RANK[athleteExperience] < EXP_RANK[program.experience] ? athleteExperience : program.experience;
+  const cap = capFor(exp, program.phase);
+  const light = program.sessions.find((s) => s.light);
+  let lightUsed = plan.some((p) => session(p.sessionId)?.light);
+  const counts = (p: DayPlan) => !!p.test || (!!p.sessionId && !session(p.sessionId)?.mobility && !session(p.sessionId)?.light);
+  let count = plan.filter(counts).length;
+  const toLight = (p: DayPlan) => {
+    if (light && !lightUsed && p.dayType !== 'game' && p.dayType !== 'tournament') {
+      Object.assign(p, { sessionId: light.id, source: 'auto' as const, note: `Light day: max ${cap} full lift days for your level` });
+      lightUsed = true;
+    } else Object.assign(p, { sessionId: null, source: 'auto' as const, note: `Off: max ${cap} lift days a week` });
+  };
+  const rank = (p: DayPlan) => CAP_REPLACE_ORDER.indexOf(homeTypeOf(session(p.sessionId))!);
+  const homes = plan.filter((p) => homeTypeOf(session(p.sessionId)) && p.source !== 'override').sort((a, b) => rank(a) - rank(b) || b.date.localeCompare(a.date));
+  for (const p of homes) {
+    if (count <= cap) break;
+    toLight(p);
+    count--;
+  }
+  if (count > cap) {
+    const order = new Map(program.sessions.filter(isRoom).map((s, k) => [s.id, k]));
+    const rooms = plan.filter((p) => isRoom(session(p.sessionId)) && !p.test && p.source !== 'override').sort((a, b) => (order.get(b.sessionId!) ?? 0) - (order.get(a.sessionId!) ?? 0));
+    for (const p of rooms) {
+      if (count <= cap) break;
+      toLight(p);
+      count--;
+    }
+  }
+  if (!plan.some((p) => !p.sessionId && !p.test)) {
+    const prio = (p: DayPlan) => {
+      const s = session(p.sessionId);
+      if (homeTypeOf(s)) return rank(p);
+      if (s?.light) return 4;
+      if (s?.mobility) return 5;
+      return 99;
+    };
+    const p = plan.filter((x) => x.sessionId && !x.test && prio(x) < 99).sort((a, b) => prio(a) - prio(b))[0];
+    if (p) Object.assign(p, { sessionId: null, source: 'auto' as const, note: 'Rest day: at least one day a week with no training' });
   }
   return plan;
 }

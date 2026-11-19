@@ -249,7 +249,8 @@ export function buildWarmup(session: Session, ctx: WarmupCtx): SessionWarmup {
     const machine = CARDIO.find((c) => ctx.equipment.includes(c.needs));
     raise.push(machine ? row(machine.id, '3 min · Easy') : row('walk-jog', '3 min · Easy'));
   }
-  const raiseCount = compact ? 2 : ctx.general && !ctx.home ? 2 : ctx.home ? 3 : inSeason ? 2 : ctx.phase === 'post' ? 3 : 4;
+  // warmups v1.1 §3a (2.4.1 B3): off-season 4 · preseason/post-season 3 · in-season 2; home 3 (in place).
+  const raiseCount = compact ? 2 : ctx.general && !ctx.home ? 2 : ctx.home ? 3 : inSeason ? 2 : ctx.phase === 'post' || ctx.phase === 'pre' ? 3 : 4;
   const start = ((ctx.rotation ?? 0) * 2) % RAISE.length;
   for (let k = 0; k < raiseCount; k++) {
     const d = RAISE[(start + k) % RAISE.length];
@@ -265,7 +266,8 @@ export function buildWarmup(session: Session, ctx: WarmupCtx): SessionWarmup {
     const lower = take(POOLS[lowerOf(session)], 2, ctx, used);
     const upper = take(POOLS[upperOf(session)], 2, ctx, used);
     const inch = usable({ id: 'inchworm', reps: '4' }, ctx, used);
-    activate = [...lower, ...upper, ...(inch && !ctx.home && !compact ? [row(inch.id, inch.reps)] : [])].slice(0, ctx.home ? 3 : compact ? 4 : 5);
+    // §3b (v1.1): 4 items (3 in-season and at home) plus the position add-on.
+    activate = [...lower, ...upper, ...(inch && !ctx.home && !compact ? [row(inch.id, inch.reps)] : [])].slice(0, base);
   } else {
     activate = take(POOLS[type], base, ctx, used);
   }
@@ -306,7 +308,8 @@ export function buildWarmup(session: Session, ctx: WarmupCtx): SessionWarmup {
   if (!ctx.home && (a === 'throws' || (a === 'vertical' && throws.length))) {
     for (const t of throws) potentiate.push(row(t.id, `2 light throws, building to about ${ctx.deload ? 70 : 80}%`));
   }
-  if (compact) potentiate = potentiate.slice(0, 1);
+  // §3c (v1.1): at most 2 steps (the empty-bar complex counts as one).
+  potentiate = potentiate.slice(0, compact ? 1 : 2);
 
   return { raise, activate, potentiate, ...(compact ? { compact: true } : {}), ...(ctx.limitedSpace ? { limitedSpace: true } : {}) };
 }
@@ -346,6 +349,7 @@ export function compactOf(w: SessionWarmup): Pick<SessionWarmup, WarmupPart> {
 /** Rough warm-up length (§1 totals): drills, activation items, potentiation steps, plus a minute of moving between parts. */
 export function warmupMinutes(w: Pick<SessionWarmup, WarmupPart> & { compact?: boolean } | null, ctx: Pick<WarmupCtx, 'phase' | 'home'>): number {
   if (!w) return 0;
+  // §1a (v1.1, 2.4.1 B3): 0.5 min between parts (R→A, A→P).
   let min = 1;
   for (const r of w.raise) {
     const m = r.reps.match(/(\d+)\s*min/);
@@ -354,7 +358,7 @@ export function warmupMinutes(w: Pick<SessionWarmup, WarmupPart> & { compact?: b
   min += w.activate.length * 0.8;
   for (const p of w.potentiate) min += p.customName ? 2.5 : 1;
   const floor = ctx.home ? 6 : w.compact ? (ctx.phase === 'in' ? 5 : 6) : 0;
-  return Math.max(floor, Math.round(min));
+  return Math.max(floor, Math.round(min * 10) / 10);
 }
 
 /** Display name of a warm-up row (library exercise or the coach's own item). */
@@ -375,10 +379,13 @@ const r5 = (n: number) => Math.max(BAR_LB, Math.round(n / 5) * 5);
 const lbl = (w: number, reps: number) => (w <= BAR_LB ? `Bar × ${reps}` : `${w} lb × ${reps}`);
 
 /** Loaded tier A or P exercises get ramp-up sets (throws are potentiated with light throws instead). */
+/**
+ * warmups v1.1 §4 (2.4.1 B4, build answer 6): ramp-ups only for loaded tier A lifts and Olympic derivatives. None for throws,
+ * any jump (loaded jumps too: trap bar jump, DB jump squat), or kettlebell swings.
+ */
 export function needsRampUp(ex: Exercise, equipment?: Equipment[]): boolean {
-  if (!ex.weighted || ex.durationOnly || ex.pattern === 'throw' || ex.pattern === 'cardio') return false;
-  const t = tierOf(ex, equipment);
-  return t === 'A' || t === 'P';
+  if (!ex.weighted || ex.durationOnly || ex.pattern === 'throw' || ex.pattern === 'cardio' || ex.pattern === 'jump' || ex.id === 'kb-swing') return false;
+  return ex.pattern === 'olympic' || tierOf(ex, equipment) === 'A';
 }
 
 const isDumbbell = (ex: Exercise) => !ex.equipment.some((s) => s.includes('barbell') || s.includes('trap-bar'));

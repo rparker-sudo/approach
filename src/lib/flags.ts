@@ -9,5 +9,5 @@
 export const FLAGS = {
   catalogV3: true,
   rackRotation: true,
-  generatorV3: false,
+  generatorV3: true,
 };

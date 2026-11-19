@@ -150,7 +150,7 @@ Evidence: **L3** = `scripts/checks/v240-p3-check.ts` (39 pass, flag on inside th
 | SQL, fresh `schema.sql` and upgrade v1 → 002–013 (011–013 run twice) | 2.1: 21 · 2.1 pass 2: 29 · 2.2 pass 1: 7 · pass 2: 7 · pass 3: 1 · 2.2.1: 7 · 2.3.0-a: 17 · 2.3.0-b: 3 · 2.4.0: 6. Every count is the expected one, on both paths. |
 | Logic (`run-all.sh`, 20 scripts incl. the 2 website checks) | All pass. Rows that tested removed builder blocks print "SUPERSEDED (§0.3) →" and test the new behavior (below). |
 | Tap targets | The 2.4.0 tap audits found two older 16-pt text links on screens they cover: the session editor's "Unpair" and the roster's "Review". Both are now 44 pt. "Unpair" now also counts as a coach edit (§0.1). |
-| Browser: 2.3.0 trainer (129), 2.3.1 custom exercises (21), 2.2.1 (53), 2.2 pass 1 (20), pass 2 (15), pass 3 (14), 2.1 pass 2 (52), 2.1 regression (7), 2.4.0 Part 1, 2.4.0 Part 2 | All pass on the final build. Test edits: the superseded rows below; v2.2 pass 3 now matches "About N min" case-insensitively (F51d copy); the custom-exercise test picks the picker's second "Edit" (the warm-up row now has the first). |
+| Browser: 2.3.0 trainer (129), 2.3.1 custom exercises (21), 2.2.1 (53), 2.2 pass 1 (20), pass 2 (15), pass 3 (14), 2.1 pass 2 (52), 2.1 regression (7), 2.4.0 Part 1, 2.4.0 Part 2 | All pass on the final build (final run after the last code change: 10 of 10 suites, exit 0). Test edits: the superseded rows below; v2.2 pass 3 now matches "About N min" case-insensitively (F51d copy); the custom-exercise test picks the picker's second "Edit" (the warm-up row now has the first). |
 
 **Superseded rows (§0.3; never counted as pass):**
 

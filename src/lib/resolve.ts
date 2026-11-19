@@ -5,8 +5,9 @@ import { BACK_AFTER_BREAK_RAMP, clampCardio, programWeeks, RPE_CEILING, shiftBeg
 import { BEGINNER_EFFORT, homeAllowed, pickExercise, restSecFor } from './generator';
 import { FLAGS } from './flags';
 import { ladderResolve } from './ladders';
+import { contactsOf, DEPTH_CONTACT_CAP, DEPTH_JUMPS, isVertical, PLYO_CAP, PLYO_CONTACTS, planWeek, prescribe, verticalFactor } from './generatorV3';
 import { blockRests, blocksOf } from './groups';
-import { BlockInfo, sessionForDate } from './progression';
+import { BlockInfo, lighten, sessionForDate } from './progression';
 import { addBack, estimateSession, fitSession, targetFor, undoneTrims, type FitCtx, type Target } from './fit';
 import { warmupFor, type WarmupCtx } from './warmup';
 import type { LevelTable } from './backend/types';
@@ -86,6 +87,10 @@ export type AthleteContext = {
   harderPicks?: Record<string, string | null>;
   /** 2.4.0: the athlete's account id (for the per-athlete "Adjust to level" override). */
   userId?: string | null;
+  /** 2.4.0 generator v3: the team coach confirmed the level (advanced methods and depth jumps need it, §9). */
+  levelConfirmed?: boolean;
+  /** 2.4.0 generator v3: under 18 (% caps ≤ 85). Missing = treated as a minor (the safer reading). */
+  minor?: boolean;
 };
 
 export type ResolvedExercise = ProgramExercise & {
@@ -279,11 +284,15 @@ export function resolveSession(program: Program, session: Session, athlete: Athl
   const target = targetFor(program, session, date);
   const fitCtx: FitCtx = { rest: restCtx, warmup: warmupCtxFor(program, session, equipment, { deload: day.block.deload }), kind: home ? 'home' : 'school' };
   // §1.4: Approach-generated sessions fit the day's target automatically (minus any trim the coach undid).
-  let written: ProgramExercise[] = day.exercises;
+  // 2.4.0 generator v3: the block and week drive the prescription (deload handled there, not by the 2.3.0 lighten).
+  const v3 = approach && !!program.block;
+  const v3w = v3 ? planWeek(program, date) : null;
+  let written: ProgramExercise[] = v3 ? (day.light ? lighten(session.exercises, 'light') : session.exercises) : day.exercises;
+  if (v3 && v3w) written = applyV3(program, session, written, v3w, athlete, adjust);
   let compactWarmup = false;
   let express = false;
   if (approach && !lightHome && !session.mobility) {
-    const fit = fitSession({ ...session, exercises: day.exercises }, target.minutes, fitCtx, { skip: undoneTrims(session) });
+    const fit = fitSession({ ...session, exercises: written }, target.minutes, fitCtx, { skip: undoneTrims(session) });
     const more = fit.trims.length || fit.express ? { session: fit.session } : addBack(fit.session, target.minutes, fitCtx);
     written = more.session.exercises;
     compactWarmup = fit.compactWarmup;
@@ -298,7 +307,10 @@ export function resolveSession(program: Program, session: Session, athlete: Athl
     let resolved: Exercise | null;
     if (!adjust) resolved = original;
     else if (home && !approach && fits(original, equipment) && original.level <= athlete.level) resolved = original;
+    else if (home && v3 && FLAGS.catalogV3) resolved = ladderResolve(original, athlete.level, equipment, exercisePool(false), { home: true }) ?? resolveHomeExercise(original, pe.role, athlete.level, equipment, jumps, usedHome);
     else resolved = home ? resolveHomeExercise(original, pe.role, athlete.level, equipment, jumps, usedHome) : resolveExercise(original, athlete.level, equipment);
+    // §9 (generated): depth jumps only for advanced athletes with a coach-confirmed level; otherwise the next rung.
+    if (v3 && resolved && DEPTH_JUMPS.has(resolved.id) && !(athlete.level === 3 && athlete.levelConfirmed)) resolved = getExercise('depth-drop');
     // Harder version the athlete accepted (only at or below their level, and allowed here).
     const harderId = resolved && adjust ? athlete.harderPicks?.[resolved.id] : null;
     if (resolved && harderId && !lightHome) {
@@ -315,7 +327,8 @@ export function resolveSession(program: Program, session: Session, athlete: Athl
     if (isStrength(pe, resolved)) {
       if (approach) {
         // program-design §9 / R2 (generated sessions only): beginner effort, the ceilings, H2 light home day ≤ RPE 6.
-        if (team && athlete.level === 1) effort = BEGINNER_EFFORT[effort] ?? effort;
+        // (v3 prescriptions already set beginners one RPE lower.)
+        if (team && athlete.level === 1 && !v3) effort = BEGINNER_EFFORT[effort] ?? effort;
         effort = capEffort(effort, lightHome ? 6 : effortCeiling(athlete.level, program.phase, easing.active));
       } else if (easing.active) {
         // Coach-built: exactly as written, except the G9 easing-back-in week while "Adjust to level" is on.
@@ -532,4 +545,47 @@ function resolveGeneral(program: Program, session: Session, athlete: AthleteCont
 /** F41 (2.4.0): a trainer's cardio block is minutes (5–180) + Easy/Moderate. Nothing else (adult rule A4). */
 export function clampCardioFree(rx: { minutes: number; intensity: 'easy' | 'moderate' }) {
   return { minutes: Math.min(180, Math.max(5, Math.round(rx.minutes))), intensity: rx.intensity === 'moderate' ? ('moderate' as const) : ('easy' as const) };
+}
+
+/**
+ * generator v3 prescriptions for one athlete on one date (program-design §3, §5, §6, §9): each slot gets the block/week
+ * sets, reps, effort, % (tested lifts only, capped ≤ 85% minors / ≤ 90% adults) and the method the athlete qualifies for
+ * (contrast/cluster/wave: advanced + coach-confirmed only; beginners straight or tempo). Plyo contacts stay under the
+ * phase cap (setter −20%, libero/DS −30% vertical); depth jumps ≤ 20 contacts.
+ */
+function applyV3(program: Program, session: Session, list: ProgramExercise[], w: ReturnType<typeof planWeek>, athlete: AthleteContext, adjust: boolean): ProgramExercise[] {
+  const level = (adjust ? athlete.level : 3) as Level;
+  const ctx = { level, confirmed: !!athlete.levelConfirmed, minor: athlete.minor !== false, phase: program.phase, position: program.position, dayIndex: 0 };
+  const maintainDay = Math.max(0, program.sessions.filter((s) => !s.mobility).findIndex((s) => s.id === session.id)) % 2;
+  const out = list.map((pe) => {
+    const rx = prescribe(pe, pe.exerciseId, w.block, w.week, ctx, maintainDay);
+    return { ...pe, sets: rx.sets, reps: rx.reps, effort: rx.effort, method: rx.method, restSec: rx.restSec, restSetByCoach: true, ...(rx.pct != null ? { pct: rx.pct } : { pct: undefined }) };
+  });
+  // Plyo contact budget for the session (§5a top of range, deload −50%), never above the §9 phase cap.
+  const jumps = out.map((pe, i) => (getExercise(pe.exerciseId).pattern === 'jump' && !getExercise(pe.exerciseId).weighted ? i : -1)).filter((i) => i >= 0);
+  if (jumps.length) {
+    const base = Math.min(PLYO_CAP[program.phase], PLYO_CONTACTS[w.block]);
+    const cap = base * (w.deload ? 0.5 : 1);
+    const per = Math.max(3, Math.floor(base / jumps.length));
+    for (const i of jumps) {
+      const id = out[i].exerciseId;
+      const each = /each/.test(out[i].reps) || getExercise(id).pattern === 'single-leg' || ['lateral-bound', 'skater-hop', 'single-leg-box-jump', 'single-leg-hop-stick'].includes(id);
+      const factor = isVertical(id) ? verticalFactor(program.position) : 1;
+      let budget = Math.floor(per * factor);
+      if (DEPTH_JUMPS.has(id) || id === 'depth-drop') budget = Math.min(budget, DEPTH_CONTACT_CAP);
+      if (w.deload) budget = Math.floor(budget * 0.5);
+      const sets = out[i].sets >= 2 ? Math.min(out[i].sets, 4) : 3;
+      const reps = Math.max(1, Math.floor(budget / sets / (each ? 2 : 1)));
+      out[i] = { ...out[i], sets, reps: each ? `${reps} each` : String(reps) };
+    }
+    // Final guard: total contacts ≤ the cap.
+    let total = jumps.reduce((n, i) => n + contactsOf(out[i].sets, out[i].reps), 0);
+    for (const i of [...jumps].reverse()) {
+      while (total > cap && out[i].sets > 1) {
+        total -= contactsOf(1, out[i].reps);
+        out[i] = { ...out[i], sets: out[i].sets - 1 };
+      }
+    }
+  }
+  return out;
 }

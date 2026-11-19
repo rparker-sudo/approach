@@ -22,6 +22,11 @@ Built from `docs/specs/training-v3.md` v1.0 on branch `v2.4.0`, Part 1 → Part 
 - Also from Part 1's UX list: Start stations is never blocked (athletes not on a rack follow the standard order), and "more racks than stations" is an info line.
 - Checks: `scripts/checks/v240-p2-check.ts`, `scripts/checks/v240-flags-check.ts`, `scripts/checks/browser-v240-p2.js`; `rls-2.4.0-p1.sql` covers 012.
 
+### Part 3 — generator v3 (migration 013, no schema change; flag `generatorV3` **off**)
+- Built behind `generatorV3` (program-design §1–§9): the annual plan (Restore; Accumulation → Strength → Strength-Power, repeating from Strength; Power; Maintain, including the club-season switch from the combined calendar), 4-week blocks with a deload, sessions in A → B → C → D → E order, prescriptions by block and week (% of e1RM for tested lifts only, capped at 85% for minors and 90% for adults), loading methods (contrast, clusters and waves only for advanced athletes with a coach-confirmed level; beginners straight or tempo, one RPE lower), the §7 weekly templates with in-season placement rules, position emphasis (§8b, including setter −20% and libero/DS −30% vertical contacts), plyo contact caps, depth jumps for advanced + confirmed only (≤ 20 contacts, box ≤ 18 in), and the R6 lift-day caps.
+- **Ships off.** With it on, some earlier checks still fail (the 2.1 G1 rule that the stored plan never exceeds the athlete's level, the G8 "same sets × reps after a swap" check on plyo slots, and the school + home week's light home day and home defaults), so the 2.3.0 generator stays live and unchanged. Details: `reports/training-v3-acceptance.md`.
+- Checks: `scripts/checks/v240-p3-check.ts` (runs v3 with the flag on).
+
 ## 2.3.1 — custom exercises
 Owner request (Ryan, November 16, 2026), outside the planning specs. No migration (custom exercises are saved inside the existing program JSON). Report: `reports/v2.3.1-acceptance.md`.
 

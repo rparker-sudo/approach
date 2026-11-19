@@ -42,7 +42,13 @@ export function setCurrentUserId(id: string | null | undefined) {
 
 /** The one way screens get an athlete's session. */
 export function resolveFor(data: AppData, program: Program, session: Session, date: Date = today()): ResolvedSession {
-  return resolveSession(program, session, { level: athleteLevel(data), logs: data.logs, homeEquipment: data.homeEquipment ?? [], harderPicks: data.harderPicks, userId: currentUserId }, date);
+  const confirmed = !!(program.teamId && data.teamLevels?.[program.teamId]?.confirmed);
+  return resolveSession(
+    program,
+    session,
+    { level: athleteLevel(data), logs: data.logs, homeEquipment: data.homeEquipment ?? [], harderPicks: data.harderPicks, userId: currentUserId, levelConfirmed: confirmed, minor: data.profile?.isMinor !== false },
+    date,
+  );
 }
 
 /** Load-test level rule on the athlete's device (mirrors can_load_test; the server decides). */

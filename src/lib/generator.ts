@@ -1,5 +1,6 @@
 import { ALL_EQUIPMENT, CATALOG_V3_IDS, EXERCISES, fits, getExercise } from './exercises';
 import { FLAGS } from './flags';
+import { clubInSeason, generateProgramV3 } from './generatorV3';
 import { lengthTarget, restFor, RestContext, withFloor } from './rest';
 import { autoGroup } from './groups';
 import type {
@@ -38,6 +39,8 @@ export type GeneratorInput = {
   homeJumps?: boolean;
   /** "Save time with supersets" (§4d). Missing = on for in-season and home sessions. */
   supersets?: boolean;
+  /** 2.4.0 generator v3 (§2): the athlete's combined calendar (club matches switch the off-season to Maintain). */
+  events?: { date: string; type: string; teamName?: string }[];
 };
 
 const isMatch = (d: DayType) => d === 'game' || d === 'tournament';
@@ -605,6 +608,8 @@ export function weekSummary(program: Program): { line: string; beginners: string
 }
 
 export function generateProgram(input: GeneratorInput): Program {
+  // 2.4.0: generator v3 behind its flag (program-design §1–§9). Off = the 2.3.0 generator below, unchanged.
+  if (FLAGS.generatorV3) return generateV3(input);
   if (input.weightRoomDays) return withAutoGroups(finishProgram(input, schoolHomeWeek(input)), input);
   return withAutoGroups(generateStandard(input), input);
 }
@@ -739,4 +744,18 @@ export function captainLine(program: Program, date: Date): string {
     if (isMatch(dayTypeOn(program, addDays(date, d)))) return d === 1 ? 'Match tomorrow. Carbs tonight.' : 'Match in 2 days. Carbs tonight.';
   }
   return 'Recovery day. Sleep is training too.';
+}
+
+/** generator v3 entry: club-season switch from the combined calendar; school + home weeks keep v3 days, extra days at home. */
+function generateV3(input: GeneratorInput): Program {
+  const club = input.phase === 'off' && !!input.events && clubInSeason(input.events, new Date());
+  const p = generateProgramV3({ ...input, clubInSeason: club });
+  if (!input.weightRoomDays?.length) return p;
+  // Lift days that aren't weight-room days become home sessions (each athlete gets the Home/bodyweight rung, §8).
+  const room = new Set(input.weightRoomDays);
+  const sessions = p.sessions.map((s) => {
+    const day = p.liftSchedule.indexOf(s.id);
+    return day >= 0 && !room.has(day) ? { ...s, location: 'home' as const } : s;
+  });
+  return { ...p, sessions, weightRoomDays: [...input.weightRoomDays], ...(input.homeJumps ? { homeJumps: true } : {}) };
 }

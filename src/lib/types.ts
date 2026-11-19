@@ -173,6 +173,10 @@ export type ProgramExercise = {
   cardio?: CardioRx;
   /** 2.4.0 warm-up items only: a coach's own item with no library exercise (name shown, no how-to link). */
   customName?: string;
+  /** 2.4.0 generator v3 (taxonomy D): the slot's loading method. */
+  method?: 'straight' | 'top_backoff' | 'wave' | 'cluster' | 'contrast' | 'tempo' | 'iso';
+  /** 2.4.0 generator v3: % of e1RM for tested lifts (with an RPE target in `effort`). */
+  pct?: number;
 };
 
 /** Cardio prescription: minutes + Easy or Moderate (2.4.0: 5–180 in the builder, F41). Nothing else exists (no HR, pace, distance, calories). */
@@ -305,6 +309,8 @@ export type Program = {
   templateOf?: string;
   /** 2.3.1: the coach's own exercises for this program (posted inside the program JSON; no new table). */
   customExercises?: Exercise[];
+  /** 2.4.0 generator v3 (taxonomy D): the program's block type; set only on v3-generated programs. */
+  block?: 'restore' | 'accumulation' | 'strength' | 'strength_power' | 'power' | 'maintain';
   /** 2.4.0 (§1.2): "Adjust exercises to each athlete's level". Missing = on. */
   levelAdjust?: boolean;
   /** 2.4.0 (§1.2): athletes (user ids) who get exactly what the coach wrote in this program. */

@@ -2342,3 +2342,5 @@ language sql stable security definer set search_path = public as $$
 $$;
 revoke execute on function public.my_rack(uuid) from public, anon;
 grant execute on function public.my_rack(uuid) to authenticated;
+
+-- ==================== 2.4.0 Training v3 Part 3 (migration 013): no schema change ====================

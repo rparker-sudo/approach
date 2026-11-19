@@ -28,6 +28,8 @@ import { estimateStrength, uid } from '../lib/util';
 import { goBack } from '../lib/nav';
 import { INTENSITY_LABEL, LEGAL, TALK_TEST, weekIndex } from '../lib/general';
 import WarmupCard from '../components/WarmupCard';
+import { RotationNowCard, RotationToday, useRotation } from '../components/RotationAthlete';
+import { positionAt } from '../lib/rotation';
 import { needsRampUp, RAMP_REST_SEC, rampSetsFor, SESSION_TYPE_LABEL, sessionType, WARMUP_PARTS, warmupMinutes, type RampSet, type WarmupPart } from '../lib/warmup';
 
 /** minutesDone: 2.3.0 cardio blocks (minutes only). rampDone: 2.4.0 ramp-up sets checked (by row). */
@@ -88,6 +90,8 @@ export default function Workout() {
   const [run, setRun] = useState<StationRun | null>(null);
   const [rackIndex, setRackIndex] = useState<number | null>(null);
   const stationsOn = session?.format === 'stations' && !!program?.teamId && !isRecovery && (session?.stations?.length ?? 0) > 0;
+  // 2.4.0 rack rotation (F54): my rack order and the room's clock.
+  const rot = useRotation(isRecovery ? undefined : program?.teamId, session);
   useEffect(() => {
     if (!stationsOn || !program?.teamId) return;
     let alive = true;
@@ -217,6 +221,7 @@ export default function Workout() {
           restEndsAt: rest ? new Date(rest.endAt).toISOString() : null,
           groupLabel: rampLabel ?? groupLine(plan, curIndex, draft.entries),
           stationId: plan[curIndex].stationId ?? null,
+          positionIndex: rot.state && !rot.state.done && rot.rack ? positionAt(rot.rack.myIndex ?? 0, rot.state.tick, rot.state.block) : null,
           rotateAt: run && !run.endedAt ? new Date(runState(run, now).rotateAt).toISOString() : null,
         }
       : null;
@@ -575,6 +580,15 @@ export default function Workout() {
           })()
         : null}
       {isRecovery ? <Note>{RECOVERY_NOTE}</Note> : null}
+      {session.format === 'rack_rotation' && !rot.state ? <RotationToday session={session} rack={rot.rack} exercises={plan} /> : null}
+      <RotationNowCard rack={rot.rack} state={rot.state} exercises={plan} />
+      {rot.state && !rot.state.done && mode === 'focus' && rot.rack ? (() => {
+        const b = rot.state.block;
+        const pos = positionAt(rot.rack.myIndex ?? 0, rot.state.tick, b);
+        const p = b.positions[pos];
+        const idx2 = p?.kind === 'exercise' ? plan.findIndex((e) => e.group === b.group && (e.teamExerciseId ?? e.exerciseId) === p.exerciseId) : -1;
+        return idx2 >= 0 && idx2 !== idx ? <Button small kind="secondary" title={`Go to Position ${pos + 1}`} onPress={() => update({ index: idx2 })} /> : null;
+      })() : null}
     </View>
   );
 

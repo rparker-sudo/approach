@@ -140,7 +140,8 @@ Only the service role can change these two columns; a trigger rejects the change
 Ryan runs these in order, after 010, in Supabase → SQL Editor. Each file is safe to run twice. Every change is recorded in `build-snapshot.md`.
 
 1. `supabase/migrations/011_training_v3_p1.sql` (Part 1): the `warmup_templates` table (a coach's or trainer's saved warm-ups; only that coach can read them), `teams.default_warmup` ('approach' / 'template' / 'none'), `teams.default_warmup_template_id`, `teams.limited_space`, and one more allowed live-board state (`warming_up`; no new column).
-2. Deploy 2.4.0 (push to `main`) after Ryan approves the deploy.
+2. `supabase/migrations/012_training_v3_p2.sql` (Part 2): `live_progress.position_index` (an athlete's current rack-rotation position), the 5 catalog v3 equipment ids allowed in a trainer's gym profile, and `my_rack` also returns the athlete's order in their rack group (derived; nothing new stored).
+3. Deploy 2.4.0 (push to `main`) after Ryan approves the deploy.
 
 Everything else in Training v3 Part 1 lives inside the existing program JSON (session source, level adjust, warm-ups, session length, Fit to time) and the existing team calendar JSON (weight room time per date).
 

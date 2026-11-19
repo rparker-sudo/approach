@@ -20,6 +20,10 @@ import { stationMinutesFrom, targetFor } from '../lib/fit';
 import { warmupCtxFor } from '../lib/resolve';
 import { warmupFor, warmupMinutes } from '../lib/warmup';
 import type { Program, Session, Station } from '../lib/types';
+import { FLAGS } from '../lib/flags';
+import { NOT_FOR_SESSION, rotationAllowed, suggestSessionRotation } from '../lib/rotation';
+import { showAlert } from '../lib/dialog';
+import RotationEditor from './RotationEditor';
 import { uid } from '../lib/util';
 import { Button, Card, Chip, ChipRow, colors, Field, H2, Label, Row, Stepper, Text } from './ui';
 
@@ -50,6 +54,13 @@ export default function StationsEditor({ program, session, onChange }: { program
   function setFormat(stations: boolean) {
     setMsg(null);
     if (!stations) {
+      if (session.format === 'rack_rotation') {
+        showAlert('Switch to Standard?', 'Positions become a normal exercise list.', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Switch', onPress: () => onChange({ ...session, format: 'standard', rotation: undefined }) },
+        ]);
+        return;
+      }
       onChange({ ...session, format: 'standard' });
       return;
     }
@@ -61,24 +72,49 @@ export default function StationsEditor({ program, session, onChange }: { program
     onChange({ ...session, format: 'stations', exercises: d.exercises, stations: d.stations, stationTransitionSec: STATION_TRANSITION_SEC });
   }
 
+  // 2.4.0 F52: Rack rotation (flag rackRotation). Each block becomes a rotation card filled with suggested positions.
+  const rotating = session.format === 'rack_rotation';
+  function setRotation() {
+    setMsg(null);
+    if (!rotationAllowed(session)) {
+      setMsg(NOT_FOR_SESSION);
+      return;
+    }
+    if (!racks) {
+      setMsg('Rack rotation uses your rack groups.');
+      return;
+    }
+    const s2 = suggestSessionRotation(session, { equipment: program.equipment });
+    onChange({ ...session, format: 'rack_rotation', exercises: s2.exercises, rotation: s2.rotation, stations: undefined });
+  }
   const header = (
     <Card>
       <Label>Format</Label>
       <ChipRow>
-        <Chip label="Standard" selected={!on} onPress={() => setFormat(false)} />
+        <Chip label="Standard" selected={!on && !rotating} onPress={() => setFormat(false)} />
         <Chip label="Stations" selected={on} onPress={() => (allowed ? setFormat(true) : setMsg(NOT_HERE))} />
+        {FLAGS.rackRotation ? <Chip label="Rack rotation" selected={rotating} onPress={setRotation} /> : null}
       </ChipRow>
+      {FLAGS.rackRotation && !rotationAllowed(session) ? <Text style={{ fontSize: 13, color: colors.muted }}>{NOT_FOR_SESSION}</Text> : null}
       {!allowed ? <Text style={{ fontSize: 13, color: colors.muted }}>{NOT_HERE}</Text> : null}
       {msg ? (
         <>
           <Text style={{ fontSize: 13, color: colors.warningText }}>{msg}</Text>
-          {msg === 'Stations need rack groups.' ? (
+          {msg === 'Stations need rack groups.' || msg === 'Rack rotation uses your rack groups.' ? (
             <Button small kind="secondary" title="Set up racks" onPress={() => router.push({ pathname: '/racks', params: { teamId: program.teamId! } })} />
           ) : null}
         </>
       ) : null}
     </Card>
   );
+  if (rotating && FLAGS.rackRotation) {
+    return (
+      <View style={{ gap: 10 }}>
+        {header}
+        <RotationEditor program={program} session={session} onChange={onChange} />
+      </View>
+    );
+  }
   if (!on) return header;
 
   const list = withBlockLetters(session.exercises);

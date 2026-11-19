@@ -311,6 +311,7 @@ x('jump-rope', 'Jump Rope', 'cardio', 'cardio', false, 2, [['jump-rope']], 'Smal
 export const WHY_GENERAL: Record<string, string> = {
   // 2.4.0 catalog v3 Part 1: sport-neutral line for general teams (the catalog's line mentions hitting and serving).
   'er-90-90-iso': 'Builds shoulder strength in the overhead position.',
+  'lateral-hurdle-hop': 'Reactive side-to-side jumping for lateral movement.',
   'glute-bridge': 'Wakes up the glutes, which drive squats, lunges, and jumps.',
   'kb-swing': 'Teaches a fast, powerful hip snap.',
   'split-squat': 'Builds single-leg strength and balance.',

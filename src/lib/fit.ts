@@ -3,6 +3,7 @@ import { getExercise } from './exercises';
 import { restSecFor } from './generator';
 import { blockRests, blocksOf } from './groups';
 import { topReps, type RestContext } from './rest';
+import { rotationMinutes } from './rotation';
 import { blockOf, compactOf, isSessionWarmup, needsRampUp, warmupFor, warmupMinutes, type WarmupCtx } from './warmup';
 import type { Phase, Program, ProgramExercise, Session } from './types';
 
@@ -74,14 +75,22 @@ export function estimateSession(session: Session, ctx: FitCtx, opts: { compactWa
   const list = session.exercises;
   const rests = opts.rests ?? blockRests(list, list.map((pe) => (pe.cardio ? 60 : restSecFor(pe, ctx.rest))), ctx.rest);
   let sec = 0;
+  // 2.4.0 rack rotation (§4b rule 9): a rotation block's time is rotation × positions × rounds, plus 1 min between blocks.
+  const rot = session.format === 'rack_rotation' ? session.rotation ?? [] : [];
+  const inRotation = new Set(rot.map((b) => b.group));
+  if (rot.length) sec += rotationMinutes(rot) * 60;
   for (const [i, pe] of list.entries()) {
-    if (pe.filler) continue;
+    if (pe.filler || (pe.group && inRotation.has(pe.group))) continue;
     sec += (pe.cardio ? 1 : pe.sets) * (workSec(pe) + (rests[i] ?? 0));
   }
-  const blocks = new Set(list.map((pe, i) => pe.group ?? `#${i}`)).size;
-  sec += Math.max(0, blocks - 1) * 30;
+  // Transitions between non-rotation blocks (rotation blocks already add 1 min between them).
+  const blocks = new Set(list.filter((pe) => !(pe.group && inRotation.has(pe.group))).map((pe, i) => pe.group ?? `#${i}`)).size;
+  sec += Math.max(0, blocks - (rot.length ? 0 : 1)) * 30;
   const w = warmupFor(session, { ...ctx.warmup, compact: opts.compactWarmup || ctx.warmup.compact });
-  return Math.round(sec / 60) + warmupMinutes(w, { phase: ctx.warmup.phase, home: ctx.warmup.home }) + rampCount(list, ctx.rest);
+  // A rotation's build-up round is its ramp-up (rule 6), so those lifts add no separate ramp-up time.
+  const buildUp = new Set(rot.filter((b) => b.buildUpRound).map((b) => b.group));
+  const ramps = rampCount(list.filter((pe) => !(pe.group && buildUp.has(pe.group))), ctx.rest);
+  return Math.round(sec / 60) + warmupMinutes(w, { phase: ctx.warmup.phase, home: ctx.warmup.home }) + ramps;
 }
 
 /* ---------- fitSession (§4a trim order) ---------- */

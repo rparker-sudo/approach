@@ -173,7 +173,8 @@ ok(!!warmupFor(lsW, ctx)?.raise.every((e) => /In place|Standing|shuffles|steps/.
 const mig = fs.readFileSync(path.join(__dirname, '../../supabase/migrations/011_training_v3_p1.sql'), 'utf8');
 ok(/create table if not exists public\.warmup_templates/.test(mig) && /default_warmup text/.test(mig) && /default_warmup_template_id/.test(mig) && /limited_space boolean/.test(mig), 'migration 011: warmup_templates + teams.default_warmup(_template_id) + limited space');
 // 15 catalog drills
-const v3 = EXERCISES.filter((e) => CATALOG_V3_IDS.has(e.id));
+const P1 = ['a-skip', 'lateral-shuffle', 'carioca', 'high-knees', 'walking-knee-hug', 'walking-quad-stretch', 'push-up-plus', 'wall-slide', 'er-90-90-iso', 'band-lateral-walk', 'short-lever-copenhagen', 'soleus-calf-raise', 'cmj', 'line-hops', 'skater-hop'];
+const v3 = EXERCISES.filter((e) => P1.includes(e.id) && CATALOG_V3_IDS.has(e.id));
 const tierOk: Record<string, string> = { cmj: 'P', 'line-hops': 'P', 'skater-hop': 'P', 'short-lever-copenhagen': 'C', 'soleus-calf-raise': 'C' };
 ok(v3.length === 15 && v3.every((e) => tierOf(e) === (tierOk[e.id] ?? 'D') && e.level === 1 && !e.scope), `the 15 movement-prep and warm-up exercises are present with their §3 tags (${v3.length})`);
 const CLAIMS = /\b(prevent\w*|injury[- ]proof|injury|safe for|guarantee\w*|proven|science-backed|clinically|rehab\w*|treat\w*|cure\w*|heal\w*|weight loss|fat loss|burn fat|calorie\w*|tone|toning|durability|recover\w*)\b/i;

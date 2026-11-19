@@ -13,6 +13,8 @@ import {
   GOALS, HEAD_INJURY_TRAINER, LEGAL, PAIN_TRAINER, postChecks, programChecks, shiftBeginner, STRENGTH_CAP, terms,
 } from '../../src/lib/general';
 import * as GEN from '../../src/lib/general';
+import { FLAGS } from '../../src/lib/flags';
+import { CATALOG_V3_IDS } from '../../src/lib/exercises';
 import { newGeneralProgram } from '../../src/lib/starter';
 import { resolveExercise, resolveSession } from '../../src/lib/resolve';
 import { tierOf } from '../../src/lib/rest';
@@ -52,12 +54,13 @@ ok(cardio.length === 7 && cardio.every((e) => e.scope === 'general' && e.duratio
 ok(GENERAL_EXERCISES.filter((e) => e.category !== 'cardio').every((e) => e.scope === 'all'), 'the other 32 are scope all');
 ok(GENERAL_EQUIPMENT.length === 13 && equipmentLabel('cable', true) === 'Cable station' && equipmentLabel('cable', false) === 'Cable / machines', '13 equipment items; cable reads "Cable station" only in general teams');
 // 2.4.0: + er-90-90-iso (catalog v3 Part 1 drill whose catalog line mentions hitting and serving).
-ok(Object.keys(WHY_GENERAL).length === 28 && Object.keys(WHY_GENERAL).every((id) => EXERCISES.some((e) => e.id === id)), 'whyGeneral for 27 existing exercises + 1 catalog v3 drill');
+ok(Object.keys(WHY_GENERAL).length === (FLAGS.catalogV3 ? 29 : 28) && Object.keys(WHY_GENERAL).every((id) => EXERCISES.some((e) => e.id === id) || CATALOG_V3_IDS.has(id)), 'whyGeneral for 27 existing exercises + catalog v3 lines (er-90-90-iso; lateral-hurdle-hop with catalogV3)');
 ok(whyFor(getExercise('kb-swing'), true) === 'Teaches a fast, powerful hip snap.' && whyFor(getExercise('kb-swing'), false) === getExercise('kb-swing').howTo.why, 'whyGeneral in general teams; volleyball keeps why');
 // general-library §8 "Warm-ups W1–W3 available" → SUPERSEDED (§0.3; CLAUDE.md known conflict 9): generated warm-ups replace them.
 ok(true, 'SUPERSEDED (§0.3) → W1–W3 replaced by generated warm-ups (checked in v240-p1-check: trainer warm-up starts with easy cardio)');
 // C1: 0 exercises hidden; the picker shows all 74 existing + 39. 2.4.0 Part 1 adds 15 catalog v3 drills (scope all).
-ok(EXERCISES.length === 74 + 15 && GENERAL_POOL.length === 113 + 15, `general picker: 74 existing + 15 catalog v3 + 39 general (${EXERCISES.length} + ${GENERAL_POOL.length - EXERCISES.length})`);
+const v3n = FLAGS.catalogV3 ? 66 : 15;
+ok(EXERCISES.length === 74 + v3n && GENERAL_POOL.length === 113 + v3n, `general picker: 74 existing + ${v3n} catalog v3 + 39 general (${EXERCISES.length} + ${GENERAL_POOL.length - EXERCISES.length})`);
 ok(!EXERCISES.some((e) => e.scope === 'general'), 'volleyball library never contains scope general (cardio)');
 // claim words and volleyball words in text shown in general teams
 const CLAIMS = /\b(prevent\w*|injury[- ]proof|injury prevention|safe for|guarantee\w*|proven|science-backed|clinically|#1|rehab\w*|treat\w*|cure\w*|heal\w*|weight loss|fat loss|burn fat|calorie\w*|tone|toning|durability|shin splints|strains|jammed|easy on the joints|joint[- ]friendly)\b/i;
@@ -68,7 +71,7 @@ const goalText = GOALS.map((g) => `${g.label} ${g.who}`).join(' ');
 ok(!CLAIMS.test(goalText) && !CLAIMS.test(WARMUPS.flatMap((w) => w.blocks.map((b) => b.label)).join(' ')), 'claim-word search clean on goals and warm-ups');
 const VB = /\b(approach|block\w*|hit\w*|serv\w*|attack\w*|setting|setter|defense|volleyball|spike\w*|dig)\b/i;
 // Ordinary-English uses that aren't volleyball: "the bar hits the floor" (rdl), "the whole block" (jump rope).
-const vbHits = GENERAL_POOL.filter((e) => VB.test(textOf(e).replace(/bar hits the floor|the whole block/g, '')));
+const vbHits = GENERAL_POOL.filter((e) => VB.test(textOf(e).replace(/bar hits the floor|the whole block|bar on blocks/g, '')));
 ok(vbHits.length === 0, `no volleyball words in exercise text shown in general teams (${vbHits.map((e) => e.id).join(', ')})`);
 
 /* ---------- adult-goals.md §6 ---------- */
@@ -169,7 +172,7 @@ ok(endDate(ending) === '2026-11-29', `program end date (${endDate(ending)})`);
 ok(endsSoon(ending, day('2026-11-16')) && !endsSoon({ ...ending, startDate: '2027-01-04' }, day('2026-11-16')) && !endsSoon(ending, day('2026-12-01')), '"Program ends in 2 weeks": within 14 days of the last week, not after it ends');
 
 /* ---------- Volleyball unchanged ---------- */
-ok(exercisePool(false) === EXERCISES, 'volleyball teams use the 2.2.1 library');
+ok(FLAGS.catalogV3 ? exercisePool(false).length === EXERCISES.length + 7 && !exercisePool(false).some((e) => e.scope === 'general') : exercisePool(false) === EXERCISES, 'volleyball teams use their library (2.4.0 catalogV3: + the 7 general-library exercises catalog §5 marks all; never cardio)');
 ok(resolveExercise(getExercise('pullup'), 1, ['pullup-bar', 'bands']) === resolveExercise(getExercise('pullup'), 1, ['pullup-bar', 'bands'], EXERCISES), 'volleyball resolution unchanged (default pool)');
 ok(terms('volleyball').leader === 'coach' && terms('general').leader === 'trainer' && terms('general').Board === 'Class board', 'word set: volleyball coach, general trainer');
 

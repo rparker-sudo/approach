@@ -5,6 +5,7 @@ import { Body, Button, Checkbox, colors, Label, Screen, Text } from '../componen
 import { showAlert } from '../lib/dialog';
 import { EQUIPMENT, equipmentLabel, getExercise } from '../lib/exercises';
 import { GENERAL_EQUIPMENT } from '../lib/generalLibrary';
+import { FLAGS } from '../lib/flags';
 import { isGeneral } from '../lib/general';
 import { useStore } from '../lib/store';
 import { useTeams } from '../lib/team';
@@ -17,6 +18,8 @@ const GROUPS: { title: string; ids: Equipment[] }[] = [
   { title: 'Cables and bands', ids: ['cable', 'bands'] },
   { title: 'Machines', ids: GENERAL_EQUIPMENT.filter((e) => e.group === 'Machines').map((e) => e.id) },
   { title: 'Cardio', ids: GENERAL_EQUIPMENT.filter((e) => e.group === 'Cardio').map((e) => e.id) },
+  // 2.4.0 catalog v3 §2 (all teams; migration 012 allows them in the gym profile).
+  ...(FLAGS.catalogV3 ? [{ title: 'More equipment', ids: ['sliders', 'hurdles', 'ssb', 'ghd', 'suspension'] as Equipment[] }] : []),
 ];
 const label = (id: Equipment) => GENERAL_EQUIPMENT.find((e) => e.id === id)?.label ?? equipmentLabel(id, true) ?? EQUIPMENT.find((e) => e.id === id)?.label ?? id;
 

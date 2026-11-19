@@ -1,3 +1,4 @@
+import { FLAGS } from '../../src/lib/flags';
 import { resolveExercise, resolveSession, easingFor, capEffort, effortCeiling } from '../../src/lib/resolve';
 import { getExercise, EXERCISES, EQUIPMENT_PRESETS } from '../../src/lib/exercises';
 import { suggestWeight } from '../../src/lib/progression';
@@ -9,7 +10,10 @@ const ALL = ['barbell','dumbbells','kettlebells','bench','bands','cable','pullup
 ok(resolveExercise(getExercise('front-squat'), 1, ALL)?.id === 'goblet-squat', 'Front Squat → Goblet Squat (beginner)');
 const hc = resolveExercise(getExercise('hang-clean'), 1, ALL);
 ok(!!hc && hc.pattern === 'jump' && hc.level === 1, `Hang Power Clean → level 1 jump (${hc?.id})`);
-ok(resolveExercise(getExercise('hang-clean'), 2, ALL)?.pattern === 'jump', 'Hang Power Clean → jump for intermediate too');
+// safety-guidelines §2a step 5 ("Olympic lifts resolve to a jump for anyone below advanced"). With catalogV3 on, spec §2.1/§3
+// and program-design §8a give intermediates L2 derivatives instead (not listed in spec §0.3; raised with Ryan in the report).
+if (FLAGS.catalogV3) ok(resolveExercise(getExercise('hang-clean'), 2, ALL)?.id === 'hang-high-pull', 'CONFLICT (spec §2.1/§8a vs safety §2a step 5; catalogV3 on) → Hang Power Clean → Hang High Pull for intermediate');
+else ok(resolveExercise(getExercise('hang-clean'), 2, ALL)?.pattern === 'jump', 'Hang Power Clean → jump for intermediate too');
 const bands = (EQUIPMENT_PRESETS as any).find((p: any) => /band/i.test(p.label))?.items ?? ['bands'];
 for (const ex of EXERCISES) {
   const r = resolveExercise(ex, 1, bands);

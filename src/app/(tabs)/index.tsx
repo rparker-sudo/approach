@@ -36,6 +36,7 @@ import { getExercise } from '../../lib/exercises';
 import { captainLine, dayAdvice } from '../../lib/generator';
 import { cardsFor, fuelDay } from '../../lib/nutrition';
 import { easingFor, lengthLine } from '../../lib/resolve';
+import { RotationTodayLive } from '../../components/RotationAthlete';
 import { canCheckIn, canLog } from '../../lib/backend';
 import { useStore } from '../../lib/store';
 import { BATTERY_LABEL } from '../../lib/testing';
@@ -231,6 +232,7 @@ function Today() {
               </>
             )}
             {activeProgram.teamId && session.format === 'stations' ? <StationsCard teamId={activeProgram.teamId} session={session} exercises={todaySession!.exercises} /> : null}
+            {activeProgram.teamId && session.format === 'rack_rotation' ? <RotationTodayLive teamId={activeProgram.teamId} session={session} exercises={todaySession!.exercises} /> : null}
             <Row style={{ gap: 6, flexWrap: 'wrap' }}>
               <Pill text={todaySession!.block.label} />
               {session.location === 'home' ? null : <Pill text={lengthLine(todaySession!).text} />}

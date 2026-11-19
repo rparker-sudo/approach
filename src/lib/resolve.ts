@@ -3,6 +3,8 @@ import { ALL_EQUIPMENT, EXERCISES, exercisePool, fits, getExercise, registerCust
 import { GENERAL_EASIER } from './generalLibrary';
 import { BACK_AFTER_BREAK_RAMP, clampCardio, programWeeks, RPE_CEILING, shiftBeginner, weekIndex, withWeekRpe } from './general';
 import { BEGINNER_EFFORT, homeAllowed, pickExercise, restSecFor } from './generator';
+import { FLAGS } from './flags';
+import { ladderResolve } from './ladders';
 import { blockRests, blocksOf } from './groups';
 import { BlockInfo, sessionForDate } from './progression';
 import { addBack, estimateSession, fitSession, targetFor, undoneTrims, type FitCtx, type Target } from './fit';
@@ -160,9 +162,20 @@ export const isStrength = (pe: Pick<ProgramExercise, 'role'>, ex: Exercise) =>
  * of the same pattern that fits; else null (drop the slot). Olympic lifts resolve to a jump below advanced.
  */
 export function resolveExercise(ex: Exercise, level: Level, equipment: Equipment[], pool: Exercise[] = EXERCISES): Exercise | null {
-  const general = pool !== EXERCISES;
+  const general = pool !== EXERCISES && pool !== exercisePool(false);
   // 2.3.0 general teams: the exercise must also fit the gym equipment profile (F40); volleyball keeps 2.2.1 behavior.
-  if (ex.level <= level && !(ex.pattern === 'olympic' && level < 3) && (!general || fits(ex, equipment))) return ex;
+  // 2.4.0 catalogV3: Olympic derivatives are gated by their own level (L2 for intermediate athletes; HPC stays L3).
+  const olympicGate = !FLAGS.catalogV3 && ex.pattern === 'olympic' && level < 3;
+  if (ex.level <= level && !olympicGate && (!general || fits(ex, equipment))) return ex;
+  // 2.4.0 catalogV3: movement ladders (program-design §8a) when the exercise is on one.
+  if (FLAGS.catalogV3) {
+    // General gyms: the trainer library's easier option (e.g., the assisted pull-up) first, when it fits (catalog §3 note).
+    const alt = general ? GENERAL_EASIER[ex.id] : undefined;
+    const altEx = alt ? pool.find((x) => x.id === alt) : undefined;
+    if (altEx && altEx.level <= level && fits(altEx, equipment)) return altEx;
+    const rung = ladderResolve(ex, level, equipment, general ? pool : exercisePool(false));
+    if (rung) return rung;
+  }
   if (ex.pattern === 'olympic') {
     const jumps = pool.filter((e) => e.pattern === 'jump' && e.level <= level && fits(e, equipment));
     return jumps.find((e) => e.id === 'box-jump') ?? jumps.find((e) => e.id === 'squat-jump') ?? jumps[0] ?? null;

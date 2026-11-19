@@ -1,6 +1,6 @@
 -- API/RLS checks for 2.4.0 Training v3 Part 1 (migration 011; spec §1.3, §1.5; compliance V4). Run on a scratch Postgres
 -- after supabase-stub.sql + schema.sql (or v1 + 002–011), as superuser. Each echo line says what to expect.
--- Total expected errors: 5 (2 coach-private inserts, 2 team-default checks, 1 unknown board state).
+-- Total expected errors: 6 (2 coach-private inserts, 2 team-default checks, 1 unknown board state; Part 2: 1 position out of range).
 \set VERBOSITY terse
 \pset footer off
 insert into auth.users (id, raw_user_meta_data) values
@@ -59,3 +59,13 @@ select state from live_progress where team_id = :'A';
 \echo == V4: no new columns about athletes (expect 0 errors; only the listed team columns)
 select column_name from information_schema.columns where table_schema = 'public' and table_name = 'teams' and column_name in ('default_warmup', 'default_warmup_template_id', 'limited_space') order by 1;
 select column_name from information_schema.columns where table_schema = 'public' and table_name = 'warmup_templates' order by ordinal_position;
+
+\echo == 2.4.0 Part 2 (migration 012): position_index 0-11 allowed, 12 rejected; new equipment ids in the gym profile (expect 1 error)
+update live_progress set position_index = 3 where team_id = :'A';
+update live_progress set position_index = 12 where team_id = :'A';
+select position_index from live_progress where team_id = :'A';
+\echo == my_rack returns the athlete order in the rack group (expect 0 errors; my_index 0)
+set role authenticated;
+select pg_temp.u(:'CA'); select save_racks(:'A', jsonb_build_array(jsonb_build_object('name', 'Rack 1', 'users', jsonb_build_array(:'AV'))));
+select pg_temp.u(:'AV'); select rack_name, partners, my_index from my_rack(:'A');
+reset role;

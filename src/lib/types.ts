@@ -75,7 +75,13 @@ export type Equipment =
   | 'treadmill'
   | 'elliptical'
   | 'stair-climber'
-  | 'jump-rope';
+  | 'jump-rope'
+  /* 2.4.0 catalog v3 §2 (all teams) */
+  | 'ssb'
+  | 'ghd'
+  | 'suspension'
+  | 'sliders'
+  | 'hurdles';
 
 /** Movement families. The generator fills session slots by pattern. */
 export type Pattern =
@@ -195,6 +201,10 @@ export type SessionWarmup = {
   teamDefault?: boolean;
 };
 
+/** 2.4.0 rack rotation (program-design §4b). A position is an exercise in the block (by id) or the spotter ("Spot"). */
+export type RotationPosition = { kind: 'exercise' | 'spot'; exerciseId?: string; reps: string; usesRack: boolean };
+export type RotationBlock = { group: string; positions: RotationPosition[]; rotationSec: number; rounds: number; buildUpRound: boolean };
+
 /** 2.4.0 (D-045): who wrote the session. */
 export type SessionSource = 'approach' | 'coach';
 
@@ -222,8 +232,10 @@ export type Session = {
   location?: 'school' | 'home';
   /** Light home day (H2): bodyweight only, RPE ≤ 6, no jumps, no weight suggestions. Only given beyond the cap. */
   light?: boolean;
-  /** Stations format (D-030 part 2). Missing = standard. */
-  format?: 'standard' | 'stations';
+  /** Stations format (D-030 part 2). 2.4.0: 'rack_rotation' (program-design §4b). Missing = standard. */
+  format?: 'standard' | 'stations' | 'rack_rotation';
+  /** 2.4.0 rack rotation blocks (one per block letter). */
+  rotation?: RotationBlock[];
   stations?: Station[];
   stationTransitionSec?: number;
   /** 2.4.0 (warmups.md §7): the warm-up. Missing (or a 2.3.0 W1–W3 id) = generated from the session; null = removed by the coach. */

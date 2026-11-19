@@ -257,6 +257,8 @@ export type LiveProgress = {
   groupLabel?: string | null;
   stationId?: string | null;
   rotateAt?: string | null;
+  /** 2.4.0 rack rotation (migration 012): current position (0-based). Never a load or level. */
+  positionIndex?: number | null;
 };
 export type LiveState = 'idle' | 'warming_up' | 'lifting' | 'resting' | 'done';
 
@@ -271,7 +273,8 @@ export type BoardTest = {
 /** Rack groups (D-026). */
 export type Rack = { id: string; name: string; sortOrder: number; userIds: string[] };
 /** The athlete's own rack. partnerNames is null until the names flag is on (count only). */
-export type MyRack = { groupId: string; rackName: string; partners: number; partnerNames: string[] | null; others: number | null };
+/** myIndex (2.4.0 rack rotation): the athlete's order in the rack group (by user id), for the start position. */
+export type MyRack = { groupId: string; rackName: string; partners: number; partnerNames: string[] | null; others: number | null; myIndex?: number };
 
 /** Effort-board inputs for one member (no weights, results, check-ins or nutrition). */
 export type EffortInput = {

@@ -11,6 +11,8 @@ import { isGeneral, scheduleFor, weekIndex } from '../lib/general';
 import type { Session } from '../lib/types';
 import { useTeamProgramFor } from './EffortBoard';
 import { Banner, Button, Card, colors, Row, Text } from './ui';
+import { FLAGS } from '../lib/flags';
+import { rotationRun, rotationState } from '../lib/rotationRun';
 
 /**
  * F29a: running a Stations session. "Start stations" is blocked until everyone in today's session is on a rack (with a
@@ -33,7 +35,8 @@ export default function StationControls({ team }: { team: Team }) {
   const [now, setNow] = useState(() => Date.now());
   const [busy, setBusy] = useState(false);
   const asked = useRef(false);
-  const on = session?.format === 'stations' && (session.stations?.length ?? 0) > 0 && session.location !== 'home';
+  const rotating = FLAGS.rackRotation && session?.format === 'rack_rotation' && (session.rotation?.length ?? 0) > 0 && session.location !== 'home';
+  const on = (session?.format === 'stations' && (session.stations?.length ?? 0) > 0 && session.location !== 'home') || rotating;
 
   const teamId = team.id;
   const [reload, setReload] = useState(0);
@@ -55,6 +58,17 @@ export default function StationControls({ team }: { team: Team }) {
   }, [on, teamId, day, reload, t.syncing]);
 
   if (!on || !session || !program) return null;
+  if (rotating) return <RotationControls teamId={team.id} day={day} session={session} run={run} now={now} busy={busy} onSave={async (r) => {
+    setBusy(true);
+    try {
+      await backend.saveStationRun(r);
+      setRun(r);
+    } catch (e) {
+      showAlert("Couldn't update the rotation", e instanceof Error ? e.message : 'Try again.');
+    } finally {
+      setBusy(false);
+    }
+  }} />;
   const stations = session.stations!;
   const roster = (t.members[team.id] ?? []).filter((m) => !(t.coachExtras[team.id]?.followingOther ?? []).includes(m.userId));
   const placed = new Set(racks.flatMap((r) => r.userIds));
@@ -103,16 +117,17 @@ export default function StationControls({ team }: { team: Team }) {
       <Card>
         <Text style={{ fontSize: 16, fontWeight: '700' }}>{`Today: ${session.name} · Stations`}</Text>
         {run?.endedAt ? <Text style={{ fontSize: 13, color: colors.muted }}>Stations ended.</Text> : null}
+        {/* 2.4.0 F29a / F28c: never blocked; neutral information. */}
         {missing.length ? (
           <>
-            <Text style={{ fontSize: 14, color: colors.warningText }}>{`${missing.length} ${general ? 'client' : 'athlete'}${missing.length === 1 ? " isn't" : "s aren't"} on a rack.`}</Text>
-            <Button kind="secondary" title="Add the rest to racks (balanced)" disabled={busy} onPress={fillRacks} />
+            <Text style={{ fontSize: 14, color: colors.ink }}>{`${missing.length} ${general ? 'client' : 'athlete'}${missing.length === 1 ? " isn't" : "s aren't"} on a rack. They'll follow the standard order.`}</Text>
+            <Button kind="secondary" title="Add them to racks" disabled={busy} onPress={fillRacks} />
           </>
         ) : null}
-        {tooManyRacks ? <Text style={{ fontSize: 13, color: colors.errorText }}>{`${racks.filter((r) => r.userIds.length).length} racks, ${stations.length} stations. Add a station or merge two racks.`}</Text> : null}
+        {tooManyRacks ? <Text style={{ fontSize: 13, color: colors.ink }}>{`${racks.filter((r) => r.userIds.length).length} racks, ${stations.length} stations. One rack has no station each round.`}</Text> : null}
         <Button
           title="Start stations"
-          disabled={busy || missing.length > 0 || tooManyRacks}
+          disabled={busy}
           onPress={() =>
             save({
               teamId: team.id,
@@ -164,5 +179,55 @@ export default function StationControls({ team }: { team: Team }) {
         <Button small kind="ghost" title="End stations" disabled={busy} onPress={() => save({ ...run, endedAt: new Date().toISOString() })} />
       </Row>
     </View>
+  );
+}
+
+/**
+ * 2.4.0 F55a: rack rotation controls. One clock for the room (all racks start together): Start rotation (per block),
+ * then "Rack rotation · B · Round 2 of 4 · Rotate in 0:42" with Rotate now (asks once), +15 s and End block.
+ * Uses the existing station-run row (rotate_at); the block letter rides in its session id.
+ */
+function RotationControls({ teamId, day, session, run, now, busy, onSave }: { teamId: string; day: string; session: Session; run: StationRun | null; now: number; busy: boolean; onSave: (r: StationRun) => Promise<void> }) {
+  const asked = useRef(false);
+  const blocks = session.rotation ?? [];
+  const st = run && run.sessionId.startsWith(`${session.id}#`) ? rotationState(run, session, now) : null;
+  const nextIdx = st ? (st.done ? blocks.findIndex((b) => b.group === st.block.group) + 1 : -1) : 0;
+  const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+  if (!st || st.done) {
+    const b = blocks[nextIdx];
+    return (
+      <Card>
+        <Text style={{ fontSize: 16, fontWeight: '700' }}>{`Today: ${session.name} · Rack rotation`}</Text>
+        {st?.done ? <Text style={{ fontSize: 13, color: colors.muted }}>{`Block ${st.block.group} done.`}</Text> : null}
+        {b ? (
+          <Button title={nextIdx === 0 ? 'Start rotation' : `Start block ${b.group}`} disabled={busy} onPress={() => onSave(rotationRun(teamId, day, session, b, Date.now()))} />
+        ) : (
+          <Text style={{ fontSize: 13, color: colors.muted }}>Rotation finished.</Text>
+        )}
+      </Card>
+    );
+  }
+  const label = `Rack rotation · ${st.block.group} · Round ${st.round + 1} of ${st.block.rounds}${st.block.buildUpRound && st.round === 0 ? ' · Build-up' : ''} · Rotate in ${clock(st.secondsLeft)}`;
+  const rotateNow = () => onSave({ ...run!, round: st.tick + 1, rotateAt: new Date(Date.now() + st.block.rotationSec * 1000).toISOString() });
+  return (
+    <Banner>
+      <View style={{ gap: 8 }}>
+        <Text accessibilityLiveRegion="polite" style={{ fontSize: 16, fontWeight: '700' }}>{label}</Text>
+        <Row style={{ gap: 6, flexWrap: 'wrap' }}>
+          <Button
+            small
+            title="Rotate now"
+            disabled={busy}
+            onPress={() => {
+              if (asked.current) return rotateNow();
+              asked.current = true;
+              showAlert('Rotate now?', 'Everyone moves to their next position.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Rotate now', onPress: rotateNow }]);
+            }}
+          />
+          <Button small kind="secondary" title="+15 s" disabled={busy} onPress={() => onSave({ ...run!, rotateAt: new Date(new Date(run!.rotateAt).getTime() + 15000).toISOString() })} />
+          <Button small kind="ghost" title="End block" disabled={busy} onPress={() => onSave({ ...run!, endedAt: new Date().toISOString() })} />
+        </Row>
+      </View>
+    </Banner>
   );
 }

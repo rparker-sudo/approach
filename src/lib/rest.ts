@@ -28,6 +28,15 @@ add('D', [
 // 2.4.0 Part 1: catalog v3 §5 tiers for the 15 movement-prep and warm-up drills.
 add('P', ['cmj', 'line-hops', 'skater-hop']);
 add('C', ['short-lever-copenhagen', 'soleus-calf-raise']);
+// 2.4.0 Part 2: catalog v3 §5 tiers for the other 51.
+add('P', ['hang-high-pull', 'jump-shrug', 'clean-pull', 'db-hang-snatch', 'push-press', 'db-push-press', 'power-clean', 'push-jerk', 'hang-power-snatch', 'db-jump-squat',
+  'hurdle-hop', 'lateral-hurdle-hop', 'single-leg-box-jump', 'single-leg-hop-stick', 'depth-drop', 'depth-jump', 'seated-box-jump', 'continuous-broad-jump',
+  'mb-scoop-toss', 'mb-step-overhead-throw', 'mb-backward-toss']);
+add('A', ['pause-back-squat', 'box-squat', 'ssb-squat', 'incline-bench', 'close-grip-bench']);
+add('B', ['heels-elevated-goblet', 'ffe-split-squat', 'lateral-squat', 'skater-squat', 'lateral-step-up', 'single-leg-box-squat', 'bb-reverse-lunge', 'bb-good-morning',
+  'ghr', 'sl-hip-thrust', 'kb-deadlift', 'chin-up', 'weighted-pullup', 'ring-row', 'single-arm-cable-row']);
+add('C', ['back-extension', 'slider-ham-curl', 'half-kneeling-pulldown', 'landmine-rotation', 'body-saw', 'overhead-carry', 'reverse-nordic', 'peterson-step-up', 'iso-split-squat']);
+add('D', ['side-lying-er']);
 add('D', ['push-up-plus', 'er-90-90-iso', 'wall-slide', 'band-lateral-walk', 'a-skip', 'lateral-shuffle', 'carioca', 'high-knees', 'walking-knee-hug', 'walking-quad-stretch']);
 
 /** Tier from §7. `hip-thrust` is tier A only when done with a barbell setup, otherwise B. Unknown ids fall back by category. */

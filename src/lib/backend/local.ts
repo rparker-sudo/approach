@@ -885,7 +885,9 @@ export const localBackend: Backend = {
     const r = (db.racks ?? []).find((x) => x.teamId === teamId && x.userIds.includes(user.id));
     if (!r) return null;
     // Partner names stay off until Legal confirms box 4 covers them (B5): count only, same as the server flag.
-    return { groupId: r.id, rackName: r.name, partners: r.userIds.filter((u) => u !== user.id).length, partnerNames: null, others: null };
+    // 2.4.0: order in the rack group by user id (same as migration 012's my_index).
+    const myIndex = [...r.userIds].sort().indexOf(user.id);
+    return { groupId: r.id, rackName: r.name, partners: r.userIds.filter((u) => u !== user.id).length, partnerNames: null, others: null, myIndex };
   },
 
   subscribeBoard(_teamId, onChange, onStatus) {

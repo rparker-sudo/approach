@@ -9,6 +9,9 @@ import { addDays, breakOn, dateKey, formatKey, mondayOf, planForDate, today } fr
 import { defaultTeamGoal, EffortMetric, formatMetric, liftDaysOf, METRICS, POINTS_LINE, rank, seasonStart, weeksRemaining } from '../../lib/effort';
 import { ALL_EQUIPMENT, getExercise } from '../../lib/exercises';
 import { adjustedFor, Level, levelAdjustFor, resolveExercise } from '../../lib/resolve';
+import { FLAGS } from '../../lib/flags';
+import { rotationState } from '../../lib/rotationRun';
+import RotationRing from '../../components/RotationRing';
 import { runState, stationFor, StationRun } from '../../lib/stations';
 import { BATTERY_LABEL } from '../../lib/testing';
 import { ALL, useTeams } from '../../lib/team';
@@ -298,7 +301,14 @@ function Board({ teamId }: { teamId: string }) {
   const gridOn = !!rs && rs.phase !== 'done' && view === 'live';
   const sortedRacks = [...racks].sort((a, b) => a.sortOrder - b.sortOrder).filter((r) => r.userIds.length);
 
-  const sessionLine = gridOn
+  // 2.4.0 F55b rack rotation ring view: only during a rotation block. Board-safe data only (position, exercise name, board
+  // name, countdown); never loads, reps done, RPE, level, check-ins or "your version" (G-4).
+  const rotSession = FLAGS.rackRotation ? today_.per.find((x) => x.session?.format === 'rack_rotation')?.session : undefined;
+  const rotNow = rotSession && run && run.sessionId.startsWith(`${rotSession.id}#`) ? rotationState(run, rotSession, now) : null;
+  const ringOn = !!rotNow && !rotNow.done && view === 'live';
+  const sessionLine = ringOn
+    ? `Rack rotation · ${rotNow!.block.group} · Round ${rotNow!.round + 1} of ${rotNow!.block.rounds}`
+    : gridOn
     ? `Stations · Round ${rs!.round + 1} of ${run!.rounds}`
     : today_.test
     ? `Testing day: ${BATTERY_LABEL[today_.test]}`
@@ -306,6 +316,29 @@ function Board({ teamId }: { teamId: string }) {
 
   let body: React.ReactNode;
   if (view === 'season') body = <Season teamId={teamId} accent={accent} />;
+  else if (ringOn)
+    body = (
+      <View style={{ gap: 12 }}>
+        <Text accessibilityLiveRegion="polite" style={{ color: P.ink, fontSize: big(48), fontWeight: '700', fontVariant: ['tabular-nums'] }}>{`Rotate in ${clock(rotNow!.secondsLeft)}`}</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+          {sortedRacks.map((rk) => (
+            <RotationRing
+              key={rk.id}
+              rack={rk}
+              block={rotNow!.block}
+              tick={rotNow!.tick}
+              names={new Map((members ?? []).map((m) => [m.userId, m.boardName]))}
+              lifting={new Set(live.filter((l) => l.state === 'lifting').map((l) => l.userId))}
+              accent={accent}
+              size={Math.max(280, Math.min(520, Math.floor((grid.w - 32) / Math.min(3, Math.max(1, sortedRacks.length)))))}
+              round={rotNow!.round}
+              rounds={rotNow!.block.rounds}
+              big={big}
+            />
+          ))}
+        </View>
+      </View>
+    );
   else if (gridOn)
     body = (
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>

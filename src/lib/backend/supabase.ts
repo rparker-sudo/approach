@@ -775,7 +775,9 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
         finished_at: p.finishedAt ?? null,
       };
       const p3 = { group_label: p.groupLabel?.slice(0, 120) ?? null, station_id: p.stationId ?? null, rotate_at: p.rotateAt ?? null };
-      let { error } = await sb.from('live_progress').upsert({ ...base, ...live, ...p3 }, { onConflict: 'team_id,user_id,day' });
+      // 2.4.0 rack rotation (migration 012): the athlete's current position.
+      let { error } = await sb.from('live_progress').upsert({ ...base, ...live, ...p3, position_index: p.positionIndex ?? null }, { onConflict: 'team_id,user_id,day' });
+      if (isMissing(error)) ({ error } = await sb.from('live_progress').upsert({ ...base, ...live, ...p3 }, { onConflict: 'team_id,user_id,day' }));
       if (isMissing(error)) ({ error } = await sb.from('live_progress').upsert({ ...base, ...live }, { onConflict: 'team_id,user_id,day' }));
       if (isMissing(error)) ({ error } = await sb.from('live_progress').upsert(base, { onConflict: 'team_id,user_id,day' }));
       if (isMissing(error)) return;
@@ -788,9 +790,15 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
       const BASE = 'team_id,user_id,day,session_id,sets_done,sets_total,status,updated_at';
       let { data, error }: Res = await sb
         .from('live_progress')
-        .select(`${BASE},state,exercise_name,set_index,set_count,last_reps,rest_ends_at,pr_today,finished_at,group_label,station_id,rotate_at`)
+        .select(`${BASE},state,exercise_name,set_index,set_count,last_reps,rest_ends_at,pr_today,finished_at,group_label,station_id,rotate_at,position_index`)
         .eq('team_id', teamId)
         .eq('day', day);
+      if (isMissing(error))
+        ({ data, error } = (await sb
+          .from('live_progress')
+          .select(`${BASE},state,exercise_name,set_index,set_count,last_reps,rest_ends_at,pr_today,finished_at,group_label,station_id,rotate_at`)
+          .eq('team_id', teamId)
+          .eq('day', day)) as Res);
       if (isMissing(error))
         ({ data, error } = (await sb
           .from('live_progress')
@@ -821,8 +829,10 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
           group_label?: string | null;
           station_id?: string | null;
           rotate_at?: string | null;
+          position_index?: number | null;
         }[]
       ).map((r) => ({
+        positionIndex: r.position_index ?? null,
         groupLabel: r.group_label ?? null,
         stationId: r.station_id ?? null,
         rotateAt: r.rotate_at ?? null,
@@ -958,8 +968,8 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
       const { data, error } = await sb.rpc('my_rack', { t: teamId });
       if (isMissing(error)) return null;
       if (error) fail(error);
-      const r = (data as { group_id: string; rack_name: string; partners: number; partner_names: string[] | null; others: number | null }[])[0];
-      return r ? { groupId: r.group_id, rackName: r.rack_name, partners: r.partners, partnerNames: r.partner_names, others: r.others } : null;
+      const r = (data as { group_id: string; rack_name: string; partners: number; partner_names: string[] | null; others: number | null; my_index?: number | null }[])[0];
+      return r ? { groupId: r.group_id, rackName: r.rack_name, partners: r.partners, partnerNames: r.partner_names, others: r.others, ...(r.my_index != null ? { myIndex: r.my_index } : {}) } : null;
     },
 
     subscribeBoard(teamId, onChange, onStatus) {

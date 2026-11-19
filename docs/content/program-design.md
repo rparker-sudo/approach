@@ -302,7 +302,7 @@ Levels shown are the exercises' actual `level` tags (catalog v3). "Top" is what 
 | Horizontal press | Bench Press (L2) | — | DB Bench · DB Floor Press → Push-Up | Push-Up → Incline Push-Up |
 | Incline press | Incline Bench (L2) | — | Incline DB Press | Pike Push-Up (L2) / Push-Up |
 | Vertical press | Push Press · Landmine Press (L2) | — | Half-Kneeling DB Press | Pike Push-Up / Push-Up |
-| Vertical pull | Weighted Pull-Up (L3) | Pull-Up · Chin-Up (L2) | Lat Pulldown · Half-Kneeling Pulldown · Band Pulldown | Prone Floor Pulldown |
+| Vertical pull | Weighted Pull-Up (L3) | Pull-Up · Chin-Up (L2) | Lat Pulldown · Half-Kneeling Pulldown · Band Pulldown · **Inverted Row** (fallback when no cable or bands fit; a bridge to pull-ups) | Prone Floor Pulldown |
 | Horizontal pull | Barbell Row (L2) | — | One-Arm DB Row · Chest-Supported Row · Ring Row · Cable Row | Doorframe Row |
 | Anti-extension | Ab Wheel Rollout · Body Saw (L2) | — | Dead Bug · Plank | Dead Bug |
 | Rotation / anti-rotation | Landmine Rotation (L2) | — | Pallof Press · Side Plank | Side Plank |

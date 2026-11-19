@@ -46,7 +46,7 @@ Built against: v2.0 code (`src/lib/generator.ts`, `progression.ts`, `exercises.t
 2. If the exercise's `level` ≤ athlete level, keep it.
 3. Otherwise, follow its `easier` chain to the first exercise with `level` ≤ athlete level that **fits the program's equipment**. (Every level 2–3 exercise has an `easier` link; see the drill library §2.)
 4. If that fails, use the lowest-level exercise of the **same pattern** that fits. If nothing fits, **drop the exercise** for that athlete.
-5. Keep the coach's sets, reps, rest, role, and notes. Apply the beginner effort shift (`BEGINNER_EFFORT`) and the R2 ceilings. Olympic lifts resolve to a jump for anyone below advanced.
+5. Keep the coach's sets, reps, rest, role, and notes. Apply the beginner effort shift (`BEGINNER_EFFORT`) and the R2 ceilings. **Olympic lifts resolve down their ladder (`program-design.md` §8a, updated 11/19):** intermediates get the L2 derivative (hang high pull, jump shrug, push press, DB hang snatch); beginners get the entry rung, a med-ball throw when a med ball fits, otherwise a level 1 jump.
 6. Show the athlete a small line: *"Your version: Goblet Squat (team: Back Squat)."* The log stores the exercise actually done, and the coach board shows that name.
 7. The coach sees the swaps per athlete in athlete detail (e.g., "3 exercises adjusted to level"). **Since 11/18 the coach can turn level adjustment off** for a program, a session, or one athlete (program-design §10); when off, athletes get exactly what the coach wrote. Default is on.
 

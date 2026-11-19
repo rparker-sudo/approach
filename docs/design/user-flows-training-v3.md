@@ -1,11 +1,22 @@
 # User Flows: Training v3
-Owner: UX/UI Design (03) · v1.0 · Wed Nov 18, 2026
+Owner: UX/UI Design (03) · v1.2 · Thu Nov 19, 2026
 Source of truth: Approach project → `design/user-flows-training-v3.md`. Screens for the Training v3 release, so Claude Code builds these rather than designing its own.
 Built from:
 - `content/program-design.md` v3.0 (§4a session length, §4b rack rotation, §10 coach freedom, §12 warm-ups)
 - `content/programs/warmups.md` v1.0
 - `design/user-flows.md` v3.2, `design/trainer-mode.md` v1.0, `design/design-system.md` v1.1. Conventions, tokens, and components there still apply: ≥ 44 pt targets, 56 pt in-workout actions, text plus color.
-- **`product/specs/training-v3.md` wasn't saved when this was written.** Where Product's spec differs, the spec wins. Items marked **[Product]** need its confirmation.
+- `product/specs/training-v3.md` v1.0 and the build's `CLAUDE.md` known conflicts. Where they differ from this doc, the spec wins.
+
+> **Changes in v1.2 (11/19):** adds **F56 · Week setup card** for `product/specs/v2.4.1.md` v1.1 Part D1 (spec dependency D6). Content rules: `content/programs/home-and-mobility-v3.md`.
+>
+> **Changes in v1.1 (11/19): matches the 2.4.0 build** (`reports/training-v3-acceptance.md`, branch `v2.4.0`, commit `69cb4ed`). UX review of each deviation: §R at the end.
+> - **Product name:** every user-facing string says **Approach Strength** (D-035): the warm-up source tag, the team default option, the session-length line, and the Express line (F49–F51).
+> - **F46:** precedence is now **most specific wins** (athlete → session → program), per spec and CLAUDE.md known conflict 3. The session toggle stays enabled, with "Program setting: Off."
+> - **F53–F55:** the spotter label is **"Spot"**, never "Spot and coach" (Legal V3). The athlete line is "Spot the next lifter." while partner names are off.
+> - **F49, F53:** reorder with ↑/↓ buttons and "To Raise / To Activate / To Potentiate," not drag handles.
+> - **F54:** the 0:00 banner is folded into the countdown line, and **Go to Position n** moves the logger. Rotation haptic is a 2.4.1 follow-up (§R).
+> - **F55a:** one room clock. **Pause and per-rack controls are deferred** (they need a server field; Legal G-5 and Product).
+> - **F45c:** the dismiss-once note isn't in Training v3 (D-049).
 
 Flows continue the numbering: **F45–F55**. Part 1 = F45–F51 (tonight). Part 2 = F52–F55 (rack rotation).
 
@@ -46,8 +57,8 @@ These stay exactly as built:
 - **Testing days:** supervision lock and eligibility (F11, F24), consent gating of logging (F2, F7), adults-only trainer teams (F33).
 - **Athlete side:** the pain card (F14) and board privacy (design system §9).
 
-### F45c. Optional note for minors **[Product, default off]**
-If Product turns it on (program-design §10, Training's recommendation), here's the design:
+### F45c. Optional note for minors: **not in Training v3 (D-049)**
+Kept for reference, in case Product adds it later:
 - **Trigger:** on a team with any minor, typing RPE 9–10 or "to failure" in a strength slot.
 - **What shows:** a one-line **Note** (info style, not a warning): "Training's guidance for athletes under 18: stop with about 2 reps left (RPE 8)."
 - **Got it** dismisses it for that coach, forever.
@@ -64,7 +75,10 @@ If Product turns it on (program-design §10, Training's recommendation), here's 
 ## F46. "Adjust exercises to each athlete's level" (program-design §10)
 One setting at three levels, **default on**.
 
-**Rule:** an athlete gets the level version (ladder rung) only if it's on at **every** level that applies to them (program **and** session **and** athlete). Any "off" means that athlete gets exactly what the coach wrote.
+**Rule (v1.1, spec + CLAUDE.md known conflict 3): most specific wins.**
+1. **Athlete:** off only. An athlete turned off always gets exactly what the coach wrote.
+2. **Session:** on or off, or follows the program. A session set **on** adjusts even if the program is off. A session set **off** gives the written exercises even if the program is on.
+3. **Program:** the default for every session that doesn't set its own.
 
 ### F46a. Program level
 **Where:** builder → program settings (Week setup row on web; ⋯ → Program settings on phone).
@@ -74,17 +88,17 @@ One setting at three levels, **default on**.
 
 ### F46b. Session level
 **Where:** session editor header, a compact toggle "Adjust to level."
-- If the program toggle is off, it shows **"Off for this program"** (disabled, with a link "Change in program settings").
-- When the session is turned off while the program is on, a muted tag **"Level adjust off"** appears on the session card in the week grid.
+- The toggle is **always enabled**. Under it, a muted line shows the program's setting: **"Program setting: On"** or **"Program setting: Off."**
+- **When the session differs from the program,** the session card in the week grid shows a muted tag: **"Level adjust off"** (session off, program on) or **"Level adjust on"** (session on, program off).
 
 ### F46c. Athlete level
 **Where:** athlete detail (coach) → Program section.
 - Toggle: **Adjust exercises to Jordan's level**
-- Off line: "Jordan gets exactly what you write, in every session of this program."
+- Off line: "Jordan gets exactly what you write, in every session of this program." This beats any session or program setting.
 - The roster row shows a muted tag **"Exact program"** when it's off.
 
 ### F46d. What changes downstream when off
-- **Athlete:** no **"Your version"** line (F13). The written exercise shows.
+- **Athlete (when the effective setting is off):** no **"Your version"** line (F13). The written exercise shows.
 - **Coach athlete detail:** no "adjusted to level" chip for that program.
 - **Unchanged:** level still gates **testing-day strength checks** (F11, F24); a coach's adjust toggle never unlocks a strength check. Boards show the exercise actually done, never level.
 - **Trainer teams:** same toggles, wording via `terms()` ("Adjust exercises to each client's level").
@@ -110,7 +124,7 @@ One setting at three levels, **default on**.
 - **Each row:** exercise name, then the prescription, then a **How-to** link. The whole row is a 48 pt target and opens the exercise screen.
 - **Each part ends** with a **Done** checkbox (56 pt, full width): "Raise done." It's checked once per part and can be unchecked.
   - When all three are done, the card collapses to "Warm-up done ✓" (tap to reopen).
-- **Coach note:** if the coach edited the warm-up, a muted "Set by your coach" line appears in the header. Nothing appears if it's Approach's.
+- **Coach note:** if the coach edited the warm-up, a muted "Set by your coach" line appears in the header. Nothing appears if it's the generated warm-up.
 
 **Behavior:**
 - **Not required.** **Start workout** isn't gated on the warm-up. An athlete can scroll past it.
@@ -143,12 +157,12 @@ One setting at three levels, **default on**.
 **Where:** session editor (F19c) → a **Warm-up** row pinned at the top of the exercise list.
 
 **Collapsed row:**
-- "Warm-up · Lower: squat · about 10 min," with a source tag: **Approach** · **Template: Our lower warm-up** · **Edited** · **None**.
+- "Warm-up · Lower: squat · about 10 min," with a source tag: **Approach Strength** · **Template: Our lower warm-up** · **Edited** · **None**.
 - Buttons: **Edit** · ⋯ (Regenerate, Save as template, Use a template, Remove).
 
 **Editor (drawer on web, full-screen sheet on phone):**
 - Three sections, **Raise / Activate / Potentiate**, each a list of rows:
-  - Drag handle (reorder within a part, or drag to another part).
+  - **↑ / ↓** buttons (44 pt each) to reorder within a part, and a ⋯ menu with **To Raise / To Activate / To Potentiate** to move an item to another part. (v1.1: no drag handles.)
   - Exercise name.
   - Prescription field (free text, e.g. "8 each," "2 × 10 yd," "15 s").
   - **Swap**: an exercise picker opened on that part's pool first, then the full library.
@@ -165,7 +179,7 @@ One setting at three levels, **default on**.
 - **Save as template:** name field (placeholder "Our lower warm-up"), then Save. Templates are team-wide for that coach; a trainer's templates are private.
   - Toast: "Template saved."
 - **Use a template:** list of templates, each with a preview of its three parts and item count. **Use** replaces the warm-up (confirm if Edited). The tag becomes **Template: name**.
-- **Remove:** confirm "Remove the warm-up from this session?" The row then reads "No warm-up," with **Add warm-up** (Approach) and **Use a template**.
+- **Remove:** confirm "Remove the warm-up from this session?" The row then reads "No warm-up," with **Add warm-up** (generates an Approach Strength warm-up) and **Use a template**.
 - **Approach-generated sessions:** same editor. Editing makes it **Edited** the same way.
 
 **States:**
@@ -175,7 +189,7 @@ One setting at three levels, **default on**.
 ## F50. Team default warm-up (Team settings)
 **Where:** Team settings → **Warm-up**.
 - **Segmented control:**
-  - **Approach**: "A warm-up built from each session."
+  - **Approach Strength**: "A warm-up built from each session."
   - **My template**: plus a picker.
   - **None**: "Sessions start with the first exercise."
 - **Toggle:** **Limited space**: "Use in-place drills for Raise (no running room)."
@@ -189,7 +203,7 @@ One setting at three levels, **default on**.
 **Where:** builder Week setup row (F19a), new control **Session length**.
 - **Quick picks** (chips, 44 pt): 30 · 45 · 60 · 75 · 90 · **Custom** (stepper 20–120, 5-min steps).
 - Plus **"Phase default,"** which shows the phase range, e.g. "Phase default (off-season 60–75)."
-- Line: "Approach fits its sessions to this. Your own sessions show the estimate."
+- Line: "Approach Strength fits its sessions to this. Your own sessions show the estimate."
 
 ### F51b. Per weekday
 **Where:** the week grid day header (F19b) shows the length: "Tue · 45 min."
@@ -235,7 +249,7 @@ One setting at three levels, **default on**.
 - **Running total** at the top: "about 52 min → about 45 after applied."
 - **Applied rows** turn into "Applied · Undo." **Apply all** applies every row in order until the target is met.
 - **Done** closes. Nothing changes unless a row is applied. The coach can close with nothing applied, and Save is never affected.
-- **If it can't fit:** the last row reads "Still about 33 min after all trims. Approach's shortest version is an Express session." with **Make it Express** (a suggestion). See F51g.
+- **If it can't fit:** the last row reads "Still about 33 min after all trims. Approach Strength's shortest version is an Express session." with **Make it Express** (a suggestion). See F51g.
 
 ### F51f. What changed (Approach-generated sessions)
 - **Builder:** a banner on the session, "Fit to 45 min," with one line per trim (`fitLog`), each with **Undo**, plus **Undo all**.
@@ -260,7 +274,7 @@ One setting at three levels, **default on**.
 - **Not offered** for home sessions, light home days, extra recovery, and testing sessions. Tooltip: "Rack rotation is for weight-room sessions with racks." (Not a block on building: those session types have no racks.)
 - **No racks yet:** choosing Rack rotation shows "Rack rotation uses your rack groups," with **Set up racks** (F17). The format stays Standard until racks exist.
 - **Switching to Rack rotation:**
-  - Each block (A, B, C, …) becomes a **rotation card** (F53), filled with Approach's **suggested** positions (rack lift first, spotter, fillers). Every card carries the **Suggested** tag until edited.
+  - Each block (A, B, C, …) becomes a **rotation card** (F53), filled with Approach Strength's **suggested** positions (rack lift first, **Spot**, fillers). Every card carries the **Suggested** tag until edited.
   - **The warm-up stays** at the top, done together. Any cooldown or finish stays at the end.
 - **Switching back to Standard:** confirm "Switch to Standard? Positions become a normal exercise list." Exercises are kept in position order.
 
@@ -268,9 +282,9 @@ One setting at three levels, **default on**.
 One card per block. **Header:** "B · Strength · Rack rotation," then the readout line: "4 positions · 1:15 rotation · 4 rounds · about 20 min."
 
 **Positions list:** numbered rows **1 … N**. Each row has:
-- Drag handle (reorder renumbers).
+- **↑ / ↓** buttons (44 pt each) to reorder; the list renumbers. (v1.1: no drag handles.)
 - Position number.
-- Exercise name (tap → exercise picker), or **Spot and coach**.
+- Exercise name, or **Spot**. In 2.4.0, **+ Add position** offers the block's exercises, and an exercise is swapped in the session's exercise list.
 - Prescription field ("× 4," "× 8/arm," "20 s/side").
 - **Rack marker:** a **Rack** chip, shown on the position that uses the rack. The chip is a toggle; any position can be marked. Text plus an icon, never color alone.
 - ⋯ menu: Swap · Remove · Mark as rack / Unmark.
@@ -278,7 +292,7 @@ One card per block. **Header:** "B · Strength · Rack rotation," then the reado
 
 **Below the list:**
 - **+ Add position**.
-- **Spotter toggle:** "Add a spotter after the rack lift" (on by default for barbell squat and bench). On inserts a **Spot and coach** row right after the rack position; off removes it.
+- **Spotter toggle:** "Add a spotter after the rack lift" (on by default for barbell squat and bench). On inserts a **Spot** row right after the rack position; off removes it. The label is always **"Spot,"** never "Spot and coach" (Legal V3).
 - **Rotation time:** stepper in 15 s steps (15 s – 5:00). An **Auto 1:15** chip shows when the value differs from auto. Line: "Longest position plus about 20 s to move."
 - **Rounds:** stepper (1–10).
 - **Build-up round:** toggle, "Round 1 is a build-up round." Line: "Work sets start in round 2. Round 1 is ramp-up weight on the rack lift." On by default when the rack lift is tier A or P.
@@ -312,13 +326,14 @@ One card per block. **Header:** "B · Strength · Rack rotation," then the reado
   - "Position 3 · One-Arm DB Row," with the prescription, "× 8/arm."
   - The set logger (reps and weight fields 48 pt, **Done** 56 pt). It logs **this position's set for this round**.
   - **Rack position, build-up round:** shows its ramp-up rows (F48) instead of a work set.
-  - **Spot and coach position:** "Spot and coach: spot Ava R. on Back Squat." Nothing to log, no Done.
-    - The partner name follows the board-name rules (F18). If the partner is hidden or hasn't allowed boards: "Spot the next lifter."
+  - **Spot position:** **"Spot the next lifter. Nothing to log."** No logger, no Done.
+    - Partner names stay off while the rack-names flag is off. If that flag is turned on later, the line becomes "Spot Ava R. on Back Squat." under the board-name rules (F18), falling back to "Spot the next lifter." for hidden or non-consented partners.
 - **Shared countdown** (48 pt tabular): "Rotate in 0:42 → Position 4 (Dead Bug)."
 - **Position strip:** below the countdown, a row of position chips "1 2 3 4" with **You** under the current one and a check on positions done this round. Text labels, not color.
-- **At 0:00:**
-  - A full-width banner: "Move to Position 4 · Dead Bug," with a haptic and sound (or a local notification if backgrounded).
-  - The next position's card loads.
+- **Go to Position n** (secondary button, 44 pt) appears under the countdown whenever the logger isn't on the current position's exercise. It moves the logger there. (v1.1, as built.)
+- **At 0:00 (v1.1, as built):**
+  - There's no separate banner. The countdown line updates to the next rotation: "Rotate in 1:15 → Position 1 (Back Squat)." The header's "Position n · …" line changes to the new position.
+  - **2.4.1 follow-up (UX):** a haptic or vibration at each rotation (reuse `buzz()` as stations and the rest timer do), and for the first 10 s after a rotation the countdown line reads **"Move to Position 4 · Dead Bug"** in bold. An athlete mid-set isn't watching the screen, so the cue can't be visual only. See §R5.
   - A set not marked done stays as **"Not done"** for that round (never "missed"). A muted line shows it: "1 set not done at Position 3."
 - **Between blocks:** "Next: Block C · You start at Position 1 (Pull-Up)," with the 1 min transition countdown.
 
@@ -338,13 +353,15 @@ One card per block. **Header:** "B · Strength · Rack rotation," then the reado
 
 **After start, a sticky control bar:**
 - Text: "Rack rotation · B · Round 2 of 4 · Rotate in 0:42."
-- Buttons: **Rotate now** · **+15 s** · **Pause** · **End block**.
+- Buttons: **Rotate now** · **+15 s** · **End block**. (Pause is deferred; see below.)
 - **Rotate now** asks to confirm once per session.
 - **End block** goes to the next block's start, or to the finish.
 
-**Per-rack controls:** expand **Racks** in the bar to see one row per rack: "Rack 2 · Round 2 · Pos 3 → 4," with **Pause** and **+15 s** for that rack only. A rack paused on its own shows "Paused" in its row and on the board.
+**One clock for the room** (as built). Every rack rotates together.
 
-**Never blocked** by group size. 2–6 athletes per rack all run (F53 readout explains open or shared positions). **[Product]:** one clock for the room by default, with per-rack override. Confirm, or make per-rack the only mode.
+**Deferred (not in 2.4.0):** **Pause** and **per-rack controls** (one row per rack with its own Pause and +15 s). They need a per-rack clock stored on the server, which is a new field: Legal (G-5) and Product decide. When built, use the v1.0 design: expand **Racks** in the bar, one row per rack ("Rack 2 · Round 2 · Pos 3 → 4"), and a rack paused on its own shows "Paused" in its row and on the board.
+
+**Never blocked** by group size. 2–6 athletes per rack all run (F53 readout explains open or shared positions).
 
 ### F55b. Board ring view (extends F9 / F30)
 **When it shows:** only during a rack-rotation block. The warm-up and other formats use the normal live view.
@@ -367,7 +384,7 @@ One card per block. **Header:** "B · Strength · Rack rotation," then the reado
     - An empty node reads "Open."
     - A shared node lists 2 names.
   - The node whose athlete is mid-set gets an accent border (team accent, with the text "Lifting" in the node). Text always carries the state.
-- **Ring center:** the rack's own countdown if it's paused or offset ("Paused" / "0:42"), and "Round 2 of 4" (20 px).
+- **Ring center:** "Round 2 of 4" (20 px). (A per-rack "Paused" or offset countdown comes with the deferred per-rack controls.)
 - **Below the ring:** a one-line text list for readability from far away: "Jordan M. → Squat · Ava R. → Spot · Maya T. → Row · Riley K. → Dead Bug."
 
 **Rotation moment:** names move one node clockwise.
@@ -382,6 +399,158 @@ One card per block. **Header:** "B · Strength · Rack rotation," then the reado
 
 ---
 
+# PART D (2.4.1)
+
+## F56. Week setup card (team programs, volleyball) (v2.4.1 D1–D3, D-062)
+**Rule:** the coach decides the days; Approach Strength's programming decides the workouts. The card is only about **which kind of day** each weekday is. There's no session content on it.
+
+**Where:**
+- The top of the program builder, above the week grid.
+- It replaces three F19a controls: the "Weight room only / Weight room + home" chips, the Weight room days row, and the Training days stepper.
+- **Session length** (F51a) and **Jumps at home** move onto this card.
+- **Not shown** for solo/personal programs or trainer teams. Those keep their current controls in 2.4.1.
+
+### F56a. Layout, web (≥ 900 px)
+```
+┌ Week setup ─────────────────────────────────────── [Recommend for me] ┐
+│ Week of Dec 1 · Off-season                                            │
+│                                                                        │
+│ Mon   Practice              [ Off | Weight room | Home workout |▣Mobility ]  20 min │
+│ Tue   Practice              [ Off |▣Weight room | Home workout | Mobility ]  60 min │
+│ Wed   Practice              [▣Off | Weight room | Home workout | Mobility ]         │
+│ Thu   Practice              [ Off |▣Weight room | Home workout | Mobility ]  60 min │
+│ Fri   —                     [▣Off | Weight room | Home workout | Mobility ]         │
+│ Sat   —                     [ Off | Weight room |▣Home workout | Mobility ]  30 min │
+│ Sun   —                     [▣Off | Weight room | Home workout | Mobility ]         │
+│                                                                        │
+│ Session length: about 60 min ▾     Jumps at home  [ off ]              │
+│ ───────────────────────────────────────────────────────────────────── │
+│ 2 weight room + 1 home workout + 1 mobility day.                       │
+│                                                        [ Build program ] │
+└────────────────────────────────────────────────────────────────────────┘
+```
+- **The example is the founder's week** (spec Part D): Mon Mobility, Tue/Thu Weight room, Sat Home workout. No per-level line is needed, because a beginner's cap of 3 covers 2 weight room + 1 home. Busier weeks: F56e.
+- **Columns:** Day (64 px, bold) · Context (180 px, `muted`) · Choice (segmented, 4 segments) · Length (muted, tappable).
+- **Rows:** 56 px tall, with a 1 px `line` divider between them.
+- The card is the full builder width (max 1120). The week grid sits below it after the build.
+
+### F56b. Layout, phone (< 900 px)
+```
+Week setup                      [Recommend]
+Week of Dec 1 · Off-season
+
+Mon · Practice                       20 min
+[ Off | Weight room | Home |▣Mobility ]
+
+Tue · Practice                       60 min
+[ Off |▣Weight room | Home | Mobility ]
+…
+Sat · —                              30 min
+[ Off | Weight room |▣Home | Mobility ]
+…
+Session length: about 60 min ▾
+Jumps at home                        [ off ]
+2 weight room + 1 home workout + 1 mobility day.
+[            Build program            ]  (56 pt, full width)
+```
+- Each day is two lines: a day + context line, then the segmented control at full width (side gutter 16).
+- **Phone segment labels:** **Off · Weight room · Home · Mobility**. Each segment's accessibility label uses the full name ("Home workout").
+- At 320 pt wide the labels drop to 12 pt; segments never go under 44 pt tall or 56 pt wide.
+- **Recommend** is a 44 pt secondary button in the card header.
+
+### F56c. The day row
+**Day:** "Mon" … "Sun" (web), "Monday" for screen readers.
+
+**Context** (read-only, `muted`, from the team's usual week + this program's first week on the combined calendar):
+| Context | Shown as |
+|---|---|
+| Usual practice day | "Practice" |
+| Match on the calendar that week | "Match" (or "Match · 7:00" if a time exists) |
+| Tournament | "Tournament" |
+| Both practice and match | "Match" (the bigger event wins) |
+| Nothing | "—" |
+| Another team's event (two-team athletes) | **Not shown.** The coach sees only their own team (compliance § Multiple teams) |
+
+**Choice** (segmented radio group, exactly one selected):
+| Segment | Icon + text | Meaning (screen-reader hint) |
+|---|---|---|
+| **Off** | — + "Off" | No session |
+| **Weight room** | dumbbell + "Weight room" | Full session in the weight room |
+| **Home workout** | house + "Home workout" | Full home session, each athlete's own equipment |
+| **Mobility** | "Mobility" (no icon on phone) | Short home mobility and care session, no load, no jumps |
+
+- **Selected style:** `primaryBg` fill and `primaryText`, with the icon. **Unselected:** `card` fill, `inputBorder` outline. Selection is shown by fill **and** the bold label, never by color alone.
+
+**Length** (muted, right side): the day's target from F51 ("60 min," "30 min" for home, "20 min" for mobility, from the phase default unless set).
+- Tap → the F51b per-weekday sheet.
+- Off days show no length.
+
+**Info line under a row** (plain `muted` text, no warning color, never blocks; F45). It's shown only in these cases, from `home-and-mobility-v3.md` §5 and spec D2:
+| Row | Line |
+|---|---|
+| Mobility on a match or tournament day | "Match day: athletes get the 12-min after-your-match version." |
+| Home workout on a match or tournament day | "Match day: athletes get this day Off (no home workout on a match day)." |
+| Home workout the day before a match | "Day before a match: this home workout will be upper body or durability." |
+| A row changed by Recommend | Tag **Recommended** (Label type) at the row end until the coach changes that row |
+
+### F56d. Recommend for me
+- **What it does:** fills **Off** days only. It never changes a Weight room, Home workout, or Mobility day the coach set.
+- **How it fills:** placement and totals from `home-and-mobility-v3.md` §5.2. Mobility goes the day after a match or the hardest weight-room day, never on a match day; home workouts follow; at least one day stays Off.
+- **After tapping:**
+  - Changed rows get the **Recommended** tag.
+  - An inline line appears under the header: "Recommended 1 home workout and 1 mobility day. **Undo**" (44 pt link). Undo restores the exact previous choices.
+- **No weight-room days set:** the button still works. It recommends home and mobility days around practices. The summary says what was filled.
+- **Nothing to fill** (no Off days, or totals already met): "Your week already has the recommended days." Nothing changes.
+
+### F56e. Summary lines (above Build)
+Plain text, `ink` for the first line and `muted` for the rest. No warnings, no blocks (D-045). They update live as rows change.
+1. **Week line:** counts by kind, in the order Weight room · Home workout · Mobility, e.g. "2 weight room + 1 home workout + 1 mobility day."
+   - Zero kinds are left out. All Off: "No training days set."
+2. **Per-level lines** (only when a level's result differs from the week line, from `home-and-mobility-v3.md` §5.3):
+   - "Beginners: 2 weight room + 1 home workout + 1 light day + 1 mobility day (max 3 full lift days for their level)."
+   - In-season, when it applies to everyone: "In season: 2 weight room + 1 light day + 1 mobility day (max 3 full lift days)."
+3. **Day exceptions** (from spec D2.5, when a coach's days make a rule impossible for some athletes):
+   - "Sat: tournament day, so the home workout is Off for athletes."
+   - "No day off this week, so Sun's mobility is Off for athletes."
+4. **Two-team athletes:** "2 athletes also train with another team. Their weeks may shift around that team's matches." No team name, no events (neutral reason, compliance § Multiple teams 4).
+
+### F56f. Build and rebuild
+- **New program:** **Build program** (56 pt).
+  - Disabled only when every day is Off, with the line "Pick at least one day." (That's an input error, not a training rule.)
+  - **Building:** "Building your program…" with the button disabled.
+  - **Success:** the week grid appears below. Toast: "Program built: 4 sessions a week."
+  - **Error:** "Couldn't build the program. Your days are saved here. Try again."
+- **Existing program:** the card opens with the days as built (spec D1 defaults: `weightRoomDays`, `liftSchedule`, each session's `location` / `mobility` / `light`). The header shows "As built."
+  - Changing any row changes the button to **Rebuild program** and shows the line "Changes apply from the next week that hasn't started."
+  - **Rebuild** asks to confirm: "Rebuild the week from these days? Approach Strength's sessions are rebuilt. Sessions you've edited keep your edits." Buttons: **Rebuild** / **Cancel**. **[Product]** Confirm how edited sessions behave on a rebuild.
+  - **Cancel changes** (link): restores "As built."
+- **Defaults for a new program:** the current lift-day pick as Weight room, every other day Off (spec D1). No row is tagged until Recommend is used.
+
+### F56g. States
+| State | What shows |
+|---|---|
+| Loading the calendar | Rows show days and choices. Context reads "Loading schedule…" in `muted`. Choices work. |
+| Calendar couldn't load | One line under the header: "Couldn't load this week's practices and matches. You can still set your days." Context shows "—" |
+| Offline | Same as above. Build is disabled with "Connect to build your program." (Builds need the server.) |
+| No usual week set for the team | Context "—", plus a link under the header: "Add your practice days in Team → Schedule" |
+
+### F56h. Accessibility
+- Each row is a radio group labeled "Monday, Practice. Day type." Each option is a radio: "Weight room, selected."
+- Arrow keys move within a row, and Tab moves between rows.
+- The Recommended tag, context, and info lines are text, never color.
+- The summary area is a polite live region, announced once after changes stop for 1 s.
+- Targets: segments ≥ 44 pt tall; Recommend, Undo, and length links ≥ 44 pt; Build 56 pt.
+
+### F56i. Acceptance (UX, for `reports/v2.4.1-acceptance.md`)
+- [ ] Web and phone layouts as F56a and F56b. The segmented choice is Off · Weight room · Home workout (Home on phone) · Mobility, with full names for screen readers.
+- [ ] Each row shows its own team's context only. Another team's events never appear.
+- [ ] Recommend fills Off days only, tags them, and Undo restores the previous choices exactly.
+- [ ] The week, per-level, and exception summary lines match the built program (spec Part D criteria, Training examples 1–3). No warning colors, nothing blocks except "Pick at least one day."
+- [ ] Editing an existing program opens "As built"; a change shows Rebuild with its confirm.
+- [ ] Jumps at home and Session length live on the card. The old chips, Weight room days row, and Training days stepper are gone.
+
+---
+
 ## Accessibility
 - **Targets:** all new controls are ≥ 44 pt. In-workout Done buttons and warm-up part checkboxes are 56 pt.
 - **Countdowns:** screen-reader text "Rotate in 42 seconds, next Position 4, Dead Bug." Announcements are throttled to every 15 s and the last 5 s.
@@ -392,20 +561,40 @@ One card per block. **Header:** "B · Strength · Rack rotation," then the reado
 **Part 1**
 - [ ] F45: none of the "Was" behaviors in F45a exist. Save is always enabled for building choices. No builder string from the removed list renders (repo search). F45b items still behave as before.
 - [ ] F45d: Auto chips appear only when the coach's value differs from auto, and tapping one restores auto.
-- [ ] F46: toggles at program, session, and athlete level; any "off" gives the written exercise and hides the "Your version" line; testing eligibility unchanged.
+- [ ] F46: toggles at program, session, and athlete level; most specific wins (athlete off → session → program); the session toggle stays enabled with "Program setting: On/Off"; an effective "off" gives the written exercise and hides "Your version"; testing eligibility unchanged.
 - [ ] F47–F48: warm-up card first on every session except the excluded types; Done per part; how-to links; "Warming up" board state; ramp-up rows before loaded tier A/P lifts, excluded from work sets, suggestions, and PRs.
-- [ ] F49–F50: edit, swap, reorder, add, remove, Regenerate (with confirm on edited), save/use template; team default Approach / template / None; Limited space.
+- [ ] F49–F50: edit, swap, reorder, add, remove, Regenerate (with confirm on edited), save/use template; team default Approach Strength / template / None; Limited space.
 - [ ] F51: program, weekday, and date lengths, with priority shown in the target line; estimate vs target in the footer, week card, and Today; Fit to time suggestions apply and undo one by one and never change Save; generated sessions show the fit log with Undo; Express label.
 
 **Part 2**
 - [ ] F52–F53: Format includes Rack rotation; rotation card with positions, Rack marker, spotter toggle, rotation time with an Auto chip, rounds, build-up round, and the rest/block-time/group-fit readouts; nothing blocks.
-- [ ] F54: start position per block on Today; current position, logger, shared countdown, position strip, rotate banner; per-position logs; spot position logs nothing.
-- [ ] F55: Start / Rotate now / +15 s / Pause / End block, plus per-rack controls; board ring per rack with names at positions, the RACK label, and the text list; no board-unsafe data.
+- [ ] F54: start position per block on Today; current position, logger, shared countdown (which carries the rotate cue), Go to Position n, position strip; per-position logs; Spot position logs nothing and reads "Spot the next lifter."
+- [ ] F55: Start / Rotate now (asks once) / +15 s / End block on one room clock; board ring per rack with names at positions, the RACK and Spot labels, and the text list; no board-unsafe data. (Pause and per-rack controls deferred.)
+
+## §R. UX review of the 2.4.0 build (11/19)
+Source: `reports/training-v3-acceptance.md` § UX sign-off (branch `v2.4.0`, `69cb4ed`), plus a read of the branch's code. **Paste this table into that section** as the UX verdict column; I didn't edit the repo branch.
+
+| # | Deviation from v1.0 | UX verdict | Doc change |
+|---|---|---|---|
+| R1 | "Approach Strength" instead of "Approach" in new user-facing copy | **Accepted.** v1.0 was wrong; D-035 applies to all user-facing text | F49, F50, F51a, F51e updated |
+| R2 | Level toggle: most specific wins; session toggle enabled, "Program setting: Off"; a session set on adjusts with the program off | **Accepted.** The spec wins, and it's the better model: the coach can turn adjustment on for one session without changing the program | F46 rule, F46b, F46c, F46d, acceptance |
+| R3 | Spotter label "Spot"; athlete line "Spot the next lifter." | **Accepted** (Legal V3) | F52, F53, F54, F55b |
+| R4 | Reorder with ↑/↓ and "To Raise/Activate/Potentiate," no drag | **Accepted.** It's keyboard and screen-reader friendly and meets the 44 pt rule (B1/B2 tap audit). Drag is a nice-to-have later, never a replacement for the buttons | F49, F53 |
+| R5 | No full-width 0:00 banner; cue is in the countdown line; **Go to Position n** moves the logger | **Accepted for 2.4.0, with a 2.4.1 follow-up.** On the branch, the rack-rotation tick doesn't call `buzz()` (stations and the rest timer do), so the only cue at 0:00 is a text change. Follow-up: (1) haptic/vibration on every rotation, (2) "Move to Position n · Exercise" in bold for 10 s after a rotation. Not a deploy blocker: the room shares one clock and the coach board shows the countdown | F54 |
+| R6 | One room clock; **Pause and per-rack controls not built** | **Accepted as deferred,** not dropped. UX9 stays **partial** in the report. Build when Legal clears a per-rack clock field (G-5) and Product schedules it | F55a, F55b |
+| R7 | F45a items built: Start stations never blocked, racks-vs-stations info line, home-jumps toggle always on, trainer week effort takes any RPE, F41 stepper 5–180 | **Confirmed.** They match F45a | none |
+| R8 | Tap audit: older "Unpair" (session editor) and "Review" (roster) text links raised from 16 pt to 44 pt | **Confirmed.** It matches design system §13.2 rule 1 (standalone links ≥ 44) | none |
+
+**UX sign-off for 2.4.0:**
+- **UX1–UX8 pass** with the deviations above accepted.
+- **UX9 partial** (R6, deferred by decision).
+- **UX-a11y passes.**
+
+No UX item blocks the deploy.
 
 ## Flags
 | To | Item |
 |---|---|
-| **Product (01)** | (1) `training-v3.md` wasn't saved; reconcile this doc with it. (2) F45c dismiss-once note: on or off (default off here). (3) F55a: one room clock with per-rack override, or per-rack only. (4) F41: stepper widened to 5–180 min with Easy/Moderate only. Confirm that's the right read of adult rules A4 (a data rule) vs. §6 limits (now generated-only). (5) F46: athlete-level toggle lives per program. Confirm that, or make it per athlete across all programs. |
-| **Training (02)** | Confirm the Fit to time row wording in F51e matches your trim steps, and the warm-up prescription text style ("8 each," "2 × 10 yd"). |
-| **Legal (07)** | F45 removes every builder limit, including for teams with minors (accepted risk per your Training v3 review). F46 lets a coach turn off level adjust for a minor. Level still gates strength checks. Confirm nothing in compliance depends on either. F54 shows the spot partner's board name in the app (B5 approved names under box 4). Confirm that covers spotting. |
-| **Coordinator** | Hand off this doc with `user-flows.md` and `trainer-mode.md`. Both now carry a note that F45 supersedes their builder blocks. |
+| **Product (01)** | **F56:** (a) confirm what Rebuild does to coach-edited sessions (F56f); (b) confirm the F56c match-day info lines and F56e exception lines read correctly against D2.5; (c) context uses the program's first week. Confirm that, or use the usual week only. (1) Schedule R5 (rotation haptic and the 10-second "Move to…" line) in 2.4.1. (2) R6: decide whether Pause and per-rack controls are wanted. If yes, request the per-rack clock field from Legal. (3) F46 v1.1 matches known conflict 3; nothing to do unless you want the athlete override to allow "on" too. |
+| **Legal (07)** | R6 would add a per-rack clock field (G-5) if Product wants it. Partner names on the Spot line stay off until the rack-names flag is on. |
+| **Coordinator** | Copy §R into `reports/training-v3-acceptance.md` § UX sign-off on branch `v2.4.0` (or have Claude Code do it) before Ryan approves the deploy. Hand off doc v1.1 to `docs/design/`. |

@@ -2,108 +2,90 @@
 
 Approach Strength is a strength-training app for volleyball teams and, from 2.3.0, for personal trainers with adult clients (Expo / React Native, web build first, Supabase). Read `AGENTS.md` for Expo-specific rules. They still apply.
 
-**Live now:** v2.3.1 (custom exercises). App on `app.approachstrength.com`; website on `approachstrength.com` (repo `rparker-sudo/approachstrength-site`).
-**Built, not deployed:** 2.4.0 Training v3 on branch **`v2.4.0`** (last commit `69cb4ed`; report `reports/training-v3-acceptance.md`). Part 1 passed; `generatorV3` off; `catalogV3` and `rackRotation` on.
+**Live now:** v2.4.0 Training v3 (deployed 11/19, `main` at `a2aede1`), with `/terms` v2.6 on the website. Flags as deployed: `generatorV3` **off**; `catalogV3` and `rackRotation` on. App on `app.approachstrength.com`; website on `approachstrength.com` (repo `rparker-sudo/approachstrength-site`).
 
 ## Where requirements come from
-The planning team works in a separate Claude project. Approved docs are copied into `docs/` as **read-only snapshots** (this hand-off: Thu Nov 19, 2026, "finish 2.4.0"). Don't edit `docs/`. If a doc looks wrong, or conflicts with the code or another doc in a way the rules below don't settle, **stop and say so** instead of guessing.
+The planning team works in a separate Claude project. Approved docs are copied into `docs/` as **read-only snapshots** (this hand-off: Thu Nov 19, 2026, "2.4.1"). Don't edit `docs/`. If a doc looks wrong, or conflicts with the code or another doc in a way the rules below don't settle, **stop and say so** instead of guessing.
 
-**Precedence when docs disagree:** `docs/compliance.md` → `docs/specs/training-v3.md` → `docs/legal/` → `docs/content/` → `docs/design/user-flows-training-v3.md` → older specs and flows.
+**Precedence when docs disagree:** `docs/compliance.md` → `docs/specs/v2.4.1.md` → `docs/content/` (with `generator-v3-rulings.md` and `programs/home-and-mobility-v3.md` ahead of the older content docs for v3 programs) → `docs/design/user-flows-training-v3.md` → `docs/specs/training-v3.md` → older specs and flows. The "Known conflicts" section below overrides all of them.
 
 | Doc | Version this session expects | What it is |
 |---|---|---|
-| `docs/compliance.md` | **updated Thu Nov 19** (§ 2.4.0 build rulings #1–#7) | **The rulings this task builds. Every MUST applies** |
-| `docs/legal/soft-launch-notice.md` | **Draft v2.6** (Wed Nov 18) | Source for `/privacy` and `/terms` (new §4.1 and §4T.3). Publish exactly; no script edits |
-| `docs/specs/training-v3.md` | Draft v1.0 | The 2.4.0 spec (already built) |
-| Everything else in `docs/` | unchanged since the 2.4.0 hand-off (`632a16e`) | As built |
+| `docs/specs/v2.4.1.md` | **Draft v1.1** (Thu Nov 19) | **The task.** Parts A, D, B, C |
+| `docs/content/generator-v3-rulings.md` | **v1.1** | R-1 to R-6 (Part A) |
+| `docs/content/programs/home-and-mobility-v3.md` | **v1.0** | Week table, v3 home and mobility sessions, rulings, examples 1–3 (Part D) |
+| `docs/content/training-v3-build-answers.md` | Thu Nov 19 (no version) | Build answers 1–9 (Part B uses 1, 3, 5, 6) |
+| `docs/content/exercise-catalog-v3.md` | **v3.1** | Copenhagen box setup, §4c `whyGeneral` |
+| `docs/content/programs/warmups.md` | **v1.1** | §1a minutes, §3 counts, §4 ramp-up scope |
+| `docs/content/program-design.md` | v3.0 (§8a Vertical pull row updated 11/19: Inverted Row) | Templates, ladders, §9 limits |
+| `docs/content/safety-guidelines.md` | v1.5 (§2a step 5 updated 11/19) | Olympic lifts resolve down their ladder |
+| `docs/design/user-flows-training-v3.md` | **v1.2** | Adds **F56 Week setup card** (Part D) |
+| `docs/compliance.md` | **updated Thu Nov 19 (2.4.0 build rulings; 2.4.1 check)** | § 2.4.1 check (no new fields, two copy fixes); TR3-2 records D-059 |
+| Everything else in `docs/` | unchanged since the finish-2.4.0 hand-off (`4c8003e`) | As built |
 
 **Version check (do this first):** if a header above doesn't match, **stop and tell Ryan**.
 
 ## Step 0
-1. `git fetch`, then `git checkout v2.4.0` (track `origin/v2.4.0`). This hand-off (`CLAUDE.md`, `docs/compliance.md`, `docs/legal/soft-launch-notice.md`) is uncommitted on `main`; the branch hasn't changed those files, so the changes carry over. **Commit them on `v2.4.0` first** ("Planning hand-off: finish 2.4.0 (Legal rulings 11/19)"). If the checkout refuses, stop and tell Ryan.
-2. Read compliance § 2.4.0 build rulings. Legal ruled from a description of the build and asked for the report to be checked against the rulings. Items F1–F4 below are where the build differs.
+1. `git pull` on `main`. Confirm `main` has the 2.4.0 deploy (`a2aede1` or later) and `reports/training-v3-acceptance.md` shows no Part 1 failure. If not, stop and ask Ryan.
+2. Create branch **`v2.4.1`** from `main`. This hand-off (`CLAUDE.md` and the `docs/` changes) is uncommitted on `main`; it carries over. **Commit it on `v2.4.1` first:** "Planning hand-off: 2.4.1 (generator v3 on, week setup)". Don't commit `.claude/settings.local.json`.
+3. Confirm `/terms` on `approachstrength.com` is the v2.6 text (Legal ruling #7). If not, stop and ask Ryan. 2.4.1 doesn't touch the website.
+4. Run the version check above. (The spec's own Step 0.3 says "v1.0"; see known conflict 1.)
 
-## Current task: finish 2.4.0 and deploy it with the website
-Work on branch `v2.4.0`. Migrations 011–013 **haven't been run on the live project yet**, so fold any SQL change into them (still safe to re-run, still folded into `schema.sql`). **No migration 014.**
-
-**F1. `session.source` legacy rule (ruling #1b).**
-- The build migrates sessions saved before 2.4.0 as `'coach'` when the program was posted to a team (or is a trainer program). Legal's rule: coach-built → `'coach'`; generated or personal → `'approach'`; **if you can't tell, `'approach'`** (generated limits apply, the safer direction).
-- A posted team program that came from the generator and wasn't edited is **generated**. Use whatever the stored program JSON shows (e.g., generator markers, unedited generator output). Document the rule you used in `build-snapshot.md`.
-- Keep #1a (any coach or trainer edit → `'coach'`) and #1c (never on boards).
-
-**F2. Per-athlete "Adjust to level" flag (ruling #2).**
-- A plain hash of team id + user id isn't opaque. Use a **keyed hash (HMAC) with a server-side secret** members can't read, and give each athlete **only their own** flag or key through an RPC. Or strip per-athlete flags from the member-readable program copy and serve each athlete's own flag by RPC.
-- The secret may live in Supabase Vault or a database setting, created by migration 011 with a random value. Record where in `build-snapshot.md`.
-- **If either approach needs a new table or column, stop and ask** (G-5).
-- **Acceptance:** a teammate can't tell from the program JSON which members have adjustment off (API check as a teammate). The coach and the athlete still see the right state.
-
-**F3. `my_index` (ruling #3).** Confirm `my_rack` returns the caller's own index only, never partners'. Add an API check.
-
-**F4. Terms v2.6 and re-acceptance (ruling #7). This goes live with the app, not after.**
-1. **App:** bump the **Coach Terms** and **Trainer Terms** versions to **`2026-11-19`**:
-   - the constants (`COACH_TERMS_VERSION`, `TRAINER_TERMS_VERSION`);
-   - the server side (`current_coach_terms` and whatever the trainer check reads), in migration 011.
-   Existing coaches re-accept through the existing Coach Terms sheet before recording consent or confirming supervision. Trainers re-accept before posting new programs (compliance T2). No new fields.
-2. **Website (`rparker-sudo/approachstrength-site`):** regenerate `/privacy` and `/terms` from `docs/legal/soft-launch-notice.md` **v2.6** with the existing generator. Anchors `#health-data` and `#trainer-terms` stay. `legal-pages-match.py` must pass. **No other website change.**
-
-**F5. UX sign-off.** In `reports/training-v3-acceptance.md` § UX sign-off, add UX's verdicts (UX `user-flows-training-v3.md` v1.1 §R, 11/19):
-
-| # | Deviation from v1.0 | UX verdict |
-|---|---|---|
-| R1 | "Approach Strength" instead of "Approach" in new copy | Accepted (D-035) |
-| R2 | Level toggle: most specific wins; session toggle enabled with "Program setting: Off" | Accepted (the spec wins) |
-| R3 | Spotter label "Spot"; athlete line "Spot the next lifter." | Accepted (Legal V3) |
-| R4 | Reorder with ↑/↓ and "To Raise/Activate/Potentiate," no drag | Accepted |
-| R5 | No full-width 0:00 banner; cue in the countdown; Go to Position n | Accepted for 2.4.0; rotation haptic and a 10-s "Move to…" line in 2.4.1 |
-| R6 | One room clock; Pause and per-rack controls not built | Accepted as deferred; UX9 stays partial |
-| R7 | F45a items (Start stations never blocked, info line, home-jumps toggle, any RPE, F41 5–180) | Confirmed |
-| R8 | "Unpair" and "Review" raised to 44 pt | Confirmed |
-
-UX sign-off: UX1–UX8 pass, UX9 partial, UX-a11y pass. No UX item blocks the deploy.
-
-**F6. Report.**
-- Add a section "Legal rulings 11/19" to `reports/training-v3-acceptance.md`, one row per ruling #1–#7 with pass/fail and evidence. #2 and #7 must show the fix (compliance "Still open": confirm the keyed hash and the Terms bump in the report).
-- Update `build-snapshot.md` §8 "2.4.0" and `CHANGELOG.md`.
-- Re-run `tsc`, `lint`, `build:web`, `run-all.sh`, the SQL suites (fresh and upgrade, 011–013 twice), and the 2.4.0 browser checks.
+## Current task: build 2.4.1 (`docs/specs/v2.4.1.md` v1.1)
+**Order: Part A → Part D → Part B → Part C.** Version 2.4.1. Branch `v2.4.1`. **No migration.**
+- **Part A:** `generatorV3: true` by default with the off switch; R-1 to R-6 exactly as `generator-v3-rulings.md`.
+- **Part D:** the Week setup card (UX **F56**) and the generator building each day as its kind, using `home-and-mobility-v3.md` (week table §2, home templates §3, mobility §4, rulings §5, `§6` constants). Remove the `generateV3` relabeling (D2.8). Examples 1–3 are acceptance tests.
+- **Part B:** build answers 1, 3, 5, 6; the D-054 guard; D-056.
+- **Part C:** waves, bye-week Day 3, 4-day Day 1 pair. Anything not built is listed as "not built" with its fallback confirmed.
 
 ## Stop rule and deploy
-- If **any of F1–F4 fails**, or any Part 1 criterion now fails, **stop and report. Don't deploy.**
-- **The app and the website deploy together.** If the website can't ship in the same session, **don't deploy the app** (Legal ruling #7).
-- **Flags stay as built:** `generatorV3` **off**, `catalogV3` and `rackRotation` on. Turning the generator on is 2.4.1's job, not this one.
+- If **any Part A or Part D criterion fails** (spec, R-6, home-and-mobility §8, UX F56i), **stop and report. Don't deploy with `generatorV3` on.** Ryan chooses: fix first, or ship the rest of 2.4.1 with `generatorV3 = false`.
+- A Part B failure is reported and Ryan chooses.
+- Save **`reports/v2.4.1-acceptance.md`** (one row per criterion: pass / fail / partial, with evidence) **before** asking Ryan to approve the deploy. Include the F56f Rebuild behavior as built (known conflict 5) as a Product item.
+- Re-run every earlier volleyball and trainer-mode check, **except** the superseded ones in spec §0. Re-run `tsc`, `lint`, `build:web`, `run-all.sh`, the SQL suites (fresh and upgrade), the 2.4.0 browser checks, and the claim-word search **including "durability"** on built strings.
+- **Schema diff must be empty and program JSON must gain no new keys.** Say so in `build-snapshot.md`.
 - **Deploy steps:**
   1. Ask Ryan to approve the deploy.
-  2. Ryan runs migrations 011 → 012 → 013 on the live project (service role).
-  3. Merge `v2.4.0` into `main` (app) and deploy.
-  4. Regenerate and deploy the website from its `main`.
-  5. Record both in `build-snapshot.md`: what was deployed, when, and any setting changed (old → new).
-  6. Ryan pushes tag `v2.4.0` from his Mac.
+  2. Merge `v2.4.1` into `main` and deploy the app. **No migration and no website change.**
+  3. Record in `build-snapshot.md` §8 "2.4.1": what was deployed, when, and flag values (`generatorV3` old → new).
+  4. Update `CHANGELOG.md` and the app version.
+  5. Ryan pushes tag `v2.4.1` from his Mac.
 
-## Known conflicts, already settled (from the 2.4.0 hand-off; unchanged)
-1. 2.3.1 custom exercises are coach-built content; their builder limits are gone, and their tags still drive resolution, warm-ups and auto-rest suggestions (D-058).
-2. Level toggle precedence: most specific wins (athlete off → session → program).
-3. Legal copy: `ssb-squat` line; E-block shows "Care," never "Durability"; spotter shows "Spot."
-4. No dismiss-once RPE 9–10 note and no level-off confirm for minors (D-049).
-5. Product rulings D-051–D-058 are in the planning project. Nothing in them changes this task.
+## Known conflicts, already settled
+1. **Spec version:** the spec's Step 0.3 says `CLAUDE.md` names "v2.4.1.md v1.0." The doc is **v1.1** (it added Part D). Expect v1.1.
+2. **Home templates are in, not out:** spec §5 lists "v3 home templates (home days follow `home-workouts.md`)" as not in 2.4.1. **Part D supersedes that line:** for v3 programs, home and mobility days follow `home-and-mobility-v3.md`. `home-workouts.md` H1–H8 still apply. The A4 fallback ("if those templates aren't saved…") doesn't apply: they're saved.
+3. **Where the templates live:** spec A4 and D4 point to `generator-v3-rulings.md` v1.1 for the templates. That doc (v1.1) only points onward; the content is in **`content/programs/home-and-mobility-v3.md` v1.0**. The rulings doc's Part A content is unchanged from v1.0 (spec header says v1.0; either is fine).
+4. **Legal copy fixes (compliance § 2.4.1 check), these win over the content docs:**
+   - The H-Durability home session is named **"Home Care"** in the app, never "Home Durability." The internal type id `H-Durability` may stay in code.
+   - Weight-room coach notes say **"Care work is on Thursday's home workout."** (not "Durability is on…").
+   - The R-5 message is **"Your next block uses Approach Strength's new programming."**
+   - Any user-facing "durability" becomes "Care" (as in 2.4.0's E-block). The `ssb-squat` line stays Legal's 2.4.0 wording.
+5. **F56f Rebuild with coach-edited sessions** (UX left it as a [Product] question): build it as UX drew it. Rebuild regenerates Approach Strength's (`'approach'`) sessions from the next week that hasn't started; sessions a coach edited (`'coach'`) keep their edits. List it in the report for Product to confirm.
+6. **UX F56 is saved** (spec dependency D6). Build the card from F56, not the fallback in D6.
+7. **Spec dependency statuses are stale:** D2 (Legal recorded D-059 in TR3-2), D5 (Training's templates), D6 (UX F56) and D7 (Legal's check) are all done.
+8. **Superseded checks:** spec §0 (G1 → R-1 and G8 → R-2 for v3 programs; Olympic beginner pick; ramp-up scope; warm-up estimates). The 2.3.0 generator (flag off) keeps G1 and G8.
+9. **Not in 2.4.1:** the rack-rotation haptic and 10-s "Move to…" line (UX §R5, not scheduled by Product), Pause and per-rack controls, a coach-chosen bar per exercise, the RPE 9–10 note and level-off confirm (D-049), Legal's interim TR3-2 limits. Don't build them.
+10. From earlier hand-offs (unchanged): 2.3.1 custom exercises are coach-built content (D-058); level toggle precedence is most specific wins; spotter label "Spot."
 
 ## Hard stops (any part)
-- **Any new table or server field** not covered by compliance V4/T4 or earlier approvals: **stop and ask.**
-- **Any domain, DNS, repo-variable, Pages, or Supabase setting change** beyond F2's secret: don't make it.
-- **Website:** only the `/privacy` and `/terms` regeneration in F4. No other text change.
+- **Any new table, column, server field, or program JSON key:** stop and ask (G-5, spec D5, compliance § 2.4.1 check).
+- **Any domain, DNS, repo-variable, Pages, or Supabase setting change:** don't make it.
+- **Website:** no change in 2.4.1.
 - **No find-and-replace on legal wording** in any script.
 - **No AI provider, SDK, or call** (TM-18).
 - **A general team must never accept a minor** (compliance T1).
+- **Another team's events never show to a coach** (Week setup context, R-4, summaries use neutral reasons only).
 
 ## Versions and folders
-- **Work in this folder (`~/Projects/approach`, GitHub `rparker-sudo/approach`) and `rparker-sudo/approachstrength-site`.** Don't create other copies. Keep `CLAUDE.md` and `docs/` in place.
+- **Work in this folder (`~/Projects/approach`, GitHub `rparker-sudo/approach`).** Don't create other copies. Keep `CLAUDE.md` and `docs/` in place.
 - `~/Downloads/approach-2.0` is an old v2.0 copy. Never work there.
-- **2.4.1** (generator v3 on) is specced (`product/specs/v2.4.1.md`), but it isn't this task. It's handed off after 2.4.0 is live.
 
 ## Always
 - No analytics, ad, or tracking SDKs, or new third-party services, without the planning team's approval.
-- No new server-side data field about users unless the spec and compliance list it (G-5). Individual-only data stays on the device (G-3).
+- No new server-side data field about users unless the spec and compliance list it (G-5). Individual-only data stays on the device (G-3); the R-5 "seen" state is on the device.
 - Every session an athlete or client sees goes through `resolveSession` (G-1).
 - Boards never show weights, loads, RPE, lift test results, estimated maxes, check-ins, pain, bodyweight, nutrition, experience level, or "your version" (G-4).
 - No medical, injury-prevention, treatment, or guaranteed-results claims (G-6).
-- Earlier checks still pass, except those marked "superseded (§0.3)."
+- Earlier checks still pass, except those superseded in spec §0.
 - Keep `local.ts` (demo mode) in step with `supabase.ts`.
 - Run `npx tsc --noEmit`, `npx expo lint`, and `npm run build:web` before calling anything done. A check that doesn't run counts as a failure.

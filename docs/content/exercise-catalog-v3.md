@@ -1,5 +1,6 @@
 # Exercise Catalog v3: College-Level Additions
-Owner: Training Content / Sports Science (02) · v3.0 · Wed Nov 18, 2026
+Owner: Training Content / Sports Science (02) · **v3.1** · Thu Nov 19, 2026
+> **Changes in v3.1 (build questions for 2.4.0):** `short-lever-copenhagen` and existing `copenhagen` get a box setup; `whyGeneral` lines for `er-90-90-iso` and `lateral-hurdle-hop`; ramp-up scope clarified in `warmups.md` v1.1.
 Status: **Draft for founder approval. Unreviewed by a CSCS.** Builds the catalog that `content/program-design.md` (v3) programs from.
 Adds **66 exercises** and **5 equipment items** to the existing library (64 v2.0 + 6 mobility + 4 home in `drill-library.md`, and 39 in `general-library.md`). With these, the full catalog is **179 exercises**.
 
@@ -89,7 +90,7 @@ Sliders and hurdles are cheap and common, so the full preset includes them; the 
 | `landmine-rotation` | Landmine Rotation | core | core-rot | 2 | C | barbell | pallof → — |
 | `body-saw` | Body Saw | core | core-ext | 2 | C | sliders | plank → ab-rollout |
 | `overhead-carry` | Single-Arm Overhead Carry | core | carry | 2 | C | kettlebells / dumbbells | suitcase-carry → — |
-| `short-lever-copenhagen` | Short-Lever Copenhagen | prehab | knee-care | 1 | C | bench | side-plank → copenhagen |
+| `short-lever-copenhagen` | Short-Lever Copenhagen | prehab | knee-care | 1 | C | bench / box | side-plank → copenhagen |
 | **Durability** | | | | | | | |
 | `side-lying-er` | Side-Lying External Rotation | prehab | shoulder-care | 1 | D | dumbbells | band-er → — |
 | `er-90-90-iso` | 90/90 External Rotation Hold | prehab | shoulder-care | 1 | D | bands / cable | band-er → — |
@@ -107,7 +108,7 @@ Sliders and hurdles are cheap and common, so the full preset includes them; the 
 | `walking-knee-hug` | Walking Knee Hug | prehab | mobility | 1 | D | bodyweight | — → — |
 | `walking-quad-stretch` | Walking Quad Stretch | prehab | mobility | 1 | D | bodyweight | — → — |
 
-**Updates to existing exercises:** `hang-clean.easier = 'hang-high-pull'` (was `kb-swing`); `box-jump.harder = 'depth-drop'` (was `trap-bar-jump`); `lateral-bound.easier = 'skater-hop'`; `nordic.easier = 'ghr'`; `pullup.easier = 'chin-up'` when no assisted option fits; `inverted-row.easier = 'ring-row'`; `copenhagen.easier = 'short-lever-copenhagen'`; `goblet-squat.easier = 'heels-elevated-goblet'`.
+**Updates to existing exercises:** `copenhagen.equipment = [['bench'], ['box']]` (a plyo box works as well as a bench); `hang-clean.easier = 'hang-high-pull'` (was `kb-swing`); `box-jump.harder = 'depth-drop'` (was `trap-bar-jump`); `lateral-bound.easier = 'skater-hop'`; `nordic.easier = 'ghr'`; `pullup.easier = 'chin-up'` when no assisted option fits; `inverted-row.easier = 'ring-row'`; `copenhagen.easier = 'short-lever-copenhagen'`; `goblet-squat.easier = 'heels-elevated-goblet'`.
 
 **Generator rule change:** remove "Olympic pattern only at level 3" (`pickExercise`). Gate by each exercise's `level` only, so L2 derivatives are available to intermediate athletes.
 
@@ -438,9 +439,9 @@ x('overhead-carry', 'Single-Arm Overhead Carry', 'core', 'carry', true, 2, [['ke
     ['Arm locked.', 'Ribs down.', 'Slow steps.'],
     ['Arching the back.', 'Bent elbow.', 'Leaning to the side.']),
   { easier: 'suitcase-carry' }),
-x('short-lever-copenhagen', 'Short-Lever Copenhagen', 'prehab', 'knee-care', false, 1, [['bench']], 'Side plank with the top knee on the bench, lift the hips.',
+x('short-lever-copenhagen', 'Short-Lever Copenhagen', 'prehab', 'knee-care', false, 1, [['bench'], ['box']], 'Side plank with the top knee on the bench, lift the hips.',
   h('Inner-thigh strength, an easier version of the Copenhagen plank.',
-    ['Lie on your side with your top knee on a bench, bottom leg underneath.', 'Lift your hips into a straight side plank, supported by your forearm and top knee.', 'Hold, then switch sides.'],
+    ['Lie on your side with your top knee on a bench or box, bottom leg underneath.', 'Lift your hips into a straight side plank, supported by your forearm and top knee.', 'Hold, then switch sides.'],
     ['Straight line.', 'Hips high.', 'Breathe.'],
     ['Hips sagging.', 'Rolling forward.', 'Holding your breath.']),
   { easier: 'side-plank', harder: 'copenhagen' }),
@@ -526,6 +527,14 @@ x('walking-quad-stretch', 'Walking Quad Stretch', 'prehab', 'mobility', false, 1
     ['Knee points down.', 'Stand tall.', 'Squeeze the glute.'],
     ['Arching the back.', 'Knee flaring out.', 'Rushing.'])),
 ```
+
+## 4c. `whyGeneral` for general (trainer) teams
+Three v3 lines mention volleyball terms. General teams show:
+| id | `whyGeneral` |
+|---|---|
+| `er-90-90-iso` | "Builds shoulder strength in the overhead position." |
+| `lateral-hurdle-hop` | "Reactive side-to-side jumping for lateral movement." |
+`single-leg-hop-stick` ("one-foot take-offs") is sport-neutral; no `whyGeneral` needed.
 
 ## 5. Tier list additions (for `rest-and-supersets.md` §7)
 - **P:** all 10 power, 11 plyometrics, 3 throws.

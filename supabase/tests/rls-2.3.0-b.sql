@@ -3,10 +3,10 @@
 \set VERBOSITY terse
 \pset footer off
 insert into auth.users (id, raw_user_meta_data) values
- ('00000000-0000-0000-0000-0000000000f1', '{"name":"Trainer Tess","role":"coach","birth_year":"1988","is_minor":"false","coach_terms_version":"2026-11-14"}'),
+ ('00000000-0000-0000-0000-0000000000f1', '{"name":"Trainer Tess","role":"coach","birth_year":"1988","is_minor":"false","coach_terms_version":"2026-11-19"}'),
  ('00000000-0000-0000-0000-0000000000c1', '{"name":"Alex Client","role":"athlete","birth_year":"1990","is_minor":"false"}'),
  ('00000000-0000-0000-0000-0000000000c2', '{"name":"Sam Client","role":"athlete","birth_year":"1985","is_minor":"false"}'),
- ('00000000-0000-0000-0000-0000000000ca', '{"name":"Coach Alpha","role":"coach","birth_year":"1985","is_minor":"false","coach_terms_version":"2026-11-14"}');
+ ('00000000-0000-0000-0000-0000000000ca', '{"name":"Coach Alpha","role":"coach","birth_year":"1985","is_minor":"false","coach_terms_version":"2026-11-19"}');
 insert into teams (id, name, join_code, coach_id) values
  ('aaaaaaaa-0000-0000-0000-000000000001','School','AAA111','00000000-0000-0000-0000-0000000000ca');
 create function pg_temp.u(x text) returns void language sql as $$ select set_config('request.jwt.claim.sub', x, false) $$;
@@ -17,7 +17,7 @@ create function pg_temp.u(x text) returns void language sql as $$ select set_con
 \set CA '00000000-0000-0000-0000-0000000000ca'
 set role authenticated;
 select pg_temp.u(:'TR');
-select create_general_team('My clients', 'GEN111', '2026-11-15', '{"terms":"2026-11-16T10:00:00Z","adults_responsible":"2026-11-16T10:00:01Z","no_cobranding":"2026-11-16T10:00:02Z"}') is not null as created;
+select create_general_team('My clients', 'GEN111', '2026-11-19', '{"terms":"2026-11-16T10:00:00Z","adults_responsible":"2026-11-16T10:00:01Z","no_cobranding":"2026-11-16T10:00:02Z"}') is not null as created;
 reset role;
 select id as g from teams where join_code = 'GEN111' \gset
 update teams set trainer_verified_at = now(), trainer_verified_by = 'Ryan (service role)' where id = :'g';

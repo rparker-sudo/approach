@@ -35,6 +35,8 @@ import { isLow } from './readiness';
 import { levelTable } from './resolve';
 import { withTeamWarmup } from './warmupTeam';
 import { useStore } from './store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { allLevelOffKeys, clearLevelOffKeys, restoreLevelOffKeys, type LevelKeyRow } from './levelKeys';
 import type { AppData, CalendarEvent, LocalTeamCalendar, Position, Program, ReadinessEntry, TestBattery } from './types';
 
 /**
@@ -366,6 +368,19 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const dataRef = useRef(data);
   const teamsRef = useRef<Team[]>(teams);
   const membersRef = useRef<Record<string, Member[]>>(members);
+  // Legal ruling #2: the level-adjust keys this account was given, kept on this device for offline starts.
+  const levelKeysKey = account ? `approach.levelKeys.${account.id}` : null;
+  const [, setLevelKeysTick] = useState(0);
+  useEffect(() => {
+    if (!levelKeysKey) return;
+    AsyncStorage.getItem(levelKeysKey)
+      .then((raw) => {
+        if (!raw) return;
+        restoreLevelOffKeys(JSON.parse(raw) as LevelKeyRow[]);
+        setLevelKeysTick((n) => n + 1);
+      })
+      .catch(() => {});
+  }, [levelKeysKey]);
   // Latest values for async callbacks. Declared before the other effects so it runs first.
   useEffect(() => {
     accountRef.current = account;
@@ -437,6 +452,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         Promise.all(ids.map((id) => backend.listGroups(id))),
       ]);
       const groupMap = Object.fromEntries(ids.map((id, i) => [id, grp[i]]));
+      AsyncStorage.setItem(`approach.levelKeys.${acct.id}`, JSON.stringify(allLevelOffKeys())).catch(() => {});
       setTeams(t);
       teamsRef.current = t;
       setGroups(groupMap);
@@ -669,6 +685,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       },
       async signOut() {
         await backend.signOut();
+        clearLevelOffKeys();
         clearTeamState();
         mutate((d) => ({ ...d, profile: null }));
       },

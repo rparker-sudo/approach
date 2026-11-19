@@ -2297,6 +2297,53 @@ grant update (default_warmup, default_warmup_template_id, limited_space) on publ
 alter table public.live_progress drop constraint if exists live_progress_state_check;
 alter table public.live_progress add constraint live_progress_state_check check (state in ('idle', 'warming_up', 'lifting', 'resting', 'done'));
 
+-- ---------- Legal ruling #7 (compliance § 2.4.0 build rulings, 11/19): Terms v2.6 → re-acceptance ----------
+-- Terms §4.1 / §4T.3 changed (soft-launch notice v2.6): existing coaches re-accept before recording consent or confirming
+-- supervision (coach_terms_ok), and trainers before posting (general_team_can_post). No new field.
+create or replace function public.current_coach_terms() returns text
+language sql immutable as $$ select '2026-11-19'::text $$;
+create or replace function public.current_trainer_terms() returns text
+language sql immutable as $$ select '2026-11-19'::text $$;
+
+-- ---------- Legal ruling #2: per-athlete "Adjust to level" keys (keyed hash, server-side secret) ----------
+-- The posted program (team_programs.program, readable by the team) lists athletes with adjustment off only as
+-- HMAC-SHA256(secret, team id : user id) keys. The secret lives in Supabase Vault (secret name 'level_adjust_key',
+-- a random 32-byte value created here once); members can't read Vault. No new table or column.
+-- level_off_keys(team_ids) returns, per team: every member's key to the team's coach (or trainer), and only the
+-- caller's own key to a member. A teammate therefore can't tell from the program JSON who has adjustment off.
+create extension if not exists pgcrypto with schema extensions;
+do $$
+begin
+  if not exists (select 1 from vault.secrets where name = 'level_adjust_key') then
+    perform vault.create_secret(encode(extensions.gen_random_bytes(32), 'hex'), 'level_adjust_key',
+      'Approach Strength 2.4.0: HMAC key for per-athlete level-adjust flags (Legal ruling #2). Never expose.');
+  end if;
+end $$;
+
+create or replace function public.level_off_key(t uuid, u uuid) returns text
+language sql stable security definer set search_path = public as $$
+  select 'k' || left(encode(extensions.hmac(t::text || ':' || u::text,
+    (select decrypted_secret from vault.decrypted_secrets where name = 'level_adjust_key' limit 1), 'sha256'), 'hex'), 32);
+$$;
+revoke execute on function public.level_off_key(uuid, uuid) from public, anon, authenticated;
+
+drop function if exists public.level_off_keys(uuid[]);
+create function public.level_off_keys(team_ids uuid[])
+returns table (team_id uuid, user_id uuid, key text)
+language sql stable security definer set search_path = public as $$
+  -- The team's coach: every member.
+  select m.team_id, m.user_id, public.level_off_key(m.team_id, m.user_id)
+  from team_members m join teams t on t.id = m.team_id
+  where m.team_id = any(team_ids) and t.coach_id = auth.uid()
+  union
+  -- A member: their own key only.
+  select m.team_id, m.user_id, public.level_off_key(m.team_id, m.user_id)
+  from team_members m
+  where m.team_id = any(team_ids) and m.user_id = auth.uid();
+$$;
+revoke execute on function public.level_off_keys(uuid[]) from public, anon;
+grant execute on function public.level_off_keys(uuid[]) to authenticated;
+
 -- ==================== 2.4.0 Training v3 Part 2 (migration 012) ====================
 -- New server field (compliance V4): live_progress.position_index (the athlete's current position in a rack rotation;
 -- a small number, never a load or level). The group's shared clock uses the existing station_runs row (rotate_at).

@@ -36,6 +36,7 @@ import {
   clientOf,
 } from './types';
 import { TRAINER_TERMS_VERSION } from '../trainerTerms';
+import { setLevelOffKeys } from '../levelKeys';
 
 if (Platform.OS !== 'web') {
   // Supabase needs a full URL implementation on iOS/Android (loaded only off the web).
@@ -1101,6 +1102,13 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
       let { data, error }: Res = await sb.from('team_programs').select('team_id,group_key,program,updated_at').in('team_id', teamIds);
       if (isMissing(error)) ({ data, error } = (await sb.from('team_programs').select('team_id,program,updated_at').in('team_id', teamIds)) as Res);
       if (error) fail(error);
+      // Legal ruling #2: the per-athlete level-adjust keys (keyed hash; coach: every member's, athlete: own only).
+      const keys = await sb.rpc('level_off_keys', { team_ids: teamIds });
+      if (keys.error && !isMissing(keys.error)) fail(keys.error);
+      setLevelOffKeys(
+        teamIds,
+        ((keys.data ?? []) as { team_id: string; user_id: string; key: string }[]).map((r) => ({ teamId: r.team_id, userId: r.user_id, key: r.key })),
+      );
       return (data as { team_id: string; group_key: string | null; program: Program; updated_at: string }[]).map(
         (r): TeamProgram => ({ teamId: r.team_id, groupKey: r.group_key ?? 'all', program: r.program, updatedAt: r.updated_at }),
       );

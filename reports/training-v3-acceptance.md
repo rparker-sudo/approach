@@ -4,22 +4,22 @@ Spec: `docs/specs/training-v3.md` **Draft v1.0** (Wed Nov 18, 2026), with `docs/
 
 ## Summary for Ryan
 
+**Update 11/19 (finish 2.4.0, Legal rulings):** every ruling #1–#7 passes; #1b, #2 and #7 needed fixes, now built (see "Legal rulings 11/19"). Nothing fails Part 1. **Ready to deploy** with the website, pending your approval.
+
 | | Result |
 |---|---|
-| **Part 1** (must ship) | **All criteria pass.** No Part 1 failure, so the stop rule doesn't block the deploy. |
-| **Part 2** (`catalogV3`, `rackRotation`) | All criteria pass except **one partial**: the §4b worked example matches 32 of 33 picks. The exception is the beginner's Copenhagen, where the catalog tags the exercise bench-only but the example room has a box. UX F55 is also **partial**: Pause and per-rack controls aren't built because they'd need a new server field. Both flags are **on**; your call whether to hold. |
-| **Part 3** (`generatorV3`) | The generator is built, and its own 39 checks pass. With the flag on, though, earlier checks fail (listed under Part 3). Under the rules, **`generatorV3` ships off**, and the 2.3.0 generator stays live and unchanged. |
-| Earlier checks (2.1, 2.2, 2.2.1, 2.3.0, 2.3.1) | All re-run and pass, except the rows marked **"superseded (§0.3)"**, each with the row it maps to. One conflict outside §0.3 needs your answer (question 2). |
-| Migrations | `011`, `012`, `013` (013 makes no schema change). Each runs twice cleanly, both on a fresh `schema.sql` and as an upgrade from v1 through 002–013. |
-| `tsc` · `lint` · `build:web` | Clean · clean · builds (see "Commands"). |
+| **Legal rulings 11/19** | **#1–#7 pass.** #1b legacy `session.source` rule, #2 keyed hash (Vault secret, own key by RPC), #7 Terms 2026-11-19 + `/terms` v2.6 (ships with the app). |
+| **Part 1** (must ship) | **All criteria pass** (re-run 11/19). |
+| **Part 2** (`catalogV3`, `rackRotation` on) | Pass, with the one §4b example partial; UX9 partial, accepted by UX (R6). Flags stay on (CLAUDE.md). |
+| **Part 3** (`generatorV3` **off**) | Unchanged: ships off; turning it on is 2.4.1, gated by Legal #6b. |
+| **UX** | UX1–UX8 pass, UX9 partial, UX-a11y pass; R1–R8 verdicts recorded. No UX item blocks the deploy. |
+| Migrations | `011` (with the 11/19 rulings folded in), `012`, `013`. No 014. Fresh and upgrade (v1 → 002–013, 011–013 twice): 0 errors. |
+| SQL suites | Every expected count, both paths: 2.1: 21 · 2.1 pass 2: 29 · 2.2 pass 1–3: 7/7/1 · 2.2.1: 7 · 2.3.0-a: 17 · 2.3.0-b: 3 · 2.4.0-p1: 6 · **2.4.0-legal: 8 (new)**. |
+| `tsc` · `lint` · `build:web` | Clean · clean · builds. |
 
-**Before the deploy, please answer:**
-1. **`session.source`** is in spec §1.5 but not in compliance V4's table (CLAUDE.md known conflict 7). It's built inside the session JSON. **Did Legal confirm it?** I won't deploy until you answer.
-2. **Olympic resolution with `catalogV3` on:** safety-guidelines §2a step 5 says "Olympic lifts resolve to a jump for anyone below advanced." Spec §2.1 and §3, and program-design §8a, give intermediates L2 derivatives instead (Hang High Pull). The spec ranks higher, so I built it that way; beginners still get a level 1 jump, so the §2a criterion holds. The one earlier check that conflicts is v2.2 resolve-check "Hang Power Clean → jump for intermediate too". It passes with `catalogV3` off, and that change isn't in §0.3. **Keep `catalogV3` on, or ship it off?**
-3. **Part 2 partials:** ship with `catalogV3` and `rackRotation` on, or hold?
-4. **F55a Pause and per-rack controls** need a per-rack clock on the server, which is a new field (G-5). Build them later with Legal's OK, or drop them?
+**Earlier questions, answered:** (1) `session.source`: approved by Legal (#1). (3) Part 2 flags: stay on (CLAUDE.md). (4) F55a Pause / per-rack: left out (Legal #5, UX R6). **Still open, not blocking:** (2) Olympic resolution with `catalogV3` on (safety §2a vs spec §2.1), built per the spec; the publish date on `/terms` (generator's fixed "November 16, 2026"; no script edits per #7).
 
-Then: run 011 → 012 → 013, approve the deploy, and I'll merge, deploy 2.4.0 and record it. You push the `v2.4.0` tag from your Mac, as before.
+**Deploy (Ryan runs the SQL and pushes):** migrations 011 → 012 → 013 on the live project; push `v2.4.0` and merge to `main` in both repos (app deploys through GitHub Actions, the site from `main`); tag `v2.4.0`.
 
 ---
 
@@ -125,6 +125,21 @@ Evidence: **L3** = `scripts/checks/v240-p3-check.ts` (39 pass, flag on inside th
 | UX9 | F55: Start / Rotate now / +15 s / Pause / End block, plus per-rack controls; board ring | **partial** | Built: Start rotation, Rotate now (asks once), +15 s, End block → next block; one room clock; board ring per rack with names at positions, RACK, Spot/Open nodes, the text list and the countdown. **Not built:** Pause and per-rack controls (they need a per-rack clock stored on the server: a new field, G-5 → question 4). |
 | UX-a11y | Targets ≥ 44 pt; in-workout Done and warm-up checkboxes 56 pt; countdown screen-reader text; text tags | **pass** | Tap audits in B1/B2 (session editor, warm-up editor, program settings, workout, rotation cards, rotation workout, team controls): none under 44 pt. Warm-up and ramp-up Done are 56 pt. The countdown label reads "Rotate in N seconds, next Position n, …". |
 
+### UX verdicts on the deviations (UX `user-flows-training-v3.md` v1.1 §R, 11/19)
+
+| # | Deviation from v1.0 | UX verdict |
+|---|---|---|
+| R1 | "Approach Strength" instead of "Approach" in new copy | Accepted (D-035) |
+| R2 | Level toggle: most specific wins; session toggle enabled with "Program setting: Off" | Accepted (the spec wins) |
+| R3 | Spotter label "Spot"; athlete line "Spot the next lifter." | Accepted (Legal V3) |
+| R4 | Reorder with ↑/↓ and "To Raise/Activate/Potentiate," no drag | Accepted |
+| R5 | No full-width 0:00 banner; cue in the countdown; Go to Position n | Accepted for 2.4.0; rotation haptic and a 10-s "Move to…" line in 2.4.1 |
+| R6 | One room clock; Pause and per-rack controls not built | Accepted as deferred; UX9 stays partial |
+| R7 | F45a items (Start stations never blocked, info line, home-jumps toggle, any RPE, F41 5–180) | Confirmed |
+| R8 | "Unpair" and "Review" raised to 44 pt | Confirmed |
+
+**UX sign-off:** UX1–UX8 pass, UX9 partial, UX-a11y pass. No UX item blocks the deploy.
+
 ## Compliance (`docs/compliance.md` § Training v3 review)
 
 | # | Item (V2: still applies to every program) | Result | Evidence |
@@ -135,11 +150,28 @@ Evidence: **L3** = `scripts/checks/v240-p3-check.ts` (39 pass, flag on inside th
 | V2.4 | Board privacy, including the rotation ring | **pass** | L2 ring scan; B1 "Warming up" shows no items; B2 ring shows no RPE/lb/level. `position_index` is never joined with load/RPE/level/check-ins. |
 | V2.5 | G3 pain message, G4 head-injury line | **pass** | Unchanged (`recovery.tsx`, `general.ts`); browser 2.2 pass 1 and 2.3.0 suites pass. |
 | V2.6 | Adults-only trainer teams; TM-19; T1–T11 | **pass** | SQL 2.3.0-a (17) / 2.3.0-b (3); browser-v230 (TM-19 gate; a minor can't join). T10 schema search: no new condition, weight-loss or body-composition columns (new columns are `default_warmup*`, `limited_space`, `position_index`, `warmup_templates`). |
-| V2.7 | Level switching off doesn't change load-test eligibility or Q-7 | **pass** | L1 1.3d; the per-athlete flag is stored as opaque per-team keys (never user ids), so teammates can't read it from the posted program (V4 condition). |
+| V2.7 | Level switching off doesn't change load-test eligibility or Q-7 | **pass** | L1 1.3d; the per-athlete flag is stored as server-keyed HMAC keys (Legal ruling #2), so teammates can't read it from the posted program (SQLL API check). |
 | V3 | Claim-word search on the built catalog and warm-up text, plus Legal's fixes | **pass** | L2 (66 exercises); L1 (15); repo search of changed source strings. Legal fixes: `ssb-squat` line exact; no "Durability" in UI (the v3 Day 5 name reads "Power + care"; the Fit lines say "Care work"); rotation spotter label "Spot" (no "Spot and coach" in `src`). |
-| V4 | New fields as approved; `roomMinutes` never shown to another team's coach | **pass, except one question** | Fields map to V4 rows (`build-snapshot.md` §4). Another team's events reach an athlete without `roomMinutes`. **`session.source` isn't in V4** → question 1. |
+| V4 | New fields as approved; `roomMinutes` never shown to another team's coach | **pass, except one question** | Fields map to V4 rows (`build-snapshot.md` §4). Another team's events reach an athlete without `roomMinutes`. `session.source` approved and added to V4 by Legal ruling #1 (11/19). |
 | V5 | Accepted risks TR3-1, TR3-2 | **noted** | TR3-1: Legal's dismiss-once note and the confirm when turning level adjust off for a minor are **not built** (founder's call, known conflict 5). TR3-2: built as the spec says; Legal's stricter interim recommendation not adopted (known conflict 6). With `generatorV3` off, TR3-2 content doesn't reach athletes in 2.4.0. |
-| V1 | Terms §4.1/§4T.3 edited in the legal notice | **not in this release** | The website and legal pages are unchanged in 2.4.0 (CLAUDE.md). The regenerated `/terms` with the corrected §4.1/§4T.3 needs a website release. **Flag for the coordinator.** |
+| V1 | Terms §4.1/§4T.3 edited in the legal notice | **pass** | Notice v2.6 published to `/terms` with the app deploy (Legal ruling #7; see "Legal rulings 11/19"). |
+
+## Legal rulings 11/19 (`docs/compliance.md` § 2.4.0 build rulings)
+
+Evidence keys: **LG** = `scripts/checks/v240-legal-check.ts` (all pass); **SQLL** = `supabase/tests/rls-2.4.0-legal.sql` (8 expected errors; fresh and upgrade, both 8). Folded into migration 011 (still safe to re-run; `schema.sql` matches). No migration 014; no new table or column.
+
+| # | Ruling | Result | Evidence |
+|---|---|---|---|
+| 1a | Any coach or trainer edit to a generated session sets `'coach'` | **pass** | LG (`coachEdit`); L1 1.2b and B1 unchanged. |
+| 1b | Legacy sessions: coach-built → `'coach'`; generated or personal → `'approach'`; unknown → `'approach'` | **pass (fixed)** | The build counted every posted legacy session as `'coach'`. Now (`src/lib/source.ts`): `'coach'` only with a coach trace in the stored JSON (coach-set rest, manual grouping, a custom exercise, a typed note, stations, a trainer's added session); else `'approach'`. LG: 216 posted, unedited 2.3.x generated programs and every trainer goal/size read `'approach'`; each trace reads `'coach'`; an unknown session gets the generated limits (RPE 9 → 7); a traced one is resolved as written. Rule recorded in `build-snapshot.md` §8. One `v230-check` fixture now marks its trainer-built session `source: 'coach'` (what the 2.4.0 editor writes) and a new row checks the unmarked one is capped. |
+| 1c | `session.source` not shown on boards | **pass** | LG source search of the board and ring. |
+| 2 | Per-athlete level-adjust flag: keyed hash with a server secret; each athlete gets only their own key | **pass (fixed)** | Keys are `HMAC-SHA256(secret, team id : user id)`; the secret is in **Supabase Vault** (`level_adjust_key`, random 32 bytes, created by 011). `level_off_keys()`: coach → every member, athlete → own key only. **API check as a teammate (SQLL):** Wes reads the posted program, gets only his own key, can't match the listed key, finds no user ids, and the key isn't any plain hash of team id + Ava's id; `level_off_key()` and Vault are denied; anon is denied. The coach sees 3 distinct keys; Ava sees herself off. App: keys from the server only (LG), device-saved for offline starts; the coach's toggle reads "Connect to change …" without a key. |
+| 3 | `my_rack` returns the caller's own `my_index` only | **pass** | SQLL: one row per caller; Wes's index equals the count of members ordered before him; three members get 0, 1, 2, each only their own; the function returns no partner index column. LG (schema shape). |
+| 4 | Spot line with no partner name | **pass** | Unchanged ("Spot the next lifter."); partner names later under B5 conditions. |
+| 5 | Pause and per-rack controls left out | **pass** | Not built (UX9 partial; UX R6 accepted as deferred). |
+| 6a | TR3-1 logged | **noted** | Not built (known conflict 4). |
+| 6b | TR3-2: generator gate before turning on for teams with a minor | **pass** | `generatorV3` stays **off** (LG flags row). Turning it on is 2.4.1, gated by #6b. |
+| 7 | Terms v2.6 live with the app, and a Terms version bump | **pass (fixed)** | App `COACH_TERMS_VERSION` and `TRAINER_TERMS_VERSION` = **2026-11-19**; migration 011 sets `current_coach_terms()` and `current_trainer_terms()` to 2026-11-19 (LG; SQLL: a coach on 11/14 can't record consent or confirm supervision until re-accepting; a trainer on 11/15 can't post until re-accepting; old versions refused). Website: `/terms` regenerated from v2.6 with the unchanged generator (site repo branch `v2.4.0`, commit `78850ba`); only §4.1 and §4T.3 change; `/privacy` and `/consent` regenerate byte-identical; `legal-pages-match.py` passes; `#health-data` and `#trainer-terms` in place. **Deploys with the app.** Open: the generator's fixed "Last updated: November 16, 2026" (no script edits) — Ryan to decide. |
 
 ## Earlier checks (re-run on the 2.4.0 build)
 

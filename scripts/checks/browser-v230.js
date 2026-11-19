@@ -131,7 +131,7 @@ const S = process.argv[2];
   let d = await demo(); const team = d.teams.find(x => x.name === 'Tess Clients');
   check(team && team.kind === 'general', 'team kind = general');
   const rec = d.trainer && d.trainer[team.id];
-  check(rec && rec.termsVersion === '2026-11-15' && ['terms', 'adults_responsible', 'no_cobranding'].every(k => typeof rec.confirmations[k] === 'string') && !!rec.acceptedAt && rec.verifiedAt === null, 'T2 recorded: Terms version, time, the three confirmations; not verified');
+  check(rec && rec.termsVersion === '2026-11-19' && ['terms', 'adults_responsible', 'no_cobranding'].every(k => typeof rec.confirmations[k] === 'string') && !!rec.acceptedAt && rec.verifiedAt === null, 'T2 recorded: Terms version, time, the three confirmations; not verified');
   check(team.settings.effortBoard === false, 'effort board off by default (general)');
   const code = team.joinCode;
 

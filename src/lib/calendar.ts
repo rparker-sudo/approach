@@ -1,5 +1,6 @@
 import type { CalendarEvent, DayType, Experience, Program, Session, TestBattery } from './types';
 import { WEEKDAYS } from './types';
+import { sourceOf } from './source';
 
 /**
  * Turns a program's default week + calendar dates + per-date overrides into
@@ -119,12 +120,11 @@ function capFor(experience: Experience, phase: Program['phase']) {
 }
 
 /**
- * 2.4.0: Approach-generated (every lift session is `source = 'approach'`). Mirrors `sourceOf` in resolve.ts (a session saved
- * before 2.4.0 counts as the coach's when the program was posted to a team or built for a trainer team).
+ * 2.4.0: Approach-generated (every lift session is `source = 'approach'`), with the legacy rule of Legal ruling #1b
+ * (`sourceOf` in source.ts).
  */
 export function generatedWeek(program: Program): boolean {
-  const coachMade = !!(program.teamId || program.general || program.postedAt);
-  return program.sessions.filter((x) => !x.mobility).every((x) => (x.source ?? (coachMade ? 'coach' : 'approach')) === 'approach');
+  return program.sessions.filter((x) => !x.mobility).every((x) => sourceOf(program, x) === 'approach');
 }
 
 /**

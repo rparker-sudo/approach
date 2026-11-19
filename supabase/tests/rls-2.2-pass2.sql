@@ -3,8 +3,8 @@
 \set VERBOSITY terse
 \pset footer off
 insert into auth.users (id, raw_user_meta_data) values
- ('00000000-0000-0000-0000-0000000000ca', '{"name":"Coach Alpha","role":"coach","birth_year":"1985","is_minor":"false","coach_terms_version":"2026-11-14"}'),
- ('00000000-0000-0000-0000-0000000000cb', '{"name":"Coach Bravo","role":"coach","birth_year":"1980","is_minor":"false","coach_terms_version":"2026-11-14"}'),
+ ('00000000-0000-0000-0000-0000000000ca', '{"name":"Coach Alpha","role":"coach","birth_year":"1985","is_minor":"false","coach_terms_version":"2026-11-19"}'),
+ ('00000000-0000-0000-0000-0000000000cb', '{"name":"Coach Bravo","role":"coach","birth_year":"1980","is_minor":"false","coach_terms_version":"2026-11-19"}'),
  ('00000000-0000-0000-0000-0000000000a1', '{"name":"Jordan Miller","role":"athlete","birth_year":"2010","is_minor":"true"}'),
  ('00000000-0000-0000-0000-0000000000a2', '{"name":"Ava Reed","role":"athlete","birth_year":"2010","is_minor":"true"}'),
  ('00000000-0000-0000-0000-0000000000b1', '{"name":"Taylor Smith","role":"athlete","birth_year":"2000","is_minor":"false"}');

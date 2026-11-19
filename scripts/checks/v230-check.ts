@@ -122,7 +122,11 @@ const adv = resolveSession({ ...base, sessions: [ses] }, ses, { level: 3, logs: 
 ok(adv.exercises[0].effort === 'RPE 7' && adv.exercises[0].exerciseId === 'back-squat', 'week 1 effort from the wave; strength capped (RPE 9 → week RPE ≤ 8)');
 const rp = { ...base, sessions: [ses], weeks: base.weeks!.map((w) => ({ ...w, rpe: 10 })) };
 // trainer-mode §B5 → SUPERSEDED (§0.3): the RPE 8 cap applies to Approach's goal-default sessions only.
-sup(resolveSession(rp, ses, { level: 3, logs: [] }, day('2026-11-30')).exercises[0].effort === 'RPE 10', 'a trainer-built session keeps the week RPE 10 as written');
+// Legal ruling #1b (11/19): a session saved with no source and no coach trace is 'approach'; a 2.4.0 trainer-built session
+// carries source = 'coach' (the editor sets it), so the fixture says so.
+const tses: Session = { ...ses, source: 'coach' };
+sup(resolveSession({ ...rp, sessions: [tses] }, tses, { level: 3, logs: [] }, day('2026-11-30')).exercises[0].effort === 'RPE 10', 'a trainer-built session keeps the week RPE 10 as written');
+ok(resolveSession(rp, ses, { level: 3, logs: [] }, day('2026-11-30')).exercises[0].effort !== 'RPE 10', 'ruling #1b: the same session saved before 2.4.0 with no coach trace is generated (RPE capped)');
 const sesA = { ...ses, source: 'approach' as const };
 ok(resolveSession({ ...rp, sessions: [sesA] }, sesA, { level: 3, logs: [] }, day('2026-11-30')).exercises[0].effort === 'RPE 8', '2.4.0: resolveSession caps an Approach goal-default session at RPE 8 even if a week says more');
 const beg = resolveSession({ ...base, sessions: [ses] }, ses, { level: 1, logs: [] }, day('2026-11-23'));

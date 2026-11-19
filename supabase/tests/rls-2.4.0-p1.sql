@@ -4,8 +4,8 @@
 \set VERBOSITY terse
 \pset footer off
 insert into auth.users (id, raw_user_meta_data) values
- ('00000000-0000-0000-0000-0000000000a1', '{"name":"Coach Alpha","role":"coach","birth_year":"1985","is_minor":"false","coach_terms_version":"2026-11-14"}'),
- ('00000000-0000-0000-0000-0000000000b1', '{"name":"Coach Bravo","role":"coach","birth_year":"1984","is_minor":"false","coach_terms_version":"2026-11-14"}'),
+ ('00000000-0000-0000-0000-0000000000a1', '{"name":"Coach Alpha","role":"coach","birth_year":"1985","is_minor":"false","coach_terms_version":"2026-11-19"}'),
+ ('00000000-0000-0000-0000-0000000000b1', '{"name":"Coach Bravo","role":"coach","birth_year":"1984","is_minor":"false","coach_terms_version":"2026-11-19"}'),
  ('00000000-0000-0000-0000-0000000000d1', '{"name":"Ava Athlete","role":"athlete","birth_year":"2010","is_minor":"true"}');
 insert into teams (id, name, join_code, coach_id) values
  ('aaaaaaaa-0000-0000-0000-000000000001','Alpha','AAA111','00000000-0000-0000-0000-0000000000a1'),

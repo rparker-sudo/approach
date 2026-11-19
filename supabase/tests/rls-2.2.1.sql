@@ -5,11 +5,11 @@
 \pset footer off
 insert into auth.users (id, raw_user_meta_data) values
  -- New coach who ticked the Coach Terms box at sign-up (2.2.1 §8).
- ('00000000-0000-0000-0000-0000000000ca', '{"name":"Coach Alpha","role":"coach","birth_year":"1985","is_minor":"false","coach_terms_version":"2026-11-14"}'),
+ ('00000000-0000-0000-0000-0000000000ca', '{"name":"Coach Alpha","role":"coach","birth_year":"1985","is_minor":"false","coach_terms_version":"2026-11-19"}'),
  -- Existing coach without acceptance (a 2.2.0 account).
  ('00000000-0000-0000-0000-0000000000cb', '{"name":"Coach Bravo","role":"coach","birth_year":"1980","is_minor":"false"}'),
  -- An athlete can't get Coach Terms recorded by sending the field at sign-up.
- ('00000000-0000-0000-0000-0000000000a1', '{"name":"Jordan Miller","role":"athlete","birth_year":"2010","is_minor":"true","coach_terms_version":"2026-11-14"}'),
+ ('00000000-0000-0000-0000-0000000000a1', '{"name":"Jordan Miller","role":"athlete","birth_year":"2010","is_minor":"true","coach_terms_version":"2026-11-19"}'),
  ('00000000-0000-0000-0000-0000000000b1', '{"name":"Taylor Smith","role":"athlete","birth_year":"2000","is_minor":"false"}'),
  ('00000000-0000-0000-0000-0000000000b2', '{"name":"Uma Lee","role":"athlete","birth_year":"2001","is_minor":"false"}');
 insert into teams (id, name, join_code, coach_id) values
@@ -40,7 +40,7 @@ select record_consent(:'B', :'J', true, true, true, true, true, true);
 insert into test_sessions (team_id, day, battery) values (:'B', current_date, 'full');
 \echo == CT3 a wrong version is refused (expect 1 error); then coach B accepts and both work (expect 0 errors)
 select accept_coach_terms('2025-01-01');
-select accept_coach_terms('2026-11-14');
+select accept_coach_terms('2026-11-19');
 select version, accepted_at is not null as accepted from my_coach_terms();
 select record_consent(:'B', :'J', true, true, true, true, true, true);
 insert into test_sessions (team_id, day, battery) values (:'B', current_date, 'full');
@@ -50,7 +50,7 @@ select pg_temp.u(:'J');
 update profiles set coach_terms_version = null, coach_terms_accepted_at = null where id = :'CB';
 select pg_temp.u(:'CB');
 update profiles set coach_terms_accepted_at = null where id = :'CB';
-select pg_temp.u(:'T'); select accept_coach_terms('2026-11-14');
+select pg_temp.u(:'T'); select accept_coach_terms('2026-11-19');
 \echo == CT5 other users cannot read the columns (expect 1 error) and the trigger keeps an acceptance (checked as superuser)
 select coach_terms_version from profiles where id = :'CB';
 reset role;

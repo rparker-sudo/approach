@@ -41,6 +41,7 @@ import {
   WarmupTemplate,
 } from './types';
 import { TRAINER_TERMS_VERSION } from '../trainerTerms';
+import { setLevelOffKeys } from '../levelKeys';
 
 /**
  * Demo mode: a pretend server stored on this device. Several accounts can
@@ -93,6 +94,8 @@ type DB = {
    * 2.3.0 (migration 009): the trainer Terms record and verification for general teams, kept apart from Team like the
    * server's column grants. Demo mode has no service role: tests (or a developer) set verifiedAt in demo storage.
    */
+  /** 2.4.0 (Legal ruling #2): demo stand-in for the Vault secret 'level_adjust_key'. Never shown or sent anywhere. */
+  levelKeySecret?: string;
   trainer?: Record<string, { termsVersion: string; acceptedAt: string; acceptedBy: string; confirmations: Record<string, string>; verifiedAt: string | null; verifiedBy: string | null }>;
 };
 
@@ -264,6 +267,18 @@ const generalOpen = (db: DB, teamId: string) => !!db.trainer?.[teamId]?.verified
 
 /** Same as general_team_can_post(): open and on the current trainer Terms. */
 const generalCanPost = (db: DB, teamId: string) => generalOpen(db, teamId) && db.trainer?.[teamId]?.termsVersion === TRAINER_TERMS_VERSION;
+
+/** Demo stand-in for public.level_off_key(): a keyed hash of team id + user id under this device's secret. */
+function keyedLevelKey(secret: string, teamId: string, userId: string): string {
+  const str = `${secret}:${teamId}:${userId}`;
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < str.length; i++) {
+    h1 = Math.imul(h1 ^ str.charCodeAt(i), 16777619) >>> 0;
+    h2 = Math.imul(h2 ^ str.charCodeAt(str.length - 1 - i), 2246822519) >>> 0;
+  }
+  return `k${h1.toString(16).padStart(8, '0')}${h2.toString(16).padStart(8, '0')}`;
+}
 
 /** Same as the 2.3.0 team_programs select policy: volleyball members see every program; general clients see team-wide, own group, own. */
 function programVisible(db: DB, viewerId: string | null, p: TeamProgram) {
@@ -984,7 +999,17 @@ export const localBackend: Backend = {
 
   async getPrograms(teamIds) {
     const db = await load();
-    return db.programs.filter((p) => teamIds.includes(p.teamId) && programVisible(db, db.sessionUserId, p));
+    // Legal ruling #2, same as level_off_keys() (migration 011): the coach gets every member's key, a member only their own.
+    const viewer = db.sessionUserId;
+    if (!db.levelKeySecret) {
+      db.levelKeySecret = `${uid()}${uid()}`;
+      await save(db);
+    }
+    const rows = db.members
+      .filter((m) => teamIds.includes(m.teamId) && (m.userId === viewer || isCoach(db, m.teamId, viewer)))
+      .map((m) => ({ teamId: m.teamId, userId: m.userId, key: keyedLevelKey(db.levelKeySecret!, m.teamId, m.userId) }));
+    setLevelOffKeys(teamIds, rows);
+    return db.programs.filter((p) => teamIds.includes(p.teamId) && programVisible(db, viewer, p));
   },
 
   async joinTeam(code) {

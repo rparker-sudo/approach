@@ -10,6 +10,8 @@ import { blockRests, blocksOf } from './groups';
 import { BlockInfo, lighten, sessionForDate } from './progression';
 import { addBack, estimateSession, fitSession, targetFor, undoneTrims, type FitCtx, type Target } from './fit';
 import { warmupFor, type WarmupCtx } from './warmup';
+import { sourceOf } from './source';
+import { levelOffKey } from './levelKeys';
 import type { LevelTable } from './backend/types';
 import type { Equipment, Exercise, Phase, Program, ProgramExercise, ProgramPosition, Session, SessionSource, SessionWarmup, WorkoutLog } from './types';
 
@@ -30,30 +32,11 @@ import type { Equipment, Exercise, Phase, Program, ProgramExercise, ProgramPosit
  * Pure functions; no React.
  */
 
-/* ---------- 2.4.0 §0.1: who wrote the session ---------- */
-/**
- * `session.source`, or the migration rule for sessions saved before 2.4.0: a session a coach or trainer posted (team
- * programs) is 'coach'; one that came straight from the generator (personal programs) is 'approach'.
- */
-export function sourceOf(program: Pick<Program, 'teamId' | 'general' | 'postedAt'>, session: Pick<Session, 'source'>): SessionSource {
-  if (session.source) return session.source;
-  return program.teamId || program.general || program.postedAt ? 'coach' : 'approach';
-}
+/* ---------- 2.4.0 §0.1: who wrote the session (legacy rule: Legal ruling #1b, see source.ts) ---------- */
+export { sourceOf };
 
-/**
- * Compliance V4: the per-athlete "Adjust to level" flag is never shown to teammates. The posted program carries an opaque
- * per-team key instead of the user id, so the athlete's own app can recognise itself and teammates' apps can't read who.
- */
-export function levelOffKey(teamId: string | undefined, userId: string): string {
-  const str = `${teamId ?? ''}:${userId}:level-adjust-off`;
-  let h1 = 0x811c9dc5;
-  let h2 = 0x01000193;
-  for (let i = 0; i < str.length; i++) {
-    h1 = Math.imul(h1 ^ str.charCodeAt(i), 16777619) >>> 0;
-    h2 = Math.imul(h2 ^ str.charCodeAt(str.length - 1 - i), 2246822519) >>> 0;
-  }
-  return `k${h1.toString(36)}${h2.toString(36)}`;
-}
+/** Legal ruling #2: per-athlete level-adjust keys come from the server (keyed hash; see levelKeys.ts). */
+export { levelOffKey };
 
 /** §0.1: a coach's edit to exercises, sets, reps, effort, rest, grouping, order or stations makes the session theirs. */
 export function coachEdit(session: Session): Session {
@@ -66,7 +49,8 @@ export function coachEdit(session: Session): Session {
  * otherwise the session override (on or off); otherwise the program setting (default on).
  */
 export function levelAdjustFor(program: Pick<Program, 'levelAdjust' | 'levelAdjustOffFor' | 'teamId'>, session: Pick<Session, 'levelAdjust'> | null | undefined, userId?: string | null): boolean {
-  if (userId && program.levelAdjustOffFor?.includes(levelOffKey(program.teamId, userId))) return false;
+  const key = userId ? levelOffKey(program.teamId, userId) : null;
+  if (key && program.levelAdjustOffFor?.includes(key)) return false;
   if (session && typeof session.levelAdjust === 'boolean') return session.levelAdjust;
   return program.levelAdjust !== false;
 }

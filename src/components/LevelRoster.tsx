@@ -182,12 +182,14 @@ export function AdjustToLevel({ program, member }: { program?: Program; member: 
   const local = program ? data.programs.find((p) => p.id === program.id) : undefined;
   if (!local) return null;
   const first = member.name.split(' ')[0] || member.name;
+  // Legal ruling #2: the key comes from the server (level_off_keys). Without it the setting can't be read or changed here.
   const key = levelOffKey(local.teamId, member.userId);
+  if (!key) return <Text style={{ fontSize: 13, color: colors.muted }}>{`Connect to change ${first}'s level setting.`}</Text>;
   const off = (local.levelAdjustOffFor ?? []).includes(key);
   const programOff = local.levelAdjust === false;
   function set(on: boolean) {
     const list = (local!.levelAdjustOffFor ?? []).filter((u) => u !== key);
-    saveProgram({ ...local!, levelAdjustOffFor: on ? list : [...list, key], ...(local!.teamId ? { unposted: true } : null) });
+    saveProgram({ ...local!, levelAdjustOffFor: on ? list : [...list, key!], ...(local!.teamId ? { unposted: true } : null) });
   }
   return (
     <View style={{ gap: 4 }}>

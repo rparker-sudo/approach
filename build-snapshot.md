@@ -233,6 +233,7 @@ Supabase and GitHub (Pages, Actions) only. `pg_cron` is a built-in Supabase exte
 
 - **App:** https://app.approachstrength.com (Pages custom domain moved 11/15). 2.2.1 deployed from `main` on November 15, 2026.
 - **Website:** https://approachstrength.com from `rparker-sudo/approachstrength-site` (placeholder + legal pages, live 11/15). When the owner set the custom domain, GitHub added `CNAME` to that repo.
+- **Training v3 Step 0.3 (11/19):** 2.3.0 (trainer mode) and 2.3.1 (custom exercises) are **deployed** (both November 16, 2026). The C31 G3/G4 blocker is **closed**: Ryan confirmed on 11/16 that Legal approved the trainer wording as written (§8). Training v3 (2.4.0) doesn't change it. 2.4.0 is built on branch `v2.4.0` from hand-off `632a16e` (docs of Wed Nov 18, 2026).
 - **2.3.1:** app deployed from `main` on November 16, 2026 (custom exercises). No migration and no setting changes.
 - **2.3.0:** app and website deployed from `main` on November 16, 2026. Migrations 009 and 010 applied by Ryan (Supabase SQL Editor) the same day. No domain, DNS, repo-variable, Pages or Supabase setting changes.
 - **Supabase:** live, Free plan. 002–007 applied (005–007 on November 14, 2026, with pg_cron enabled, per the owner). 008 applied November 15, 2026 (owner). Auth Site URL and Redirect URLs moved to `app.` 11/15.

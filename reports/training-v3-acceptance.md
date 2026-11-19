@@ -4,7 +4,7 @@ Spec: `docs/specs/training-v3.md` **Draft v1.0** (Wed Nov 18, 2026), with `docs/
 
 ## Summary for Ryan
 
-**Update 11/19 (finish 2.4.0, Legal rulings):** every ruling #1–#7 passes; #1b, #2 and #7 needed fixes, now built (see "Legal rulings 11/19"). Nothing fails Part 1. **Ready to deploy** with the website, pending your approval.
+**Update 11/19 (finish 2.4.0, Legal rulings):** every ruling #1–#7 passes; #1b, #2 and #7 needed fixes, now built (see "Legal rulings 11/19"). Nothing fails Part 1. **Deployed November 19, 2026** with the website (`/terms` v2.6): migrations 011–013 run by Ryan, app `main` `a84cc6e`, site `main` `78850ba`, tag `v2.4.0`.
 
 | | Result |
 |---|---|
@@ -16,10 +16,12 @@ Spec: `docs/specs/training-v3.md` **Draft v1.0** (Wed Nov 18, 2026), with `docs/
 | Migrations | `011` (with the 11/19 rulings folded in), `012`, `013`. No 014. Fresh and upgrade (v1 → 002–013, 011–013 twice): 0 errors. |
 | SQL suites | Every expected count, both paths: 2.1: 21 · 2.1 pass 2: 29 · 2.2 pass 1–3: 7/7/1 · 2.2.1: 7 · 2.3.0-a: 17 · 2.3.0-b: 3 · 2.4.0-p1: 6 · **2.4.0-legal: 8 (new)**. |
 | `tsc` · `lint` · `build:web` | Clean · clean · builds. |
+| Browser (11/19 re-run, demo build, local Chrome) | 2.4.0 Part 1: 51 · Part 2: 20 · 2.3.0 trainer: 130 · 2.3.1 custom: 22 — all pass, 0 FAIL. **Not re-run 11/19:** the 2.2 / 2.2.1 / 2.1 browser suites (their runners lived outside the repo; last pass: the 2.4.0 build run above). |
+| Logic | `run-all.sh`: all 19 TypeScript checks pass. The two website checks need Python 3.10+ (this Mac has 3.9): run through a 3.9 wrapper with no script change, both pass. |
 
 **Earlier questions, answered:** (1) `session.source`: approved by Legal (#1). (3) Part 2 flags: stay on (CLAUDE.md). (4) F55a Pause / per-rack: left out (Legal #5, UX R6). **Still open, not blocking:** (2) Olympic resolution with `catalogV3` on (safety §2a vs spec §2.1), built per the spec; the publish date on `/terms` (generator's fixed "November 16, 2026"; no script edits per #7).
 
-**Deploy (Ryan runs the SQL and pushes):** migrations 011 → 012 → 013 on the live project; push `v2.4.0` and merge to `main` in both repos (app deploys through GitHub Actions, the site from `main`); tag `v2.4.0`.
+**Deployed:** Ryan ran 011 → 012 → 013 on the live project, merged and pushed `main` in both repos, and pushed tag `v2.4.0`. Details in `build-snapshot.md` §6.
 
 ---
 

@@ -1,6 +1,6 @@
 # Approach Strength — build snapshot
 
-*As of November 19, 2026 (v2.4.0 Training v3 built on branch `v2.4.0`, **not deployed**, waiting for Ryan's approval; live: v2.3.1 custom exercises, deployed November 16, 2026, on 2.3.0 trainer mode, deployed November 16, 2026). Facts only. Items marked **(unverified)** could not be confirmed from the code or from the owner. **(pending)** = waits for the owner's dashboard step or the live test.*
+*As of November 19, 2026: **v2.4.0 (Training v3) deployed November 19, 2026** with the website's `/terms` v2.6 (Legal ruling #7); `generatorV3` off, `catalogV3` and `rackRotation` on.*
 
 **What it is:** a weight-training, nutrition and planning app for volleyball athletes and coaches, and (from 2.3.0) for personal trainers with adult clients ("general" teams). Product name **Approach Strength** (since 2.2.1, D-035). Home-screen short name: "Approach". App: https://app.approachstrength.com. Website: https://approachstrength.com.
 
@@ -8,7 +8,7 @@
 
 ## 1. Version and changes
 
-**2.4.0 (Training v3, `docs/specs/training-v3.md` v1.0):** branch `v2.4.0` from hand-off `632a16e` (docs of Wed Nov 18, 2026). Part 1 → 2 → 3, a commit per part (`c13dddd`, `525bb49`, `c29897c`). Migrations `011_training_v3_p1.sql`, `012_training_v3_p2.sql`, `013_training_v3_p3.sql` (013 is a no-op: Part 3 keeps its keys in the program JSON). Report: `reports/training-v3-acceptance.md`. **Not deployed:** waits for Ryan's answer on `session.source` (Legal) and his deploy approval; Ryan runs 011–013 first. Version 2.4.0 in `app.json`/`package.json`.
+**2.4.0 (Training v3, `docs/specs/training-v3.md` v1.0):** branch `v2.4.0` from hand-off `632a16e` (docs of Wed Nov 18, 2026). Part 1 → 2 → 3, a commit per part (`c13dddd`, `525bb49`, `c29897c`). Migrations `011_training_v3_p1.sql`, `012_training_v3_p2.sql`, `013_training_v3_p3.sql` (013 is a no-op: Part 3 keeps its keys in the program JSON). Report: `reports/training-v3-acceptance.md`. Finished 11/19 for Legal's rulings (`a84cc6e`). **Deployed November 19, 2026** (see §6). Version 2.4.0 in `app.json`/`package.json`.
 - **Flags** (`src/lib/flags.ts`, build-time constants): `catalogV3` **on**, `rackRotation` **on**, `generatorV3` **off** (some earlier checks fail with it on; see §8 "2.4.0"). With `generatorV3` off the 2.3.0 generator is unchanged (it never picks catalog v3 exercises).
 
 **2.3.1 (custom exercises, owner request 11/16):** branch `v2.3.1`. Coaches and trainers can create their own exercises inside any program (saved in the existing program JSON, no migration). Each one carries a type (sets the tier), a movement (pattern) and a level, so resolveSession, rest floors, pairing rules and effort caps treat it like a library exercise. Report: `reports/v2.3.1-acceptance.md`. **Deployed November 16, 2026** (Ryan approved; `v2.3.1` merged into `main`; no migration; website unchanged). Tag `v2.3.1`: Ryan pushes it from his Mac.
@@ -253,7 +253,11 @@ Supabase and GitHub (Pages, Actions) only. `pg_cron` is a built-in Supabase exte
 
 - **App:** https://app.approachstrength.com (Pages custom domain moved 11/15). 2.2.1 deployed from `main` on November 15, 2026.
 - **Website:** https://approachstrength.com from `rparker-sudo/approachstrength-site` (placeholder + legal pages, live 11/15). When the owner set the custom domain, GitHub added `CNAME` to that repo.
-- **2.4.0 (11/19):** built on `v2.4.0` and pushed (branch only; `main` untouched, nothing deployed). No domain, DNS, repo-variable, Pages or Supabase setting changes. Website repo untouched.
+- **2.4.0 deployed (November 19, 2026, about 10:25 AM PST; Ryan ran the SQL and pushed from his Mac):**
+  - **Supabase (live):** Ryan ran migrations `011` → `012` → `013` (SQL Editor). Check after: `current_coach_terms()` = 2026-11-19, `current_trainer_terms()` = 2026-11-19, Vault secret `level_adjust_key` present (1). The first 011 run didn't take (check showed 2026-11-14 / 2026-11-15 / 0); re-run succeeded.
+  - **App:** `v2.4.0` fast-forwarded into `main` at `a84cc6e`; GitHub Actions deploys `main` to `app.approachstrength.com`. Tag `v2.4.0` pushed by Ryan (app repo).
+  - **Website:** branch `v2.4.0` fast-forwarded into `main` at `78850ba` (`/terms` from notice v2.6; `/privacy`, `/consent` unchanged). Live `/terms` checked: §4.1/§4T.3 v2.6 wording present.
+  - **Settings changed (old → new):** Coach Terms version 2026-11-14 → 2026-11-19; Trainer Terms version 2026-11-15 → 2026-11-19; new Supabase Vault secret `level_adjust_key` (F2). Flags unchanged (`generatorV3` off; `catalogV3`, `rackRotation` on). No domain, DNS, repo-variable or Pages change.
 - **Training v3 Step 0.3 (11/19):** 2.3.0 (trainer mode) and 2.3.1 (custom exercises) are **deployed** (both November 16, 2026). The C31 G3/G4 blocker is **closed**: Ryan confirmed on 11/16 that Legal approved the trainer wording as written (§8). Training v3 (2.4.0) doesn't change it. 2.4.0 is built on branch `v2.4.0` from hand-off `632a16e` (docs of Wed Nov 18, 2026).
 - **2.3.1:** app deployed from `main` on November 16, 2026 (custom exercises). No migration and no setting changes.
 - **2.3.0:** app and website deployed from `main` on November 16, 2026. Migrations 009 and 010 applied by Ryan (Supabase SQL Editor) the same day. No domain, DNS, repo-variable, Pages or Supabase setting changes.

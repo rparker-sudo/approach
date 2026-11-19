@@ -4,7 +4,7 @@ Version numbers: whole numbers (1.0, 2.0) for big changes, decimals (1.1, 1.2) f
 The number is in `app.json` (`expo.version`, written as 1.1.0 for 1.1) and shows in the app under Settings.
 Each version has a matching GitHub tag (`v1.0`, `v1.1`, …) and download (`approach-1.0.zip`).
 
-## 2.4.0 — Training v3 (not deployed yet)
+## 2.4.0 — Training v3 (deployed November 19, 2026)
 Built from `docs/specs/training-v3.md` v1.0 on branch `v2.4.0`, Part 1 → Part 2 → Part 3. Migrations `011`–`013` (run in order after 010; each safe to re-run). Acceptance report: `reports/training-v3-acceptance.md`.
 
 ### Legal rulings of 11/19 (folded into migration 011; no migration 014)

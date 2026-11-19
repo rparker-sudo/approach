@@ -110,7 +110,7 @@ const T2: Day[] = [
   { name: 'Day 1 Total: squat', focus: 'Total: squat', heavyLegs: true, slots: [A('hang-clean'), A('box-jump'), B('back-squat'), C('bench'), C('db-row'), D('db-rdl'), Core('pallof'), ...circuit('shoulder', 'knee').slice(0, 3)] },
   { name: 'Day 2 Total: hinge', focus: 'Total: hinge', heavyLegs: true, slots: [A('push-press'), A('mb-rotational'), B('trap-bar-deadlift'), C('split-squat'), C('weighted-pullup'), D('copenhagen'), D('face-pull'), ...circuit('ankle', 'hamstring')] },
 ];
-const T5_DAY5: Day = { name: 'Day 5 Power + durability', focus: 'Power + durability', slots: [A('clean-pull'), A('lateral-hurdle-hop'), A('mb-overhead'), A('mb-rotational'), A('mb-chest-pass'), A('trap-bar-jump'), ...circuit('shoulder', 'knee', 'ankle', 'adductor')] };
+const T5_DAY5: Day = { name: 'Day 5 Power + care', focus: 'Power + care', slots: [A('clean-pull'), A('lateral-hurdle-hop'), A('mb-overhead'), A('mb-rotational'), A('mb-chest-pass'), A('trap-bar-jump'), ...circuit('shoulder', 'knee', 'ankle', 'adductor')] };
 const PRE3: Day[] = [
   { name: 'Day 1 Lower', focus: 'Lower', heavyLegs: true, slots: [{ ...A('hang-clean'), method: 'cluster' }, A('depth-jump', DEPTH_BOX_NOTE), B('back-squat'), C('lateral-squat'), C('copenhagen'), ...circuit('knee', 'ankle')] },
   { name: 'Day 2 Upper', focus: 'Upper', slots: [A('push-press'), A('mb-overhead'), B('bench'), C('weighted-pullup'), C('face-pull'), D('rear-delt-fly'), ...circuit('shoulder')] },

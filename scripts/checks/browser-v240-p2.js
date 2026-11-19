@@ -15,6 +15,23 @@ const fs = require('fs');
   const demo = async () => JSON.parse((await ls())['load-and-launch/demo-server/v1']);
   const app = async () => JSON.parse((await ls())['volley-strength/data/v1']);
   const setDemo = async (fn) => { const d = await demo(); fn(d); await p.evaluate((v) => localStorage.setItem('load-and-launch/demo-server/v1', v), JSON.stringify(d)); };
+  const taps = [];
+  const tapAudit = async (label) => {
+    const bad = await p.evaluate(() => {
+      const sel = '[role=button],[role=link],[role=checkbox],[role=switch],[role=tab],[role=radio],a[href],button,input,textarea,select';
+      const out = [];
+      for (const el of new Set(document.querySelectorAll(sel))) {
+        const r = el.getBoundingClientRect(); const st = getComputedStyle(el);
+        if (!r.width || !r.height || st.visibility === 'hidden' || st.display === 'none' || el.closest('[aria-hidden=true]')) continue;
+        if (el.tagName !== 'INPUT' && st.display === 'inline') continue;
+        let ok = r.width >= 44 && r.height >= 44;
+        if (!ok) { let a = el.parentElement; for (let k = 0; a && k < 3; k++, a = a.parentElement) { if (a.matches?.(sel)) { const ar = a.getBoundingClientRect(); if (ar.width >= 44 && ar.height >= 44) ok = true; break; } } }
+        if (!ok) out.push(`${(el.innerText || el.getAttribute('aria-label') || el.tagName).trim().slice(0, 30)} ${Math.round(r.width)}×${Math.round(r.height)}`);
+      }
+      return out;
+    });
+    for (const b2 of bad) taps.push(`${label}: ${b2}`);
+  };
   const welcomeCreate = async () => {
     if (!(await p.getByRole('button', { name: /^Month:/ }).count()) && (await p.getByText('Create an account', { exact: true }).count())) {
       await p.getByText('Create an account', { exact: true }).last().click(); await p.waitForTimeout(500);
@@ -86,7 +103,7 @@ const fs = require('fs');
   step('F52/F53 rotation cards');
   await p.goto(sUrl); await p.waitForTimeout(1500);
   await click('Rack rotation'); await p.waitForTimeout(800);
-  let t = await body(); await shot('p2-rotation-cards');
+  let t = await body(); await shot('p2-rotation-cards'); await tapAudit('rotation cards');
   a = await app(); let s2 = a.programs.find(x => x.id === prog.id).sessions.find(s => s.id === ses.id);
   check(s2.format === 'rack_rotation' && (s2.rotation || []).length >= 1, `format rack_rotation with ${(s2.rotation || []).length} rotation blocks`);
   check(/\w · Rack rotation/.test(t) && /\d+ positions · \d:\d\d rotation · \d+ rounds · about \d+ min/.test(t) && /Suggested/.test(t), 'rotation card header, readout line and "Suggested" tag');
@@ -109,7 +126,7 @@ const fs = require('fs');
 
   step('F55a coach controls');
   await p.goto(`http://localhost:8099/team/${team.id}`); await p.waitForTimeout(1800);
-  t = await body(); await shot('p2-team-start');
+  t = await body(); await shot('p2-team-start'); await tapAudit('team rotation controls');
   check(/Rack rotation/.test(t) && /Start rotation/.test(t), 'team screen: "Start rotation"');
   await click('Start rotation'); await p.waitForTimeout(1200);
   t = await body(); check(/Rack rotation · \w · Round 1 of \d+ · Rotate in \d:\d\d/.test(t) && /Rotate now/.test(t) && /\+15 s/.test(t) && /End block/.test(t), 'control bar: "Rack rotation · A · Round 1 of N · Rotate in m:ss" with Rotate now, +15 s, End block');
@@ -129,11 +146,12 @@ const fs = require('fs');
   await p.waitForTimeout(1500);
   a = await app(); const ap = a.programs.find(x => x.teamId === team.id);
   await p.goto(`http://localhost:8099/workout?programId=${ap.id}&sessionId=${ses.id}`); await p.waitForTimeout(3500);
-  t = await body(); await shot('p2-athlete-workout');
+  t = await body(); await shot('p2-athlete-workout'); await tapAudit('rotation workout');
   check(/Rack 1 · \w · Round 1 of \d+/.test(t) && /Position \d · /.test(t) && /Rotate in \d:\d\d → Position \d \(/.test(t), 'athlete: "Rack 1 · A · Round 1 of N", current position, "Rotate in m:ss → Position n (…)"');
   await p.goto(`http://localhost:8099/`); await p.waitForTimeout(2500);
   t = await body(); check(/Rack 1 · Rack rotation/.test(t) && /You start at Position \d \(/.test(t) || /Rack rotation/.test(t), 'Today: "Rack 1 · Rack rotation" with start positions');
 
+  check(taps.length === 0, `new screens: every tap target is at least 44 pt (${taps.slice(0, 8).join(' | ') || 'none under'})`);
   check([...hosts].every(h => h.startsWith('localhost')), `only localhost requested (${[...hosts].filter(h => !h.startsWith('localhost')).join(', ') || 'none'})`);
   check(errs.filter(e => !/favicon|Failed to load resource|wake lock/.test(e)).length === 0, `no page errors (${errs.slice(0, 3).join(' | ')})`);
   console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');

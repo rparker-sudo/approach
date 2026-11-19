@@ -391,12 +391,15 @@ function TeamScreen() {
       <View style={{ gap: 8 }}>
         <Label>{`Roster · ${allMembers.length}`}</Label>
         {unconfirmed.length || reviewLevels ? (
-          <Text style={{ fontSize: 13, color: colors.muted }}>
-            {reviewLevels ? 'Showing levels not confirmed · ' : `${unconfirmed.length} level${unconfirmed.length === 1 ? '' : 's'} not confirmed · `}
-            <Text accessibilityRole="button" onPress={() => setReviewLevels(!reviewLevels)} style={{ fontSize: 13, fontWeight: '600', textDecorationLine: 'underline' }}>
+          <Row style={{ gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, color: colors.muted }}>
+              {reviewLevels ? 'Showing levels not confirmed ·' : `${unconfirmed.length} level${unconfirmed.length === 1 ? '' : 's'} not confirmed ·`}
+            </Text>
+            {/* F-7: a 44 pt target (2.4.0 tap audit). */}
+            <Text accessibilityRole="button" onPress={() => setReviewLevels(!reviewLevels)} style={{ fontSize: 13, fontWeight: '600', textDecorationLine: 'underline', minHeight: 44, minWidth: 44, paddingVertical: 12 }}>
               {reviewLevels ? 'Show everyone' : 'Review'}
             </Text>
-          </Text>
+          </Row>
         ) : null}
         {minors.length ? (
           <Text style={{ fontSize: 13, color: colors.muted }}>

@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native';
 import { LEVEL_NAME } from '../lib/athlete';
 import type { Member, MemberLevel } from '../lib/backend';
 import { getExercise } from '../lib/exercises';
-import { adjustedFor, Level, levelAdjustFor, swapsFor } from '../lib/resolve';
+import { adjustedFor, Level, levelAdjustFor, levelOffKey, swapsFor } from '../lib/resolve';
 import { useStore } from '../lib/store';
 import type { Program } from '../lib/types';
 import { formatDate } from '../lib/util';
@@ -182,11 +182,12 @@ export function AdjustToLevel({ program, member }: { program?: Program; member: 
   const local = program ? data.programs.find((p) => p.id === program.id) : undefined;
   if (!local) return null;
   const first = member.name.split(' ')[0] || member.name;
-  const off = (local.levelAdjustOffFor ?? []).includes(member.userId);
+  const key = levelOffKey(local.teamId, member.userId);
+  const off = (local.levelAdjustOffFor ?? []).includes(key);
   const programOff = local.levelAdjust === false;
   function set(on: boolean) {
-    const list = (local!.levelAdjustOffFor ?? []).filter((u) => u !== member.userId);
-    saveProgram({ ...local!, levelAdjustOffFor: on ? list : [...list, member.userId], ...(local!.teamId ? { unposted: true } : null) });
+    const list = (local!.levelAdjustOffFor ?? []).filter((u) => u !== key);
+    saveProgram({ ...local!, levelAdjustOffFor: on ? list : [...list, key], ...(local!.teamId ? { unposted: true } : null) });
   }
   return (
     <View style={{ gap: 4 }}>

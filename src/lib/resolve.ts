@@ -40,6 +40,21 @@ export function sourceOf(program: Pick<Program, 'teamId' | 'general' | 'postedAt
   return program.teamId || program.general || program.postedAt ? 'coach' : 'approach';
 }
 
+/**
+ * Compliance V4: the per-athlete "Adjust to level" flag is never shown to teammates. The posted program carries an opaque
+ * per-team key instead of the user id, so the athlete's own app can recognise itself and teammates' apps can't read who.
+ */
+export function levelOffKey(teamId: string | undefined, userId: string): string {
+  const str = `${teamId ?? ''}:${userId}:level-adjust-off`;
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < str.length; i++) {
+    h1 = Math.imul(h1 ^ str.charCodeAt(i), 16777619) >>> 0;
+    h2 = Math.imul(h2 ^ str.charCodeAt(str.length - 1 - i), 2246822519) >>> 0;
+  }
+  return `k${h1.toString(36)}${h2.toString(36)}`;
+}
+
 /** §0.1: a coach's edit to exercises, sets, reps, effort, rest, grouping, order or stations makes the session theirs. */
 export function coachEdit(session: Session): Session {
   return { ...session, source: 'coach', fitLog: undefined };
@@ -50,8 +65,8 @@ export function coachEdit(session: Session): Session {
  * Most specific wins (CLAUDE.md known conflict 3): an athlete in `levelAdjustOffFor` always gets the written program;
  * otherwise the session override (on or off); otherwise the program setting (default on).
  */
-export function levelAdjustFor(program: Pick<Program, 'levelAdjust' | 'levelAdjustOffFor'>, session: Pick<Session, 'levelAdjust'> | null | undefined, userId?: string | null): boolean {
-  if (userId && program.levelAdjustOffFor?.includes(userId)) return false;
+export function levelAdjustFor(program: Pick<Program, 'levelAdjust' | 'levelAdjustOffFor' | 'teamId'>, session: Pick<Session, 'levelAdjust'> | null | undefined, userId?: string | null): boolean {
+  if (userId && program.levelAdjustOffFor?.includes(levelOffKey(program.teamId, userId))) return false;
   if (session && typeof session.levelAdjust === 'boolean') return session.levelAdjust;
   return program.levelAdjust !== false;
 }

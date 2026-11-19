@@ -7,7 +7,7 @@ const fs = require('fs') as { readFileSync: (p: string, e: 'utf8') => string };
 const path = require('path') as { join: (...p: string[]) => string };
 import { generateProgram, restSecFor } from '../../src/lib/generator';
 import { getExercise, EXERCISES, CATALOG_V3_IDS, fits, ALL_EQUIPMENT } from '../../src/lib/exercises';
-import { coachEdit, levelAdjustFor, resolveSession, sourceOf, coachEstimate } from '../../src/lib/resolve';
+import { coachEdit, levelAdjustFor, levelOffKey, resolveSession, sourceOf, coachEstimate } from '../../src/lib/resolve';
 import { groupRows } from '../../src/lib/groups';
 import { stationChecks, withBlockLetters } from '../../src/lib/stations';
 import { weekPlan, mondayOf, generatedWeek, withRoomMinutes, dateKey, addDays } from '../../src/lib/calendar';
@@ -105,7 +105,8 @@ const ro = resolveSession(offP, adv, { level: 1, logs: [{ id: 'old', date: '2026
 ok(ro.exercises[0].exerciseId === 'front-squat' && !ro.exercises[0].teamExerciseId && ro.exercises[0].effort === 'RPE 7' && !ro.easing.active, 'program off: exact exercise and effort, no "Your version" line, no G9 adjustment');
 ok(levelAdjustFor(offP, { levelAdjust: true }, 'u') === true && resolveSession(offP, { ...adv, levelAdjust: true }, { level: 1, logs: [] }, d).exercises[0].exerciseId === 'goblet-squat', 'session override on wins over program off');
 ok(levelAdjustFor(advP, { levelAdjust: false }, 'u') === false, 'session override off wins over program on');
-const athOff = { ...advP, levelAdjustOffFor: ['u1'] };
+const athOff = { ...advP, levelAdjustOffFor: [levelOffKey(advP.teamId, 'u1')] };
+ok(!JSON.stringify(athOff).includes('u1'), 'compliance V4: the posted program carries an opaque key, never the athlete id');
 ok(resolveSession(athOff, { ...adv, levelAdjust: true }, { level: 1, logs: [], userId: 'u1' }, d).exercises[0].exerciseId === 'front-squat' && resolveSession(athOff, adv, { level: 1, logs: [], userId: 'u2' }, d).exercises[0].exerciseId === 'goblet-squat', 'athlete override (off-only) is the most specific: wins over a session set on; other athletes unchanged');
 const athleteTs = fs.readFileSync(path.join(__dirname, '../../src/lib/athlete.ts'), 'utf8');
 ok(/export function levelAllowsLoadTest[\s\S]{0,400}athleteLevel\(data\)/.test(athleteTs) && !/levelAdjust/.test(athleteTs.slice(athleteTs.indexOf('export function levelAllowsLoadTest'))), 'toggling off never changes testing eligibility (load-test rule reads the confirmed level only)');

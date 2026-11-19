@@ -313,7 +313,8 @@ export type Program = {
   block?: 'restore' | 'accumulation' | 'strength' | 'strength_power' | 'power' | 'maintain';
   /** 2.4.0 (§1.2): "Adjust exercises to each athlete's level". Missing = on. */
   levelAdjust?: boolean;
-  /** 2.4.0 (§1.2): athletes (user ids) who get exactly what the coach wrote in this program. */
+  /** 2.4.0 (§1.2): athletes who get exactly what the coach wrote in this program, as opaque per-team keys (`levelOffKey`),
+   *  never user ids (compliance V4: the flag is never shown to teammates). */
   levelAdjustOffFor?: string[];
   /** 2.4.0 (§1.4): session length, minutes (20–120). Missing = the phase target. */
   sessionMinutes?: number;

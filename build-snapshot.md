@@ -1,12 +1,15 @@
 # Approach Strength — build snapshot
 
-*As of November 16, 2026 (v2.3.1: custom exercises, an owner request, deployed November 16, 2026; built on 2.3.0 trainer mode from `docs/specs/trainer-mode.md` v0.3, deployed November 16, 2026). Facts only. Items marked **(unverified)** could not be confirmed from the code or from the owner. **(pending)** = waits for the owner's dashboard step or the live test.*
+*As of November 19, 2026 (v2.4.0 Training v3 built on branch `v2.4.0`, **not deployed**, waiting for Ryan's approval; live: v2.3.1 custom exercises, deployed November 16, 2026, on 2.3.0 trainer mode, deployed November 16, 2026). Facts only. Items marked **(unverified)** could not be confirmed from the code or from the owner. **(pending)** = waits for the owner's dashboard step or the live test.*
 
 **What it is:** a weight-training, nutrition and planning app for volleyball athletes and coaches, and (from 2.3.0) for personal trainers with adult clients ("general" teams). Product name **Approach Strength** (since 2.2.1, D-035). Home-screen short name: "Approach". App: https://app.approachstrength.com. Website: https://approachstrength.com.
 
 ---
 
 ## 1. Version and changes
+
+**2.4.0 (Training v3, `docs/specs/training-v3.md` v1.0):** branch `v2.4.0` from hand-off `632a16e` (docs of Wed Nov 18, 2026). Part 1 → 2 → 3, a commit per part (`c13dddd`, `525bb49`, `c29897c`). Migrations `011_training_v3_p1.sql`, `012_training_v3_p2.sql`, `013_training_v3_p3.sql` (013 is a no-op: Part 3 keeps its keys in the program JSON). Report: `reports/training-v3-acceptance.md`. **Not deployed:** waits for Ryan's answer on `session.source` (Legal) and his deploy approval; Ryan runs 011–013 first. Version 2.4.0 in `app.json`/`package.json`.
+- **Flags** (`src/lib/flags.ts`, build-time constants): `catalogV3` **on**, `rackRotation` **on**, `generatorV3` **off** (some earlier checks fail with it on; see §8 "2.4.0"). With `generatorV3` off the 2.3.0 generator is unchanged (it never picks catalog v3 exercises).
 
 **2.3.1 (custom exercises, owner request 11/16):** branch `v2.3.1`. Coaches and trainers can create their own exercises inside any program (saved in the existing program JSON, no migration). Each one carries a type (sets the tier), a movement (pattern) and a level, so resolveSession, rest floors, pairing rules and effort caps treat it like a library exercise. Report: `reports/v2.3.1-acceptance.md`. **Deployed November 16, 2026** (Ryan approved; `v2.3.1` merged into `main`; no migration; website unchanged). Tag `v2.3.1`: Ryan pushes it from his Mac.
 
@@ -167,7 +170,23 @@
 
 Flags: **AGE** · **HEALTH/WELLNESS** · **BODY METRICS** · **LOCATION** · **PHOTO/VIDEO** · **CREDENTIALS** · **FREE TEXT**.
 
-### Stored on the server (Supabase), after migrations 002–010
+### Stored on the server (Supabase), after migrations 002–013
+
+**2.4.0 (migrations 011–013).** Every new field maps to a compliance V4 row (Training v3 review) or CLAUDE.md known conflict 7:
+
+| New field / object | V4 row | Who can read / write |
+|---|---|---|
+| `warmup_templates` (id, team_id, created_by, name ≤ 60, items jsonb {raise, activate, potentiate}, created_at) | warm-up templates (coach-private) | only the team's coach, only their own rows (RLS); athletes never read it (a template is copied into the session when used) |
+| `teams.default_warmup` ('approach' / 'template' / 'none'), `teams.default_warmup_template_id` (must be this team's template; on delete set null), `teams.limited_space` | team "Default warm-up" setting, "Limited space" setting | members read (no personal data); the coach writes |
+| `live_progress.state` may be `warming_up` (constraint change, no new column) | the tile state "Warming up" | as `live_progress` (box 4 / boards toggle) |
+| `live_progress.position_index` (0–11) | `live_progress.position_index` (+ existing `rotate_at`) | as `live_progress`; never joined with load, RPE, level or check-ins |
+| `teams.gym_equipment` may hold `ssb`, `ghd`, `suspension`, `sliders`, `hurdles` (constraint change) | catalog v3 equipment (program content) | as before |
+| `my_rack` returns `my_index` (the athlete's order in their rack group by user id; derived, nothing stored) | rack rotation start position (program-design §4b data) | the athlete, own rack only |
+| `team_programs.program` JSON: session `source`, `levelAdjust`, `warmup` (raise/activate/potentiate, `edited`, `template`, `limitedSpace`, `compact`, `teamDefault`), `targetMinutes`, `fitLog` (`undo:<step>`), `format: 'rack_rotation'`, `rotation` (positions, rotationSec, rounds, buildUpRound); program `levelAdjust`, `levelAdjustOffFor` (opaque per-team keys, never user ids), `sessionMinutes`, `minutesByWeekday`, `block`; exercise `method`, `pct`, `customName` (warm-up item) | a V4 row for each, except `session.source` (CLAUDE.md known conflict 7: ask Ryan before deploy) | as `team_programs` |
+| `team_calendars` events: `roomMinutes` | `CalendarEvent.roomMinutes` | the team's coach and members; another team's events reach an athlete without it (V4) |
+| `workout_logs.entries` JSON: `warmupSets` (each `warmup: true`) | ramp-up sets in logs | as `workout_logs`; never counted as work sets (`setsDone`), suggestions or bests |
+
+Not on the server: warm-up Done states (`warmupDone` on the device log only); the session estimate and fit lines are computed.
 
 **2.3.0 (migrations 009, 010).** Every new field maps to a compliance T4 row:
 
@@ -219,7 +238,8 @@ New RPCs: `create_general_team`, `my_team_status`, `accept_trainer_terms`, `curr
 | `approach/not-eligible/v1`, `approach/workout-draft/…`, Supabase session | as in 2.1 | — / FREE TEXT / CREDENTIALS |
 | `volley-strength/data/v1` (2.2.1 additions) | `profile.hasAccount` (this device was signed in, so an expired session goes to Log in), `coachTermsPrompted` (account ids shown the one-time Coach Terms sheet) | — |
 | `volley-strength/data/v1` (2.3.0 additions) | `templates` (trainer's program templates: plan only, never logs), `openSeen` (general teams already shown "Your team is open") | — |
-| `load-and-launch/demo-server/v1` (demo only) | demo server, now also levels, lift program, racks, station runs | CREDENTIALS, HEALTH/WELLNESS, AGE |
+| `volley-strength/data/v1` (2.4.0 additions) | logs: `warmupDone` (warm-up parts checked; device only); `entries[].warmupSets` (ramp-up sets, also synced inside `entries`) | — |
+| `load-and-launch/demo-server/v1` (demo only) | demo server, now also levels, lift program, racks, station runs; 2.4.0: `warmupTemplates`, team warm-up settings | CREDENTIALS, HEALTH/WELLNESS, AGE |
 
 ---
 
@@ -233,6 +253,7 @@ Supabase and GitHub (Pages, Actions) only. `pg_cron` is a built-in Supabase exte
 
 - **App:** https://app.approachstrength.com (Pages custom domain moved 11/15). 2.2.1 deployed from `main` on November 15, 2026.
 - **Website:** https://approachstrength.com from `rparker-sudo/approachstrength-site` (placeholder + legal pages, live 11/15). When the owner set the custom domain, GitHub added `CNAME` to that repo.
+- **2.4.0 (11/19):** built on `v2.4.0` and pushed (branch only; `main` untouched, nothing deployed). No domain, DNS, repo-variable, Pages or Supabase setting changes. Website repo untouched.
 - **Training v3 Step 0.3 (11/19):** 2.3.0 (trainer mode) and 2.3.1 (custom exercises) are **deployed** (both November 16, 2026). The C31 G3/G4 blocker is **closed**: Ryan confirmed on 11/16 that Legal approved the trainer wording as written (§8). Training v3 (2.4.0) doesn't change it. 2.4.0 is built on branch `v2.4.0` from hand-off `632a16e` (docs of Wed Nov 18, 2026).
 - **2.3.1:** app deployed from `main` on November 16, 2026 (custom exercises). No migration and no setting changes.
 - **2.3.0:** app and website deployed from `main` on November 16, 2026. Migrations 009 and 010 applied by Ryan (Supabase SQL Editor) the same day. No domain, DNS, repo-variable, Pages or Supabase setting changes.
@@ -273,6 +294,27 @@ $0 now. Future: Apple Developer Program $99/year; Supabase Pro about $25/month i
 ---
 
 ## 8. Known gaps, judgment calls and checks
+
+**2.4.0 judgment calls, gaps and questions (Training v3; also in `reports/training-v3-acceptance.md`):**
+- **Ask Ryan before deploy:** `session.source` is in spec §1.5 but not in compliance V4 (CLAUDE.md known conflict 7). Built inside the session JSON.
+- **Spec inconsistency (§1.2 vs the Part 1 criterion):** §1.2 says turning "Adjust to level" off on a generated session makes it `'coach'`; the Part 1 criterion says the level toggle doesn't change the source. Built: no flip; "off" is honored on generated sessions too (athletes get the written exercises; Approach Strength's limits still apply). Product to confirm.
+- **Level toggle precedence** (known conflict 3, for UX): athlete off → session → program; the session toggle stays enabled with "Program setting: Off".
+- **Not built (known conflict 5):** the dismiss-once RPE 9–10 note and the confirm when turning level adjust off for a minor (Legal TR3-1). **TR3-2** built as the spec says; Legal's stricter interim recommendation not adopted (founder's call). TR3-2 content only reaches athletes once `generatorV3` is on.
+- **Migration rule for `source`:** sessions saved before 2.4.0 are `'coach'` when the program was posted to a team (or is a trainer program), `'approach'` otherwise. Generated weeks keep the R6 cap (C14) and the full rest day; coach-built weeks don't.
+- **R7 match-day moves** (a lift on a match day moves to a free day) still run for every program: they aren't in spec §0.3 and the v2.2 calendar checks still expect them. Product to confirm whether coach-built weeks should keep them.
+- **Back after a break ramp** (trainer goal) still applies to trainer-built sessions in that program: it's part of the goal the trainer chose, and its 2.3.0 check isn't in §0.3. Product to confirm.
+- **Product name in new UX copy:** UX v1.0 draws "Approach" (tag, chip, "Approach fits its sessions"). The 2.2.1 rename (D-035) requires "Approach Strength" in user-facing text, so the app says "Approach Strength." UX to update the doc.
+- **Effort explainer:** the session editor's "Strength sets stop with about 2 reps left: RPE 8 or below" sentence was removed (it read as a builder rule); the RPE definition stays.
+- **Per-athlete level-adjust flag:** stored as opaque per-team keys, never user ids, because the posted program reaches every team member (V4: never shown to teammates).
+- **Warm-ups:** team default and Limited space are stamped into each session's warm-up when the coach posts (marked `teamDefault`); sessions the coach edited keep theirs. Session-level Limited space lives inside the `warmup` key. Warm-up minutes are an estimate (drills, items, potentiation steps + 1 min). Ramp-ups skip throws (potentiated with light throws). "Bar" = 45 lb.
+- **Fit to time:** generated sessions fit to the day's target (date → weekday → program → top of the phase range); undone trims are stored in `fitLog` as `undo:<step>`. Editing a generated session makes it the coach's and the automatic fit stops. The under-target add-back covers the care round and accessory sets, not the extra position accessory.
+- **Catalog:** the §4b worked example matches the table except the beginner's Copenhagen: catalog §3 tags Short-Lever Copenhagen bench-only and the example room has a box (the beginner gets Side Plank). Training to fix the tag or the example. `er-90-90-iso` and `lateral-hurdle-hop` got sport-neutral general-team "why" lines (judgment calls).
+- **Olympic resolution conflict (catalogV3 on):** safety-guidelines §2a step 5 ("Olympic lifts resolve to a jump for anyone below advanced") vs spec §2.1/§3 and program-design §8a (L2 derivatives for intermediates). Built per the spec; beginners still get a level 1 jump (keeps the §2a criterion). The v2.2 check "Hang Power Clean → jump for intermediate" passes with `catalogV3` off and is replaced while it's on. **Ryan to confirm** (or ship `catalogV3` off).
+- **Ladders:** Inverted Row sits after the band pulldown in the vertical-pull entry rung (the §4b worked example's beginner pick).
+- **Rack rotation:** one clock for the room (the existing station-run row, block letter in its session id). **Not built:** Pause and per-rack controls (F55a), which need a per-rack clock on the server, a new field (G-5): ask before building. Partner names stay off (`rack_partner_names` flag), so the spot line reads "Spot the next lifter." The start order in a rack is by user id (`my_index`).
+- **generatorV3 off:** with it on, these earlier checks fail: the 2.1 G1 rule that the stored plan never exceeds the athlete's level (v3 writes at the top rung on purpose), G8 "same sets × reps after a swap" on plyo slots, and the school + home week's light home day and bodyweight home defaults (H2). Also not built in v3: the practice-load adjustment of plyo contacts, wave loading, and the bye-week Day 3 from the calendar.
+- **Trainer:** per-week effort takes any RPE (5–10); cardio stepper 5–180 (UX F41, Product to confirm).
+- **Known conflict 10** (built as drawn; Product to confirm): F41 5–180 min; F55a one room clock (built) with per-rack override (not built, above); F46c per-athlete toggle stored per program.
 
 **2.3.1 judgment calls (custom exercises; for the planning team and Legal):**
 - **Owner decision outside the specs:** Ryan asked for custom exercises in all programs (volleyball and trainer teams) on 11/16 and chose: stored inside each program, coach sets type and level, name/cue/equipment/how-to/weighted, version 2.3.1. CLAUDE.md says volleyball teams don't change; this is a deliberate owner-approved change for volleyball coaches (athletes see more exercises only when their coach adds them).

@@ -336,7 +336,7 @@ export default function SessionScreen() {
                 {`${block.length === 2 ? 'Superset' : 'Circuit'} · ${Math.min(...block.map((k) => session.exercises[k].sets))} rounds`}
                 {e.autoGroup ? '  · Auto' : ''}
               </Text>
-              <Text accessibilityRole="button" onPress={() => update({ ...session, exercises: ungroup(session.exercises, e.group!) })} style={{ fontSize: 13, textDecorationLine: 'underline' }}>
+              <Text accessibilityRole="button" onPress={() => edit({ ...session, exercises: ungroup(session.exercises, e.group!) })} style={{ fontSize: 13, textDecorationLine: 'underline', minHeight: 44, minWidth: 44, paddingVertical: 12, textAlignVertical: 'center' }}>
                 {block.length === 2 ? 'Unpair' : 'Ungroup'}
               </Text>
             </Row>

@@ -15,6 +15,23 @@ const fs = require('fs');
   const demo = async () => JSON.parse((await ls())['load-and-launch/demo-server/v1']);
   const app = async () => JSON.parse((await ls())['volley-strength/data/v1']);
   const setDemo = async (fn) => { const d = await demo(); fn(d); await p.evaluate((v) => localStorage.setItem('load-and-launch/demo-server/v1', v), JSON.stringify(d)); };
+  const taps = [];
+  const tapAudit = async (label) => {
+    const bad = await p.evaluate(() => {
+      const sel = '[role=button],[role=link],[role=checkbox],[role=switch],[role=tab],[role=radio],a[href],button,input,textarea,select';
+      const out = [];
+      for (const el of new Set(document.querySelectorAll(sel))) {
+        const r = el.getBoundingClientRect(); const st = getComputedStyle(el);
+        if (!r.width || !r.height || st.visibility === 'hidden' || st.display === 'none' || el.closest('[aria-hidden=true]')) continue;
+        if (el.tagName !== 'INPUT' && st.display === 'inline') continue;
+        let ok = r.width >= 44 && r.height >= 44;
+        if (!ok) { let a = el.parentElement; for (let k = 0; a && k < 3; k++, a = a.parentElement) { if (a.matches?.(sel)) { const ar = a.getBoundingClientRect(); if (ar.width >= 44 && ar.height >= 44) ok = true; break; } } }
+        if (!ok) out.push(`${(el.innerText || el.getAttribute('aria-label') || el.tagName).trim().slice(0, 30)} ${Math.round(r.width)}×${Math.round(r.height)}`);
+      }
+      return out;
+    });
+    for (const b2 of bad) taps.push(`${label}: ${b2}`);
+  };
   const welcomeCreate = async () => {
     if (!(await p.getByRole('button', { name: /^Month:/ }).count()) && (await p.getByText('Create an account', { exact: true }).count())) {
       await p.getByText('Create an account', { exact: true }).last().click(); await p.waitForTimeout(500);
@@ -67,7 +84,7 @@ const fs = require('fs');
   const ses = prog.sessions.find(s => s.exercises.some(e => e.role === 'main')) || prog.sessions[0];
   const sUrl = `http://localhost:8099/session?programId=${prog.id}&sessionId=${ses.id}`;
   await p.goto(sUrl); await p.waitForTimeout(1500);
-  let t = await body(); await shot('editor-generated');
+  let t = await body(); await shot('editor-generated'); await tapAudit('session editor');
   check(/Warm-up · (Lower|Upper|Total|Power)[^\n]* · about \d+ min/.test(t) && /Approach Strength/.test(t), 'F49: Warm-up row pinned at the top with type, minutes and the source tag');
   check(/Adjust to level/.test(t) && /Program setting: On/.test(t), 'F46b: session "Adjust to level" toggle');
   check(/about \d+ min · target \d+/.test(t), 'F51d: estimate against the target in the builder footer');
@@ -135,7 +152,7 @@ const fs = require('fs');
 
   step('warm-up editor, templates, team default (F49, F50)');
   await p.goto(sUrl); await p.waitForTimeout(1200);
-  await click('Edit'); await p.waitForTimeout(500); t = await body(); await shot('warmup-editor');
+  await click('Edit'); await p.waitForTimeout(500); t = await body(); await shot('warmup-editor'); await tapAudit('warm-up editor');
   check(/Edit warm-up/.test(t) && /Raise/.test(t) && /Activate/.test(t) && /Potentiate/.test(t) && /Limited space/.test(t) && /\+ Add/.test(t), 'F49 editor: three parts, + Add, Limited space');
   await p.getByLabel(/^Prescription for /).first().fill('3 × 10 yd'); await p.waitForTimeout(150);
   await p.getByRole('button', { name: /^Remove / }).last().click(); await p.waitForTimeout(150);
@@ -168,7 +185,7 @@ const fs = require('fs');
 
   step('program settings: level toggle and session length (F46a, F51a/b)');
   await p.goto(`http://localhost:8099/program/${prog.id}`); await p.waitForTimeout(1500);
-  t = await body(); await shot('program-settings');
+  t = await body(); await shot('program-settings'); await tapAudit('program settings');
   check(/Adjust exercises to each athlete's level/.test(t) && /Athletes get the version of each exercise that fits their level\./.test(t), 'F46a program toggle with the On line');
   check(/Session length/.test(t) && /Phase default \(off-season 60–75\)|Phase default \(\w+-?\w* \d+–\d+\)/.test(t) && /Approach Strength fits its sessions to this\./.test(t), 'F51a: quick picks with the phase default');
   await click('45'); await p.waitForTimeout(400);
@@ -223,7 +240,7 @@ const fs = require('fs');
   check(/Warm-up · about \d+ min/.test(t) && /Raise/.test(t) && /Activate/.test(t) && /Potentiate/.test(t), 'F47: Warm-up card at the top with Raise, Activate, Potentiate');
   check(/About \d+ min/.test(t), 'F51d athlete: "About N min"');
   await p.goto(`http://localhost:8099/workout?programId=${ap.id}&sessionId=${ses.id}`); await p.waitForTimeout(2500);
-  t = await body(); await shot('athlete-workout');
+  t = await body(); await shot('athlete-workout'); await tapAudit('workout with warm-up');
   check(/Warm-up · about \d+ min/.test(t) && /Raise done/.test(t), 'workout view: warm-up card first, with "Raise done"');
   await p.waitForTimeout(2600);
   d = await demo(); const lv0 = (d.live || []).find(x => x.teamId === team.id);
@@ -256,6 +273,7 @@ const fs = require('fs');
   check(/Warming up/.test(t) && !/Raise|Activate|Potentiate|A-Skip|Ankle Rock/.test(t), 'board tile shows "Warming up" only, never warm-up items');
   check(!/RPE|lb\b|Beginner|Intermediate|Advanced/.test(t), 'board privacy unchanged (no loads, RPE or level)');
 
+  check(taps.length === 0, `new screens: every tap target is at least 44 pt (${taps.slice(0, 8).join(' | ') || 'none under'})`);
   check([...hosts].every(h => h.startsWith('localhost')), `only localhost requested (${[...hosts].filter(h => !h.startsWith('localhost')).join(', ') || 'none'})`);
   check(errs.filter(e => !/favicon|Failed to load resource/.test(e)).length === 0, `no page errors (${errs.slice(0, 3).join(' | ')})`);
   console.log(fails ? `\n${fails} FAILED` : '\nALL PASSED');

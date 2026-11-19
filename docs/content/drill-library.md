@@ -190,7 +190,8 @@ x('band-hamstring', 'Lying Hamstring Stretch', 'prehab', 'mobility', false, 1, [
 
 `REP_OVERRIDE` additions in `generator.ts` (so generated mobility days read correctly): `crocodile-breathing: '5 breaths'`, `cat-camel: '8'`, `hip-flexor-stretch: '30s each'`, `ankle-rock: '10 each'`, `lat-reach: '20s each'`, `band-hamstring: '30s each'`. Also add `hip-flexor-stretch`, `lat-reach`, and `band-hamstring` to `HOLDS` so they get no weight suggestion.
 
-## 5. More v2.2 additions (defined in other docs)
+## 5. More additions (defined in other docs)
+- **Catalog v3 (11/18): 66 college-level exercises** (Olympic derivatives, full plyometric ladder, strength variations, durability, movement prep) and 5 equipment items: `content/exercise-catalog-v3.md`. Full catalog: 179 exercises.
 - **4 home exercises** (`incline-pushup`, `doorframe-row`, `prone-pulldown`, `backpack-carry`) plus `pushup.easier = 'incline-pushup'`: code-ready in `programs/home-workouts.md` §8.
 - **Demand tier** (`P`/`A`/`B`/`C`/`D`) for all 74 exercises, which sets rest times and superset rules: `programs/rest-and-supersets.md` §7.
 - **Data fix:** `nordic` needs a partner or anchor (currently `NONE`); excluded from home sessions.

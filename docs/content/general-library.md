@@ -34,7 +34,7 @@ In general teams, relabel `cable` as **"Cable station"** (same id). Clients' hom
 ## 3. New patterns, category, and scope
 - **Patterns:** `knee-ext` (leg extension), `knee-flex` (leg curl), `shoulder-iso` (raises), `arm-flex` (curls), `arm-ext` (triceps), `cardio`.
 - **Category:** `cardio`. Cardio exercises are **logged by duration only** (adult rules §6): no sets, reps, weight, heart rate, pace, distance, or calories.
-- **Scope tag** (new, T-A1): `scope: 'all' | 'general' | 'volleyball'`, default `'all'`. **All 7 cardio exercises are `'general'`** (conditioning is undecided for volleyball teams). Everything else is `'all'`: volleyball coaches can use it if their equipment fits (the new machines only fit if a volleyball coach's picker had them, and it doesn't, so they won't appear there).
+- **Scope tag** (new, T-A1): `scope: 'all' | 'general' | 'volleyball'`, default `'all'`. **All 7 cardio exercises are `'general'`** (conditioning is undecided for volleyball teams). Everything else is `'all'` (and since 11/18 the warm-up, incline press, rows, and rear delt fly are used by volleyball programs too): volleyball coaches can use it if their equipment fits (the new machines only fit if a volleyball coach's picker had them, and it doesn't, so they won't appear there).
 
 ## 4. The 39 exercises
 ### 4a. Summary
@@ -342,6 +342,7 @@ Add an optional `whyGeneral` field. In general teams, show `whyGeneral` when it 
 | `thoracic-rotation` | "Upper-back rotation." |
 
 ## 6. General warm-ups (static content, about 6–8 min)
+> **Superseded (11/18):** every session now gets a warm-up generated from its content (`content/programs/warmups.md`). W1–W3 below are kept only as reference.
 Shown as the first step of a general-team session when the trainer turns on **"Include warm-up"** (default on). The trainer picks one per session, or Approach picks by session type.
 | Warm-up | Use for | Blocks |
 |---|---|---|

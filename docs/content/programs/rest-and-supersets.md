@@ -3,6 +3,9 @@ Owner: Training Content / Sports Science (02) · v1.0 · Tue Nov 10, 2026
 Status: **Draft for founder approval → v2.2.** Founder request (11/10): the program should set rest times automatically from the exercise and scheme, allow supersets, and give longer rest for heavy compound lifts.
 Replaces the flat `REST_BY_ROLE` defaults in `generator.ts`. The coach's own rest setting (`ProgramExercise.restSec`) still wins whenever they set one.
 
+> **Coach freedom (11/18, founder):** the rules in this doc now apply only to **Approach-generated programs and Approach suggestions** (auto rest, auto-pairing, recommended weeks). A coach or trainer building or editing a workout has **full control**: the builder never blocks their choices. See `content/program-design.md` §10–§11.
+
+
 ---
 
 ## 1. Today vs. proposed

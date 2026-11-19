@@ -2,85 +2,96 @@
 
 Approach Strength is a strength-training app for volleyball teams and, from 2.3.0, for personal trainers with adult clients (Expo / React Native, web build first, Supabase). Read `AGENTS.md` for Expo-specific rules. They still apply.
 
-**Live now (per `build-snapshot.md` §6):** v2.2.1, with the app on `app.approachstrength.com` and the website on `approachstrength.com` (repo `rparker-sudo/approachstrength-site`). The 2.2.1 report still has live rows pending (see Step 0).
+**Live now (per `build-snapshot.md`):** v2.3.1 (custom exercises, deployed 11/16) on top of 2.3.0 trainer mode (deployed 11/16). App on `app.approachstrength.com`; website on `approachstrength.com` (repo `rparker-sudo/approachstrength-site`). Local `main` was 1 commit behind `origin/main` at hand-off.
 
 ## Where requirements come from
-The planning team works in a separate Claude project. Approved docs are copied into `docs/` as **read-only snapshots** (hand-off of Sun Nov 15, 2026). Don't edit `docs/`. If a doc looks wrong, or conflicts with the code or another doc in a way the rules below don't settle, **stop and say so** instead of guessing.
+The planning team works in a separate Claude project. Approved docs are copied into `docs/` as **read-only snapshots** (hand-off of Wed Nov 18, 2026). Don't edit `docs/`. If a doc looks wrong, or conflicts with the code or another doc in a way the rules below don't settle, **stop and say so** instead of guessing.
 
-**Precedence when docs disagree:** `docs/compliance.md` → `docs/specs/trainer-mode.md` → `docs/legal/` → `docs/content/` (adult rules, goals, general library, taxonomy) → `docs/design/trainer-mode.md` → older specs and flows.
+**Precedence when docs disagree:** `docs/compliance.md` → `docs/specs/training-v3.md` → `docs/legal/` → `docs/content/` (program-design, catalog v3, warm-ups, safety, adult rules, then the rest) → `docs/design/user-flows-training-v3.md` → older specs and flows.
 
 | Doc | Version this session expects | What it is |
 |---|---|---|
-| `docs/specs/trainer-mode.md` | **Draft v0.3** (Sun Nov 15) | **The current task.** 2.3.0 = Phase A + Phase B, no AI. §B10 (AI) is 2.3.1: don't build any of it |
-| `docs/compliance.md` | **updated Sun Nov 15** (§ Trainer mode T1–T11) | **Hard rules. Every MUST applies to all work.** T4 is the complete list of new server fields allowed |
-| `docs/legal/soft-launch-notice.md` | **Draft v2.5** (Sun Nov 15) | Source text for `/privacy` (Parts A and **A2**, anchor `#health-data`) and `/terms` (incl. **§4T**, anchor `#trainer-terms`). Publish exactly; no script edits |
-| `docs/legal/parent-consent-form.md` | updated 11/14 (unchanged) | Source for `/consent` |
-| `docs/content/adult-training-rules.md` | **v1.0** | Adult hard rules A1–A9, caps, cardio, acceptance §10 |
-| `docs/content/programs/adult-goals.md` | **v1.0** | The four goals, defaults, ramp, waves, acceptance §6 |
-| `docs/content/general-library.md` | **v1.0** | 39 exercises (code-ready), 13 equipment items, `whyGeneral`, warm-ups W1–W3, acceptance §8 |
-| `docs/content/tagging-taxonomy.md` | **v1.2** | Part C: T-A1 hide list (0 exercises hidden), `scope`, new fields |
-| `docs/design/trainer-mode.md` | **v1.0** | Screens F31–F44 and the Trainer/Client string list §S |
-| `docs/specs/v2.2.1.md`, `marketing-site.md`, `v2.2.md`, `rack-groups.md`, `v2.1-*.md`; `docs/design/user-flows*.md`, `marketing-site.md`; `docs/copy/`; other `docs/content/` | unchanged | Reference for what's already built |
+| `docs/specs/training-v3.md` | **Draft v1.0** (Wed Nov 18) | **The current task: 2.4.0, Parts 1 → 2 → 3.** §0.3 lists the earlier criteria it supersedes |
+| `docs/compliance.md` | **updated Wed Nov 18** (§ Training v3 review, V1–V5; risks TR3-1, TR3-2) | **Hard rules. Every MUST applies to all work.** V4 + T4 + earlier approvals = the complete list of new server fields allowed |
+| `docs/content/program-design.md` | **v3.0** | §4a session length, §4b rack rotation, §1–§9 generator v3, §10 coach freedom |
+| `docs/content/exercise-catalog-v3.md` | **v3.0** | 66 exercises (code-ready §4), 5 equipment items, link updates, acceptance §7 |
+| `docs/content/programs/warmups.md` | **v1.0** | `buildWarmup`, `rampSetsFor`, pools, special sessions, acceptance §9 |
+| `docs/content/safety-guidelines.md` | **v1.5** | R2/R6 now generated-only; §2a step 7 changed; §4 depth jumps |
+| `docs/content/adult-training-rules.md` | **v1.0 + 11/18 coach-freedom banner** | A1, A3, §4, §5 now generated-only; A2, A4, A7, A8 unchanged |
+| `docs/content/tagging-taxonomy.md` | **v1.3** | Part D: v3 tags |
+| `docs/content/programs/rest-and-supersets.md`, `circuits-and-stations.md`, `home-workouts.md` | **v1.0 + 11/18 coach-freedom banner** | Their rules now drive `'approach'` sessions and suggestions only |
+| `docs/content/general-library.md` | **v1.0 + 11/18 notes** (§3 scope, §6 W1–W3 superseded) | |
+| `docs/content/drill-library.md` | **v1.0 + 11/18 §5** | |
+| `docs/design/user-flows-training-v3.md` | **v1.0** (Wed Nov 18) | Screens F45–F55 and the UX acceptance list |
+| `docs/legal/soft-launch-notice.md`, `parent-consent-form.md`; `docs/specs/trainer-mode.md` v0.3, `v2.2.1.md`, `v2.2.md`, `rack-groups.md`, `marketing-site.md`, `v2.1-*.md`; `docs/design/trainer-mode.md` v1.0, `user-flows*.md`, `marketing-site.md`; other `docs/content/` | unchanged | Reference for what's already built |
 
 **Version check (do this first):** if any header above doesn't match the version in this table, **stop and tell Ryan**.
 
-**Not handed off (by design):** `design/user-flows.md` v3.2 and `design/design-system.md` v1.1, which `docs/design/trainer-mode.md` mentions. The behavior they describe is already built (2.2.1). Where `trainer-mode.md` cites them: "design system §9" = the board-safe rule G-4; "§13.2" = 44 pt targets and 56 pt in-workout actions; F8, F14, F16, F19–F24 = the screens as built. `safety-guidelines.md` §2b (level checklist) is already in `src/lib/levelChecklist.ts`; reuse it for adult clients.
+**Older design docs:** `docs/design/user-flows*.md` and `docs/design/trainer-mode.md` still draw the old blocked/red/amber builder states. **F45 supersedes them**, including the `trainer-mode.md` §S1b "Effort clamp" and "Circuit clamp" strings. Delete those strings; don't move them into tooltips.
 
-## Step 0: close out 2.2.1 before starting 2.3.0
-1. Update `reports/v2.2.1-acceptance.md` rows 1–3, 29, and 31 with the live results (HTTPS and deep links on `app.`, the github.io redirect, auth emails end to end, the two-device board test, tags pushed). Ask Ryan for anything you can't check yourself.
-2. Fix `build-snapshot.md` §1, which still says 2.2.1 is "Not deployed yet" while §6 says it's deployed.
-3. Report the marketing site's status: whether Part B (screenshots) and Part C (marketing site) were done, and where `reports/marketing-site-acceptance.md` is. **Don't build or change the marketing site in this session** beyond the one footer link in Step 2.4.
-4. **If any 2.2.1 live row fails, stop and report. Don't start 2.3.0.**
+## Step 0: before any code
+1. `git pull` (main was behind by 1). Commit this planning hand-off (`CLAUDE.md` + `docs/`) first if it isn't committed.
+2. Spec Step 0.1: 2.3.0 is merged on `main` and `reports/v2.3.0-acceptance.md` had no failed rows at hand-off. Confirm both. If either isn't true, **stop and ask Ryan**.
+3. Spec Step 0.3: record in `build-snapshot.md` that 2.3.0 and 2.3.1 are deployed. The C31 G3/G4 blocker is **closed**: Ryan confirmed Legal approved the trainer wording on 11/16 (snapshot §8). Training v3 doesn't change it.
 
-## Current task: build 2.3.0 trainer mode (`docs/specs/trainer-mode.md` v0.3)
-1. Commit this planning hand-off first if it isn't committed.
-2. Build in a branch `v2.3.0`, **Phase A, then Phase B**. **No AI** (compliance T7): no AI packages, calls, Edge Functions, labels, toggles, or placeholders, and no `ai_assisted` column.
-3. Migrations `009_trainer_a.sql` and `010_trainer_b.sql`, each safe to re-run, folded into `schema.sql`. Add "Upgrading from 2.2.1" steps to the README, including the SQL Ryan runs (service role) to set and clear `teams.trainer_verified_at` / `_by`. **Don't build any in-app admin control for verification.**
-4. **Website (`rparker-sudo/approachstrength-site`):**
-   1. Regenerate `/privacy` and `/terms` from `docs/legal/soft-launch-notice.md` v2.5 with the existing generator. Part A2 must be reachable at `/privacy#health-data` and §4T at `/terms#trainer-terms`. `legal-pages-match.py` must pass.
-   2. Add a footer link **"Consumer health data"** → `/privacy#health-data` on every page of whatever is live at the apex (placeholder or marketing site). Compliance (Marketing site rules, T10) requires it; it's the only text change allowed on the website in this session.
-   3. **No trainer or gym content** on the website (compliance T8).
-5. Check **every** acceptance criterion and save **`reports/v2.3.0-acceptance.md`** (one row per criterion: pass / fail / partial, with evidence) **before** asking Ryan to approve the deploy. Include all of:
-   - spec §A6 (Phase A) and §B11 (Phase B);
-   - compliance T10;
-   - adult rules §10; adult goals §6; general library §8; taxonomy C1;
-   - design `trainer-mode.md` "Acceptance (UX sign-off)" and the §S0.4 string search;
-   - a re-run of the v2.2 and 2.2.1 checks for volleyball teams.
-6. **Stop rule (TM-17):** if any **Phase A** criterion fails, **stop and report before deploying.** Any other failure is listed as fail, never as pass.
-7. **Deploy precondition (G3/G4 wording):** see "Known conflicts" item 5. Don't deploy until Ryan confirms Legal's wording.
-8. Ask Ryan to approve the deploy. Deploy app and website as **2.3.0**, tag `v2.3.0`, and update `CHANGELOG.md` and `build-snapshot.md` (incl. every new table and column, with its compliance T4 row).
+## Current task: build 2.4.0 Training v3 (`docs/specs/training-v3.md` v1.0)
+1. Branch `v2.4.0`. Build **Part 1, then Part 2, then Part 3.** Commit at the end of each part.
+2. Migrations `011_training_v3_p1.sql`, `012_training_v3_p2.sql`, `013_training_v3_p3.sql`, each safe to re-run, folded into `schema.sql`. Add "Upgrading from 2.3.1" steps to the README (Ryan runs them in order after 010).
+3. Flags `catalogV3`, `rackRotation` (Part 2) and `generatorV3` (Part 3), exactly as spec "Build plan" says. `generatorV3` defaults **on only if every Part 3 criterion passes**; otherwise **off**, and the 2.3.0 generator stays live and unchanged.
+4. **Website: no changes in this release.** Don't touch `rparker-sudo/approachstrength-site`.
+5. Check **every** acceptance criterion and save **`reports/training-v3-acceptance.md`** (one row per criterion: pass / fail / partial, with evidence) **before** asking Ryan to approve the deploy. Include all of:
+   - spec Part 1, Part 2, and Part 3 criteria (they already copy warmups §9, program-design §4a/§4b, and catalog §7);
+   - `user-flows-training-v3.md` "Acceptance (UX sign-off)" Parts 1 and 2;
+   - compliance § Training v3 review **V2** (every unchanged item: consent and the six permissions, testing eligibility and the supervision lock, no 1RM feature, board privacy including the rotation ring, G3/G4, adults-only trainer teams, TM-19, T1–T11) and **V3** (claim-word search on the built catalog and warm-up text);
+   - **a re-run of every earlier volleyball (v2.2, 2.2.1) and trainer-mode (2.3.0) check, and the 2.3.1 custom-exercise checks.** A check listed in spec §0.3, or one that tests a builder block now removed, is marked **"superseded (§0.3)"** with the row it maps to. It's never marked pass or silently dropped. Every other earlier check must still pass.
+6. **Stop rule:** if **any Part 1 criterion fails**, **stop and report. Don't deploy.** A Part 2 failure: report it and let Ryan choose to hold the deploy or ship with that feature's flag off. A Part 3 failure: `generatorV3` ships off. No failure is ever listed as pass.
+7. **Deploy precondition:** see "Known conflicts" item 7 (`session.source`). Ask Ryan before deploying.
+8. Ask Ryan to approve the deploy. Ryan runs migrations 011–013 on the live project. Deploy the app as **2.4.0**, tag `v2.4.0`, and update `CHANGELOG.md` (a section per part) and `build-snapshot.md` (every new table and column with its compliance V4/T4 row, every flag's state, every judgment call).
 
 ## Known conflicts, already settled
-1. **Class board default for clients:** `design/trainer-mode.md` F33 shows "Class board: On." **Compliance T6 and Privacy Part A2 win: off by default** for general-team clients. Check-ins and sharing are off too (F33 already says so).
-2. **Weekly caps across all programs posted to one client** (adult rules §4, F36): build the combined-total check, with a block on over-cap posts. Product hasn't confirmed it in the spec yet; list it in the report.
-3. **Unverified trainer:** she can build programs but can't post them (F32a, Terms §4T.2, compliance T3.6). Build it that way.
-4. **Equipment removed from the gym profile** (F40): build the warning and the switch to the closest exercise for each client, as drawn. Product hasn't confirmed; list it in the report.
-5. **G3 pain card and G4 head-injury line in general teams** (`trainer-mode.md` §S1b): **Legal hasn't approved the trainer versions yet.** Build them with the §S1b text in one place (a single constant each), and mark them "pending Legal" in the report. **Before the deploy, ask Ryan whether Legal approved them or supplied different text.** Don't deploy them unapproved, and don't use the volleyball wording (it mentions parents and school protocols).
-6. **Table and column names:** the spec's `programs.target_user_id` and `groups.name` map to the existing `team_programs` and `team_groups` tables. Every **new** table or column must correspond to a row in compliance T4 (trainer Terms record, verification, `teams.kind`, target client, group name, goal, gym equipment profile, cardio minutes, templates). Anything else: **stop and ask** (G-5).
-7. **`teams.kind`** can't change once a team has members (compliance T4).
-8. **Other Product/Training/UX flags** inside the content and design docs (e.g., "lowest level among targets" for group caps, F33/F40 confirmations, "minors" rules as warnings in general teams): build them as written and list them in the report for the planning team.
-9. **Adult volleyball "Your choices" defaults** (compliance T5 flag): **not in 2.3.0.** Don't change volleyball defaults.
-10. The string **"Return to training"** must not appear anywhere (spec B11).
+1. **Baseline:** the spec says 2.2.1 is live. It's actually **2.3.1** (custom exercises, an owner request outside the specs). Build on 2.3.1. Don't change 2.3.1's behavior except as item 2 says.
+2. **2.3.1 custom exercises are coach-built content.** Their type, movement, and level still drive `resolveSession`, the level toggle, warm-up session types, and auto rest **suggestions**. But the builder limits 2.3.1 applied through the type (rest floors, pairing rules, effort caps, the trainer RPE 8 cap) are **builder blocks and come out** for coach-built sessions, like everything else in §1.1. The 2.3.1 checks that test those blocks are "superseded (§0.3)."
+3. **Level toggle precedence:** the spec wins over UX F46. **Most specific wins:** athlete override (off-only, `levelAdjustOffFor`) → session override (`session.levelAdjust`, on or off) → program setting. So the session toggle stays **enabled** when the program is off (show "Program setting: Off" instead of UX's disabled "Off for this program"), and a session set **on** adjusts even if the program is off. An athlete in `levelAdjustOffFor` always gets the written program. List it in the report for UX.
+4. **Legal's copy fixes (compliance V3) win over the content docs:**
+   - `ssb-squat` why text: **"Heavy squatting with your hands on the handles in front."** (not the catalog's "…easier on the shoulders").
+   - The E-block's user-facing label is **"Care"** (e.g., "Care circuit," "Shoulder care"), never "Durability," anywhere users can see it. "Durability" may stay in code identifiers and internal comments only.
+   - The rotation spotter position's user-facing label is **"Spot"**, not "Spot and coach." Athlete line: "Spot: Ava R. on Back Squat" (or "Spot the next lifter"). Builder row and board node: "Spot."
+   - Re-run the claim-word search on all new catalog, warm-up, and builder strings.
+5. **Dismiss-once RPE 9–10 note:** **not built** (D-049, spec §1.1). Legal's TR3-1 recommendation (the note, and a confirm when turning level adjust off for a minor) is the founder's call and wasn't adopted. Don't build either. List them in the report.
+6. **Generated-program content (TR3-2):** build exactly as the spec says (depth jumps, contrast pairs, clusters, waves for advanced athletes with a **coach-confirmed** level; ≤ 85% minors). Legal's stricter interim recommendation wasn't adopted by the founder. List it in the report.
+7. **New fields and G-5:**
+   - Allowed new tables/columns: `warmup_templates`; `teams.default_warmup`, `teams.default_warmup_template_id`; the limited-space setting; `live_progress.position_index` (+ existing `rotate_at`); and the fields in spec §1.5 and §2.2 that compliance V4 lists.
+   - Program-content keys stored **inside the existing program/session JSON** (no new column) are allowed: `levelAdjust`, `levelAdjustOffFor`, `warmup`, `sessionMinutes`, `minutesByWeekday`, `targetMinutes`, `fitLog`, `format`, `rotation`, and Part 3's `block`, `method`, `pct`, slot ladders. `CalendarEvent.roomMinutes` follows calendar visibility: never shown to another team's coach (V4).
+   - **`session.source`** is in spec §1.5 but **not in compliance V4's table.** Build it inside the session JSON. **Before the deploy, ask Ryan whether Legal confirmed `session.source`.** Don't deploy until he answers.
+   - Anything else (a new table, or a new column not listed here): **stop and ask** (G-5).
+8. **Superseded 2.3.0 settlements:** the combined weekly cap block at post (old item 2) and the "minors rules as warnings" item (old item 8) are **removed**. The trainer post screen shows the combined weekly count as information only. Unchanged from 2.3.0: the class board defaults off for clients, an unverified trainer can build but not post, the F40 equipment-removed warning, `teams.kind` locked once a team has members, no "Return to training" string, adult volleyball "Your choices" defaults unchanged.
+9. **Trainer warm-ups:** generated warm-ups (warmups §5) **replace** W1–W3 in trainer mode. General-library §8's "Warm-ups W1–W3 available" row is "superseded (§0.3)."
+10. **UX items Product hasn't confirmed; build as drawn and list in the report:**
+    - F41 cardio stepper 5–180 min (duration and Easy/Moderate only stay; adult rule A4).
+    - F55a one room clock with a per-rack override.
+    - F46c per-athlete toggle stored per program.
+11. **Spec cross-reference:** "§3.5" in spec §0.3 (Gate 3) means the Part 3 **Limits** criteria.
 
 ## Hard stops (any part)
-- **Any new table or server field** not covered by compliance T4 (or earlier approvals): **stop and ask.**
+- **Any new table or server field** not covered by "Known conflicts" item 7, compliance V4/T4, or earlier approvals: **stop and ask.**
 - **Any domain, DNS, repo-variable, Pages, or Supabase setting change** not listed in the spec: don't make it. Record every change you do make (old → new) in `build-snapshot.md`.
-- **Any text change on the website or legal pages** beyond the docs and the one footer link: don't make it. Ask.
+- **Any text change on the website or legal pages:** don't make it in this release.
 - **No find-and-replace on legal wording** in any script.
 - **Any AI provider, SDK, or call:** don't add it (TM-18).
-- **A general team must never accept a minor** (compliance T1): if any path allows it, stop.
+- **A general team must never accept a minor** (compliance T1). If any path allows it, stop.
+- **No path may weaken the things that still apply to every session** (spec §0.2): consent, testing eligibility and the supervision lock, no 1RM feature for minors, board privacy, TM-19 posting, the G3 message. If removing a builder block would touch one of these, stop and ask.
 
 ## Versions and folders
-- **Work in this folder (`~/Projects/approach`, GitHub `rparker-sudo/approach`) and `rparker-sudo/approachstrength-site`.** Don't create other copies. Commit as you go and tag each release. Keep `CLAUDE.md` and `docs/` in place; they're the planning team's hand-off.
+- **Work in this folder (`~/Projects/approach`, GitHub `rparker-sudo/approach`).** Don't create other copies. Commit as you go and tag the release. Keep `CLAUDE.md` and `docs/` in place; they're the planning team's hand-off.
 - `~/Downloads/approach-2.0` is an old v2.0 copy. Never work there.
 
 ## Always
 - Never add analytics, ad, or tracking SDKs, or any new third-party service, without the planning team's approval (`docs/compliance.md`).
 - Never add a new server-side data field about users unless the spec and compliance list it (rule G-5). Anything only for the individual (home equipment, etc.) stays on the device (G-3).
-- Every session an athlete or client sees goes through `resolveSession` (G-1). No other code path builds a session.
-- Boards never show weights, loads, RPE, lift test results, estimated maxes, check-ins, pain, bodyweight, nutrition, or experience level (G-4).
-- No medical, injury-prevention, treatment, or guaranteed-results claims in user-facing copy (G-6). Run the claim-word search on the new library text.
-- **Volleyball teams don't change.** Every v2.2.x check still passes for them, and their strings stay exactly as in 2.2.1.
+- Every session an athlete or client sees goes through `resolveSession` (G-1). No other code path builds a session. Generated-program limits live there (and in the generator and suggesters), keyed to `source = 'approach'`, never in the builder.
+- Boards never show weights, loads, RPE, lift test results, estimated maxes, check-ins, pain, bodyweight, nutrition, experience level, or "your version" (G-4). That includes the "Warming up" tile state and the rotation ring.
+- No medical, injury-prevention, treatment, or guaranteed-results claims in user-facing copy (G-6). Run the claim-word search on every new string.
+- **Earlier checks still pass.** Every v2.2.x volleyball check and every 2.3.x trainer-mode check passes, except the ones spec §0.3 supersedes (marked "superseded," never "pass").
 - Keep `local.ts` (demo mode) in step with `supabase.ts`.
-- When you finish a release: bump the version, update `CHANGELOG.md`, and update `build-snapshot.md` (what's built, data stored, services used, known gaps, and every placeholder or judgment call you made). The planning team reads that file.
+- When you finish a release: bump the version, update `CHANGELOG.md`, and update `build-snapshot.md` (what's built, data stored, services used, flags, known gaps, and every placeholder or judgment call you made). The planning team reads that file.
 - Run `npx tsc --noEmit`, `npx expo lint`, and `npm run build:web` before calling anything done. A check that doesn't run counts as a failure.

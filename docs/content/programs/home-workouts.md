@@ -3,6 +3,9 @@ Owner: Training Content / Sports Science (02) · v1.0 · Tue Nov 10, 2026
 Status: **Draft for founder approval → v2.2.** Founder decisions (11/10): coaches can mix weight-room days and home days, and the app can recommend the mix or the coach can choose it. **Full home days count toward the lift-day caps, plus one light home day is allowed beyond the cap.** **Each athlete sets their own home equipment** (bodyweight by default, stored on the device only).
 Related: `safety-guidelines.md` (R5, R6, §2a), `drill-library.md`, `v2.2-training-handoff.md` (I1 athlete layer, I7 local-only data). Separate from extra recovery sessions (`extra-recovery-sessions.md`).
 
+> **Coach freedom (11/18, founder):** the rules in this doc now apply only to **Approach-generated programs and Approach suggestions** (auto rest, auto-pairing, recommended weeks). A coach or trainer building or editing a workout has **full control**: the builder never blocks their choices. See `content/program-design.md` §10–§11.
+
+
 ---
 
 ## 1. What the coach can do

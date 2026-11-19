@@ -1,5 +1,5 @@
 # Approach: Content Tagging Taxonomy
-Owner: Training Content / Sports Science (02) · **v1.2** · Sun Nov 15, 2026
+Owner: Training Content / Sports Science (02) · **v1.3** · Wed Nov 18, 2026
 Status: **Draft for founder approval.** v1.2 (11/15): **Part C, trainer mode**: the T-A1 hide list, `scope`, `whyGeneral`, new equipment, patterns, and the `cardio` category. v1.1: 6 new mobility exercises (70 total), session `kind`, coach-set athlete level (G8), and testing tags moved to "in spec." Part A documents the tags **exactly as they exist in the v2.0 code** (`src/lib/types.ts`, `src/lib/exercises.ts`, `src/lib/generator.ts`), plus the 6 mobility exercises ready for v2.2 (`drill-library.md` §4). Part B lists proposed additions. Nothing in Part B gets built without Product (01) and Claude Code agreeing to the schema change.
 
 **Source of truth for exercise data:** `src/lib/exercises.ts` (64 exercises in v2.0; 70 with the v2.2 additions). Readable index: `content/drill-library.md`. The role doc mentions a separate `drills.json`. I recommend Claude Code **generate** any JSON from `EXERCISES` rather than maintaining a second copy, so the two can't drift. (Engineering decision, flagged.)
@@ -148,3 +148,20 @@ Spec: `product/specs/trainer-mode.md` §A3, §B4. Content: `content/general-libr
 | `programs.goal` | `'strength'` · `'muscle'` · `'general'` · `'back_after_break'` | `adult-goals.md` §5 |
 | Warm-up | `'W1'` · `'W2'` · `'W3'` (static content) | `general-library.md` §6 |
 | Tier | the 39 general exercises are assigned in `general-library.md` §4a (cardio = `D`) | rest table unchanged |
+
+---
+
+## Part D: Program design v3 (11/18)
+Source: `content/program-design.md`, `content/exercise-catalog-v3.md`, `content/programs/warmups.md`.
+| Tag | Values | Where |
+|---|---|---|
+| `Equipment` | adds `ssb`, `ghd`, `suspension`, `sliders`, `hurdles` (all teams); "Full weight room" preset adds `sliders`, `hurdles` | catalog v3 §2 |
+| `Program.block` | `'restore'` · `'accumulation'` · `'strength'` · `'strength_power'` · `'power'` · `'maintain'` | program-design §2–§3 |
+| Slot | `{ slotId, ladder: exerciseId[] (top → entry → home), role, method }` | program-design §8a |
+| `ProgramExercise.method` | `'straight'` · `'top_backoff'` · `'wave'` · `'cluster'` · `'contrast'` · `'tempo'` · `'iso'` | program-design §6 |
+| `ProgramExercise.pct` | % of e1RM (tested lifts only), with an RPE target | program-design §5b |
+| `Session.format` | adds `'rack_rotation'`; `Block.rotation { positions[], rotationSec, rounds, buildUpRound }`; `live_progress.position_index` | program-design §4b |
+| `levelAdjust` | `true` (default) / `false` at program, session, and athlete level | program-design §10 |
+| `Session.warmup` | `{ raise[], activate[], potentiate[], edited? }` + ramp-up sets logged as `warmup: true` | warmups §7 |
+| `scope` update | general-library warm-up, incline press, rows, rear delt fly → `'all'`; only cardio stays `'general'` | catalog v3 §5 |
+| Builder | **No blocking rules for coach-built content**; auto values are suggestions | program-design §10 |

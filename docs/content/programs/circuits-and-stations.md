@@ -3,6 +3,9 @@ Owner: Training Content / Sports Science (02) · v1.0 · Fri Nov 13, 2026
 Status: **Draft for founder approval → proposed for v2.2 pass 3** (with supersets). Founder request (11/13): circuits inside a block, and rack groups rotating through stations.
 Builds on: `programs/rest-and-supersets.md` (tiers, rest table, floors, superset rules), `product/specs/rack-groups.md` (D-026), `safety-guidelines.md`. Every rule in those docs still applies. **This doc extends `rest-and-supersets.md` §4b rule 6**, which limited circuits to care/core/mobility.
 
+> **Coach freedom (11/18, founder):** the rules in this doc now apply only to **Approach-generated programs and Approach suggestions** (auto rest, auto-pairing, recommended weeks). A coach or trainer building or editing a workout has **full control**: the builder never blocks their choices. See `content/program-design.md` §10–§11.
+
+
 ---
 
 ## Part 1: Circuits within a block
@@ -35,6 +38,7 @@ Coaches can build, split, or reorder circuits by hand. The builder blocks anythi
 ---
 
 ## Part 2: Rack-group station rotation
+> **See also (11/18):** a third format, **rack rotation** (athletes in one rack group rotate through positions at their own rack on a shared clock), is in `content/program-design.md` §4b.
 **What it is:** the coach switches a session to **Stations**. The session's blocks become stations, each rack group starts at a different station, and the groups rotate on a timer, so the whole team moves through the workout at once.
 
 ### 2a. How a session is split (MUST)

@@ -1,7 +1,11 @@
 # Approach: Training Safety Guidelines
-Owner: Training Content / Sports Science (02) · **v1.3** · Tue Nov 10, 2026
-Status: **Draft v1.2 for founder approval.** Items marked **[Pro review]** need a certified professional before the 2027 App Store launch (§9).
+Owner: Training Content / Sports Science (02) · **v1.5** · Wed Nov 18, 2026
+Status: **Draft v1.5 for founder approval.** Items marked **[Pro review]** need a certified professional before the 2027 App Store launch (§9).
 Built against: v2.0 code (`src/lib/generator.ts`, `progression.ts`, `exercises.ts`, `team.tsx`, `session.tsx`), decisions D-005, D-007, D-013 to D-026, and specs `v2.1-soft-launch.md` (pass 1), `v2.1-pass-2.md`, and `rack-groups.md` (v2.2).
+
+> **Changes in v1.5 (11/18, founder direction):** Approach's programming is now designed at a college level (`content/program-design.md`, `exercise-catalog-v3.md`, `programs/warmups.md`). **Coach freedom:** limits in this doc constrain **Approach-generated programs and suggestions only**; coaches who build or edit workouts have full control (program-design §10). Changed here: R2 and R6 status, §2a step 7, §4 depth jumps, §10.
+
+> **Changes in v1.4 (11/13):** new §2b level-progression criteria (I4), with the coach card text for UX F24b. §2a now uses the **lower level across teams** (Q-7, TM-7) and is marked as in the v2.2 spec. §5 adds the extra-recovery rule on pain days (UX F14). New §11 records Training's answers to UX items F13, F14, F19c, F21, and F27.
 
 > **Changes in v1.3 (11/10, later):** home workouts (R6 home/light-day rule; `programs/home-workouts.md`) and auto rest times + supersets with rest floors (§3; `programs/rest-and-supersets.md`).
 
@@ -12,7 +16,7 @@ Built against: v2.0 code (`src/lib/generator.ts`, `progression.ts`, `exercises.t
 ---
 
 ## 1. Scope
-- **Who:** high school volleyball athletes aged 13–18 (most are 14–18), plus adult athletes and coaches (18+). **Every rule here is written for minors.** Adults get the same defaults; v2.x has no separate adult track.
+- **Who:** high school volleyball athletes aged 13–18 (most are 14–18), plus adult athletes and coaches (18+). **Every rule here is written for minors.** Adults on volleyball teams get the same defaults. **Trainer mode (general teams, adults only, 2.3.0) has its own rules:** `content/adult-training-rules.md`, with `general-library.md` and `programs/adult-goals.md`.
 - **Levels:** beginner (`level 1`), intermediate (`level 2`), advanced (`level 3`), mapped to `Experience` in `types.ts`.
 - **What Approach programs:** strength, power (jumps, throws, Olympic lifts for advanced athletes only), core, prehab, mobility, extra recovery sessions, and testing days, all to support volleyball across the full year (off, pre, in, post-season).
 - **What it doesn't program:** on-court volleyball drills or skill work (founder decision, 11/9). Also out: rehab, return-to-play, nutrition (Product owns the Fuel cards, §8), true 1-rep-max testing for minors, and conditioning (not decided yet, §8).
@@ -21,11 +25,11 @@ Built against: v2.0 code (`src/lib/generator.ts`, `progression.ts`, `exercises.t
 | # | Rule | Why | Status |
 |---|---|---|---|
 | R1 | **No true 1-rep-max attempts for minors.** Strength testing uses 3–5 rep-max tests on coach-supervised testing days only (§4a). Athletes are never prompted to attempt a single. Working loads may use the *estimated* max, always capped by the RPE ceilings in R2. | AAP 2020 supports youth strength testing *with qualified supervision, technique, and progression*. Rep-max tests give nearly the same information with less risk. | **Decided (D-020, DS-5).** In v2.1 pass 2 (P6). See the recorded disagreement in §4a. |
-| R2 | **Never train to failure.** RPE ceilings: beginner ≤ 7; intermediate/advanced ≤ 8; in-season ≤ 7 for everyone. Cue athletes to stop with about 2 reps left. | Technique breaks down near failure, and that's where youth injuries cluster. | ✅ Built (`RX` + `BEGINNER_EFFORT`). **Coach edits must not exceed these** (see G8/§2a). |
+| R2 | **Never train to failure.** RPE ceilings: beginner ≤ 7; intermediate/advanced ≤ 8; in-season ≤ 7 for everyone. Cue athletes to stop with about 2 reps left. | Technique breaks down near failure, and that's where youth injuries cluster. | ✅ Built. **Applies to Approach-generated programs only.** Coach-built programs have no effort limits (program-design §10). |
 | R3 | **Experience gates are hard limits.** Never prescribe an exercise above the athlete's level. If nothing at their level fits the equipment, use an easier or bodyweight option, or drop the slot. | Advanced lifts need coached technique. | Personal programs: **G1, v2.1 pass 1 (S11).** Team programs: **G8, proposed for v2.2** (§2a). |
 | R4 | **Olympic lifts (Hang Power Clean) are for advanced athletes only, with the note "Only with coaching."** | High technical demand. | ✅ Built. G8 extends this to team programs. |
 | R5 | **At least 1 full day per week with no lifting and no conditioning.** Default target is 2 days with no lifting. Gentle mobility (extra recovery sessions) doesn't break this rule. | AAP 2016: 1–2 days off per week from organized sport. | **G2, v2.1 pass 1 (S11).** |
-| R6 | **Weekly lift-day caps for minors:** beginner ≤ 3, intermediate ≤ 4, advanced ≤ 5 (in-season ≤ 3 for everyone). Days beyond the cap can only be mobility/recovery sessions. **Home workouts (founder 11/10):** full home sessions count toward the cap; **one light home day** a week (bodyweight, RPE ≤ 6, no jumps, 15–20 min) is allowed beyond it, and it doesn't count as the rest day. | These athletes also practice volleyball 4–6 days a week. | **G2, v2.1 pass 1 (S11).** |
+| R6 | **Weekly lift-day caps for minors:** beginner ≤ 3, intermediate ≤ 4, advanced ≤ 5 (in-season ≤ 3 for everyone). Days beyond the cap can only be mobility/recovery sessions. **Home workouts (founder 11/10):** full home sessions count toward the cap; **one light home day** a week (bodyweight, RPE ≤ 6, no jumps, 15–20 min) is allowed beyond it, and it doesn't count as the rest day. | These athletes also practice volleyball 4–6 days a week. | **Approach-generated and personal programs only** (since 11/18). Coach-built team programs show the week's count but aren't capped. |
 | R7 | **Match-day rules:** no lifting on match/tournament days; no heavy-leg session the day before a match; lift after practice, not before. No testing within 48 h before a match. | Freshness and fatigue management. | ✅ Built (lifting); testing rule in P6.1. |
 | R8 | **Built-in recovery:** 4-week blocks with a deload in week 4 (about 40% fewer sets, easy effort). The coach can lighten any day. | Periodization basics. | ✅ Built. |
 | R9 | **Readiness only suggests changes.** It never changes a program on its own. The coach chooses "Lighten today." | Auto-adjusting stays OUT until a CSCS reviews the rules. | ✅ Built. |
@@ -34,17 +38,17 @@ Built against: v2.0 code (`src/lib/generator.ts`, `progression.ts`, `exercises.t
 | R12 | **Head injury:** the app never offers concussion assessment or return-to-play steps. Copy points to the school's concussion protocol and medical clearance. **[Pro review]** | State laws and school medical staff govern return to play. | **G4**, proposed for v2.2 (one Settings line, §5). |
 | R13 | **Effort board ranks effort, never strength or the body** (§4b). | Comparison and body-image risk for teens. | In v2.1 pass 2 (P4). |
 
-## 2a. Team programs: per-athlete level resolution (G8, proposed for v2.2, **High**)
+## 2a. Team programs: per-athlete level resolution (G8, **in v2.2 spec pass 1**, High)
 **The problem:** a coach builds one program per team or position group at one experience level, and every athlete in that group gets the same exercises. The coach can also add any exercise from the picker (`session.tsx`), and that picker doesn't check level. G1 only fixes personal programs. **Result today:** a beginner in an "advanced" group gets front squats and hang cleans.
 
 **Rule:** when an athlete opens a session from a coach-posted program, each exercise is resolved to that athlete's level:
-1. **Athlete level** = the coach-set level for that athlete if there is one (§ new field below), otherwise the athlete's own profile `experience`.
+1. **Athlete level** = the coach-set level for that athlete if there is one, otherwise their self-reported level. **On two or more teams, use the lowest of their levels across all teams** (Q-7, decided 11/13; details in `programs/testing-day-checklist.md` Part 4).
 2. If the exercise's `level` ≤ athlete level, keep it.
 3. Otherwise, follow its `easier` chain to the first exercise with `level` ≤ athlete level that **fits the program's equipment**. (Every level 2–3 exercise has an `easier` link; see the drill library §2.)
 4. If that fails, use the lowest-level exercise of the **same pattern** that fits. If nothing fits, **drop the exercise** for that athlete.
 5. Keep the coach's sets, reps, rest, role, and notes. Apply the beginner effort shift (`BEGINNER_EFFORT`) and the R2 ceilings. Olympic lifts resolve to a jump for anyone below advanced.
 6. Show the athlete a small line: *"Your version: Goblet Squat (team: Back Squat)."* The log stores the exercise actually done, and the coach board shows that name.
-7. The coach sees the swaps per athlete in athlete detail (e.g., "3 exercises adjusted to level"). The coach can't force a harder exercise on one athlete. To change that, the coach changes the athlete's level.
+7. The coach sees the swaps per athlete in athlete detail (e.g., "3 exercises adjusted to level"). **Since 11/18 the coach can turn level adjustment off** for a program, a session, or one athlete (program-design §10); when off, athletes get exactly what the coach wrote. Default is on.
 
 **Coach-set level (new field, needs Legal):** `team_members.level` (1–3, nullable), set by the coach on the roster. It defaults to the athlete's self-reported level when they join. The same field is needed by **testing eligibility** (P6.4 checks level on the server) and **rack-group auto-assign** (`rack-groups.md` R3), and neither has a server-side level today. One field covers all three. It's training data, not health data, but it's a new field about minors, so Legal confirms.
 
@@ -53,6 +57,78 @@ Built against: v2.0 code (`src/lib/generator.ts`, `progression.ts`, `exercises.t
 - [ ] A coach-added level 3 exercise resolves down for a beginner the same way.
 - [ ] With a "Bands & bodyweight" program, a beginner gets a fitting level 1 option or the slot is dropped, never a harder one.
 - [ ] Logs and the coach board show the resolved exercise; the coach's sets, reps, and rest are kept.
+
+## 2b. Level-progression criteria (I4)
+Level now controls which exercises an athlete gets (§2a), whether a minor can do strength checks (§4a), and how racks are mixed. So each level needs a clear, observable meaning.
+
+**Principles**
+1. **Technique and training history, not strength numbers.** No bodyweight ratios or "squat 1.5× bodyweight" standards. Bodyweight stays on the device (D-007), teens grow at different rates, and strength targets push athletes to chase load. Level answers one question: *can this athlete do these lifts well and consistently?*
+2. **Coaches decide.** For coached athletes, only the coach sets level (`team_members.level`). Minors never raise their own level. Self-reported level is a starting point and never unlocks strength checks for a minor.
+3. **Never based on health data.** Pain flags, check-ins, and readiness are never inputs to level, up or down (they're consent-gated health data). A coach can lower a level for any reason they see in the weight room.
+4. **The app can suggest, never decide** (later phase, below).
+
+### Beginner (level 1)
+**Start here if any of these are true:**
+- Less than about 6 months of regular lifting (2+ sessions a week), **or**
+- Not yet meeting the intermediate technique checks below, **or**
+- New to the coach. When in doubt, start at beginner. Moving up after a few weeks costs little; starting too high is the risk.
+
+**What they get:** level 1 exercises only (goblet squat, DB RDL, push-ups, rows, lunges, level 1 jumps), beginner effort (RPE ≤ 7), jump tests only on testing days.
+
+### Intermediate (level 2)
+**Move up when ALL of these are true:**
+1. **Consistency:** about **12+ weeks** of regular training (in Approach: ≥ 80% of prescribed sessions over the last 12 weeks, or coach-known history from before Approach).
+2. **Technique checks**, seen by the coach on a normal training day at about RPE 7 (every rep clean, every set):
+
+| Pattern | Check |
+|---|---|
+| Squat | Goblet squat 3 × 8: hips to knee height or lower, heels down, knees tracking over toes, chest up |
+| Hinge | DB Romanian deadlift 3 × 8: flat back, hips push back, weights stay close to the legs |
+| Single-leg | Reverse lunge or step-up 3 × 8 each: knee doesn't cave in, balance under control |
+| Push | Push-up 3 × 8: straight body, chest to the floor, full lockout |
+| Pull | One-arm DB row 3 × 10 each: no torso twist, elbow to hip |
+| Core | Plank 45 s with ribs down and no sagging; dead bug 3 × 8 each with the low back down |
+| Landing | Squat jump and broad jump, 5 of 5 landings soft and quiet, knees not caving, landing stuck |
+
+3. **Coach judgment:** the athlete follows coaching cues and doesn't chase weight at the expense of form.
+
+**What it unlocks:** level 2 exercises (back squat, trap bar deadlift, RDL, bench, split squat, pull-ups, lateral bounds), RPE up to 8, and strength checks for minors (5RM).
+
+### Advanced (level 3)
+**Move up when ALL of these are true:**
+1. **History:** about **2+ years** of regular lifting, including **6+ months at intermediate** (in Approach, or coach-known).
+2. **Barbell technique checks** at about RPE 7–8, with safeties set:
+
+| Pattern | Check |
+|---|---|
+| Squat | Back squat 3 × 5: depth at or below parallel, brace held, bar path over mid-foot, no hips shooting up |
+| Hinge | Trap bar deadlift or RDL 3 × 5: neutral spine from floor to lockout |
+| Press | Bench press 3 × 5: controlled descent, feet planted, safeties or spotter used without reminders |
+| Pull | 3+ strict pull-ups, or inverted row 3 × 10 with a straight body |
+| Single-leg | Rear-foot elevated split squat 3 × 8 each, controlled |
+| Landing | Lateral bound 5 of 5 each side, landing stuck |
+
+3. **Self-management:** sets up and uses safeties without reminders and picks weights that match the prescribed RPE.
+
+**What it unlocks:** level 3 exercises (front squat, Nordic curl), the **hang power clean only if the coach teaches it** (the "Only with coaching" note stays), and 3RM options on squat and bench testing.
+
+### Moving down
+- The coach can lower a level at any time, for any reason seen in training (technique slipping, a long layoff, a new coach starting fresh).
+- **Recommended:** lower one level after **3+ months without regular lifting**. Shorter breaks are handled by G9 (easing back in), not by a level change.
+- Never lowered automatically, and never because of pain or check-in data.
+
+### Coach card text (UX F24b, replaces the placeholder descriptions)
+| Card | Text (2 lines max) |
+|---|---|
+| **Beginner** | "New to lifting (under about 6 months), or still building form on goblet squats, push-ups, and landings." |
+| **Intermediate** | "12+ weeks of steady training, with clean goblet squats, DB RDLs, lunges, push-ups, rows, and landings." |
+| **Advanced** | "2+ years of lifting, with clean barbell squats, deadlifts, and bench using safeties. Ready for coached Olympic lifts." |
+
+Under the cards, a link **"See the full checklist"** opens the technique tables above (read-only). Static content, no new data.
+
+### Later (after v2.2, not in the current spec)
+- **App suggestion to the coach:** when the history part is met (e.g., 12 weeks at ≥ 80% consistency), the coach sees *"Jordan may be ready for intermediate. Check their form,"* with the technique checklist. The technique part is always the coach's call. The app never promotes anyone.
+- **Adults and solo athletes:** adults can set their own level; the same suggestion appears to them. Solo minors stay capped at level 2 (G6, pending the attorney).
 
 ## 3. Loading and progression
 - **Prescription source:** `RX[phase][role]` in `generator.ts`. Any change to `RX`, `REST_BY_ROLE`, `splitFor`, `MAX_LEVEL`, the e1RM percentages, or the effort-board point values is a **training-content change** that needs Training Content sign-off.
@@ -63,9 +139,9 @@ Built against: v2.0 code (`src/lib/generator.ts`, `progression.ts`, `exercises.t
 - **Rest (v2.2):** rest is set automatically by exercise tier, reps, and effort, with supersets for low-fatigue pairs (`programs/rest-and-supersets.md`). **Floors (MUST):** heavy compound lifts (tier A) never get less than 2:00 rest and power work (tier P) never less than 1:30, even if the coach types less. Power and heavy compound lifts are never supersetted except with a light care/mobility filler. No contrast pairs (heavy lift → jump) for minors.
 
 ## 4. Power and plyometrics
-- Every jump is cued "land soft and quiet." Box jumps: **step down, never jump down.** No depth or drop jumps for minors without **[Pro review]**.
+- Every jump is cued "land soft and quiet." Box jumps: **step down, never jump down.** **Changed 11/18:** Approach-generated programs include depth drops (L2) and depth jumps (L3, advanced, coach-confirmed level, box ≤ 18 in, ≤ 20 contacts per session). **This is the top CSCS review item** (program-design §13).
 - Beginners: only level 1 jumps. Lateral bounds and trap bar jumps are level 2.
-- **Jump volume caps per lift session:** ≤ 30 ground contacts in-season, ≤ 50 off/pre-season. Current `RX` stays under these. Keep it there.
+- **Jump volume caps per lift session (Approach-generated):** off-season ≤ 70, preseason ≤ 40, in-season ≤ 25 contacts (program-design §9).
 - Med-ball throws: a weight that keeps the throw fast (about 4–10 lb for most high schoolers).
 
 ## 4a. Testing days (D-020, decided 11/9, in v2.1 pass 2 P6)
@@ -108,6 +184,7 @@ Built against: v2.0 code (`src/lib/generator.ts`, `progression.ts`, `exercises.t
 1. The athlete sees: *"Don't train through pain. Talk to your coach, parent, or athletic trainer before you lift today."* No exercise swaps, no body-part logic, and no extra recovery session suggested.
 2. The coach's roster shows the flag with: *"Check in with [name] in person."*
 3. The app never asks *where* it hurts (D-016).
+4. **Extra recovery on a pain day (UX F14, confirmed 11/13):** the Extra recovery entry stays in its normal place but is **never suggested or promoted** that day. If the athlete opens a session anyway, the session screen repeats the pain line at the top: *"You reported pain today. Talk to your coach, parent, or athletic trainer first. If anything hurts, stop."* No session is labeled as helping pain.
 
 **Head injury copy (G4, v2.2):** add to Settings: *"If you hit your head or have any concussion symptoms, stop and follow your school's concussion protocol. Only a medical provider can clear you to return."* **[Pro review]**
 
@@ -159,16 +236,28 @@ Built against: v2.0 code (`src/lib/generator.ts`, `progression.ts`, `exercises.t
 | G2 | Lift-day caps and rest day | **v2.1 pass 1 (S11)**, not built yet |
 | G5 | Flat +5 lb progression | **v2.1 pass 1 (S11)**, not built yet |
 | G7 | Testing days | **v2.1 pass 2 (P6)** |
-| **G8** | Team programs ignore each athlete's level | **Proposed for v2.2, High** (§2a) |
-| G3 | Pain = yes doesn't change the Today screen | Proposed for v2.2 |
-| G4 | No head-injury copy | Proposed for v2.2 |
+| **G8** | Team programs ignore each athlete's level | **In v2.2 spec pass 1** (§2a; lower level across teams) |
+| G3 | Pain = yes doesn't change the Today screen | In v2.2 spec pass 1 |
+| G4 | No head-injury copy | In v2.2 spec pass 1 (Legal's revised wording) |
 | G6 | Solo minors can get level 3 / Olympic lifts | Open (Product + Legal); fits the individual-athlete phase |
-| G9 | No return-from-break rule | Proposed for v2.2+ (§3) |
+| G9 | No return-from-break rule | In v2.2 spec pass 1 |
+| I4 | Level-progression criteria | **Written** (§2b). App suggestions to coaches come after v2.2 |
 | Copy | 14 more claim lines + 2 data fixes | Proposed for v2.2 (`drill-library.md` §3) |
 | Content | 6 new mobility exercises + 5 extra recovery sessions | Ready (`drill-library.md` §4, `programs/extra-recovery-sessions.md`) |
 | Feature | Home workouts (school + home weeks) | Ready for v2.2 spec (`programs/home-workouts.md`) |
 | Feature | Auto rest times + supersets | In v2.2 spec (pass 1 rest, pass 3 supersets) |
 | Feature | Block circuits + station rotation | Proposed for v2.2 pass 3 (`programs/circuits-and-stations.md`). **MUST for minors:** no power or heavy compound lifts in circuits or stations; no timed/for-time tier B work |
+
+## 11. Answers to UX items (11/13)
+| Flow | UX asked | Training's answer |
+|---|---|---|
+| **F13** "Your version" line | Shorten the visible line to **"Your version (team: Back Squat)"** under the resolved title; screen readers get the full sentence | **Confirmed.** The title already names the athlete's exercise. Keep the "Why is this different?" sheet as written. Keep "Your version" **off** every board and the ticker (confirmed). For dropped slots, "1 exercise left out for your level" is fine from a training standpoint (Product decides the UX proposal). |
+| **F14** Pain day and extra recovery | Should the Extra recovery entry stay visible (unpromoted) on a pain day? | **Confirmed, with one addition:** it stays visible but is never suggested, and opening it on a pain day shows the pain line at the top of the session (§5 item 4). Leaving **Start workout** available (no block) is also confirmed. R10 is about guidance, not locking athletes out. |
+| **F19c** Tier chip names | "Heavy," "Compound," "Accessory," "Care" | **Confirmed, plus one missing:** tier P needs a chip. Use **Power** (P) · **Heavy** (A) · **Compound** (B) · **Accessory** (C) · **Care** (D, which includes mobility). Coach-only, as UX proposed. |
+| **F19c** Blocked-pair reasons | Six reasons | **Confirmed** for the first five. The sixth ("Supersets are for 2 strength exercises…") is retired, as UX noted (circuits, D-030). |
+| **F21** Harder-version card | "Ready for a harder version? [exercise]" with **Try it / Not yet** | **Confirmed.** After **Not yet**, offer it again only after 2 more sessions at the top of the range. Never offer an exercise above the athlete's level. **Try it** starts the harder exercise at the bottom of its rep range. |
+| **F27c** Timed rows | Default **"30 s on · 15 s off"** for tier C/D | **Confirmed** for two-sided exercises. One-sided exercises (side plank, Copenhagen, Pallof, band ER) default to **"20 s each side · 15 s off."** Coaches can edit within 10–60 s of work. Timed work stays tier C/D only. |
+| **F27c** Beginner note | "Beginners do A1–A3 as the circuit, then A4 as straight sets after." | **Confirmed** as written. |
 
 ## Sources (orientation, not legal or medical authority)
 - AAP Council on Sports Medicine and Fitness, *Resistance Training for Children and Adolescents*, Pediatrics 2020;145(6):e20201011.

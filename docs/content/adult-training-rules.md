@@ -4,6 +4,8 @@ Status: **Ready for the 2.3.0 build (T-B3). Unreviewed by a CSCS** (recorded ris
 For: `product/specs/trainer-mode.md` §B5, general (adult) teams only. Rules set in the 11/15 meeting: **RPE ceiling 8, no rep-max testing for adults, cardio logged by duration only.**
 **Volleyball teams don't change.** Everything in `content/safety-guidelines.md` still applies to them exactly as written.
 
+> **Coach freedom (11/18, founder):** A1 (RPE 8 block), A3 (AMRAP block), §4 caps, and §5 warnings now apply only to **Approach-generated programs and suggestions**. A trainer building or editing a workout has full control, with no blocks or warnings (`content/program-design.md` §10). A2 (no testing features in trainer mode), A4 (cardio by duration only), A7, and A8 are product features, not building limits, and stay.
+
 > **Not medical advice.** Approach gives the trainer tools to program for **healthy adult clients**. It doesn't screen clients, diagnose, treat, or clear anyone to exercise. Pre-participation screening, health questions, and any condition-specific programming are the trainer's professional responsibility, outside the app.
 
 ---

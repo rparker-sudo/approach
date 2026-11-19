@@ -76,7 +76,8 @@ export function starterSessions(goal: Goal, n: number, equipment: Equipment[]): 
       exercises.push({ exerciseId: ex.id, sets: rx.sets, reps: rx.reps, effort: rx.effort, role: s.role });
     }
     if (goal === 'general' || goal === 'back_after_break') exercises.push(cardioRow(goal, equipment));
-    return { id: uid(), name: t.name, focus: t.focus, exercises, warmup: t.warmup };
+    // 2.4.0: goal defaults applied by Approach (§0.1); the warm-up is generated (W1–W3 replaced, warmups.md §5).
+    return { id: uid(), name: t.name, focus: t.focus, exercises, source: 'approach' as const };
   });
 }
 

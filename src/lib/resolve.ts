@@ -5,9 +5,10 @@ import { BACK_AFTER_BREAK_RAMP, clampCardio, programWeeks, RPE_CEILING, shiftBeg
 import { BEGINNER_EFFORT, homeAllowed, pickExercise, restSecFor } from './generator';
 import { blockRests, blocksOf } from './groups';
 import { BlockInfo, sessionForDate } from './progression';
-import { estimateMinutes } from './rest';
+import { addBack, estimateSession, fitSession, targetFor, undoneTrims, type FitCtx, type Target } from './fit';
+import { warmupFor, type WarmupCtx } from './warmup';
 import type { LevelTable } from './backend/types';
-import type { Equipment, Exercise, Phase, Program, ProgramExercise, Session, WorkoutLog } from './types';
+import type { Equipment, Exercise, Phase, Program, ProgramExercise, ProgramPosition, Session, SessionSource, SessionWarmup, WorkoutLog } from './types';
 
 /**
  * The athlete layer (G-1, I1). Every session an athlete sees goes through `resolveSession`.
@@ -17,8 +18,58 @@ import type { Equipment, Exercise, Phase, Program, ProgramExercise, Session, Wor
  *  3. effort ceilings (R2: beginner 7, intermediate/advanced 8, in-season 7; returning from a break 6);
  *  4. rest (restFor tiers, coach setting within the floors);
  *  5. the session length estimate.
+ * 2.4.0 (Training v3, D-044/D-045/D-046/D-047):
+ *  - the generated-program limits (effort ceilings, rest floors, C1, H2, the trainer RPE 8 cap, ramp weeks) apply only to
+ *    `source = 'approach'` sessions; a coach-built session is resolved exactly as written, rest as typed;
+ *  - "Adjust exercises to each athlete's level" (athlete → session → program, most specific wins) turns the level swap
+ *    and the G9 easing on or off;
+ *  - the warm-up (generated, the coach's, or none), the session target, and Fit to time for generated sessions.
  * Pure functions; no React.
  */
+
+/* ---------- 2.4.0 §0.1: who wrote the session ---------- */
+/**
+ * `session.source`, or the migration rule for sessions saved before 2.4.0: a session a coach or trainer posted (team
+ * programs) is 'coach'; one that came straight from the generator (personal programs) is 'approach'.
+ */
+export function sourceOf(program: Pick<Program, 'teamId' | 'general' | 'postedAt'>, session: Pick<Session, 'source'>): SessionSource {
+  if (session.source) return session.source;
+  return program.teamId || program.general || program.postedAt ? 'coach' : 'approach';
+}
+
+/** §0.1: a coach's edit to exercises, sets, reps, effort, rest, grouping, order or stations makes the session theirs. */
+export function coachEdit(session: Session): Session {
+  return { ...session, source: 'coach', fitLog: undefined };
+}
+
+/* ---------- 2.4.0 §1.2: "Adjust exercises to each athlete's level" ---------- */
+/**
+ * Most specific wins (CLAUDE.md known conflict 3): an athlete in `levelAdjustOffFor` always gets the written program;
+ * otherwise the session override (on or off); otherwise the program setting (default on).
+ */
+export function levelAdjustFor(program: Pick<Program, 'levelAdjust' | 'levelAdjustOffFor'>, session: Pick<Session, 'levelAdjust'> | null | undefined, userId?: string | null): boolean {
+  if (userId && program.levelAdjustOffFor?.includes(userId)) return false;
+  if (session && typeof session.levelAdjust === 'boolean') return session.levelAdjust;
+  return program.levelAdjust !== false;
+}
+
+/** The warm-up context for a session (position add-on, equipment, limited space, home, trainer cardio, rotation, deload). */
+export function warmupCtxFor(program: Program, session: Session, equipment: Equipment[], extra: { deload?: boolean; home?: boolean; compact?: boolean } = {}): WarmupCtx {
+  const w = session.warmup;
+  const limited = w && typeof w === 'object' ? !!w.limitedSpace : false;
+  const rotation = Math.max(0, program.sessions.filter((x) => !x.mobility).findIndex((x) => x.id === session.id));
+  return {
+    phase: program.phase,
+    position: (program.position ?? null) as ProgramPosition | null,
+    equipment,
+    limitedSpace: limited,
+    home: extra.home ?? session.location === 'home',
+    general: !!program.general,
+    rotation,
+    deload: extra.deload,
+    compact: extra.compact,
+  };
+}
 
 export type Level = 1 | 2 | 3;
 
@@ -31,6 +82,8 @@ export type AthleteContext = {
   homeEquipment?: Equipment[];
   /** Harder versions the athlete accepted (home bodyweight progression): exercise id → harder id. */
   harderPicks?: Record<string, string | null>;
+  /** 2.4.0: the athlete's account id (for the per-athlete "Adjust to level" override). */
+  userId?: string | null;
 };
 
 export type ResolvedExercise = ProgramExercise & {
@@ -59,6 +112,16 @@ export type ResolvedSession = {
   home: boolean;
   /** H2 light home day. */
   lightHome: boolean;
+  /** 2.4.0: who wrote the session (§0.1). */
+  source: SessionSource;
+  /** 2.4.0: level versions applied for this athlete (§1.2). */
+  levelAdjust: boolean;
+  /** 2.4.0: the warm-up card (null = none). */
+  warmup: (SessionWarmup & { source: 'approach' | 'edited' | 'template' }) | null;
+  /** 2.4.0: the session's target length (date → weekday → program → phase). */
+  target: Target;
+  /** 2.4.0: generated sessions under ~25 min (§4a Express). */
+  express: boolean;
 };
 
 export type Easing = { active: boolean; until?: string };
@@ -156,6 +219,28 @@ export function capEffort(effort: string, ceiling: number): string {
   return effort.replace(m[0], `RPE ${lo}–${ceiling}`);
 }
 
+/**
+ * Coach views (builder, week grid): the session's estimate against its target, as written (coach-built) or as fitted
+ * (Approach-generated, minus any trim the coach undid). No athlete layer.
+ */
+export function coachEstimate(program: Program, session: Session, date?: Date | null, weekday?: number | null): { minutes: number; target: Target; express: boolean } {
+  registerCustomExercises(program.customExercises);
+  const home = session.location === 'home';
+  const equipment = home ? [] : program.equipment?.length ? program.equipment : ALL_EQUIPMENT;
+  const approach = sourceOf(program, session) === 'approach';
+  const ctx: FitCtx = {
+    rest: { phase: program.phase, equipment: home ? [] : program.equipment, home, light: !!session.light, free: !approach },
+    warmup: warmupCtxFor(program, session, equipment),
+    kind: home ? 'home' : 'school',
+  };
+  const target = targetFor(program, session, date, weekday);
+  if (approach && !session.light && !session.mobility) {
+    const fit = fitSession(session, target.minutes, ctx, { skip: undoneTrims(session) });
+    return { minutes: fit.after, target, express: fit.express };
+  }
+  return { minutes: estimateSession(session, ctx), target, express: false };
+}
+
 /* ---------- resolveSession ---------- */
 export function resolveSession(program: Program, session: Session, athlete: AthleteContext, date: Date = todayDate()): ResolvedSession {
   // 2.3.1: the program's own exercises resolve like library ones (level, tier, equipment).
@@ -165,20 +250,44 @@ export function resolveSession(program: Program, session: Session, athlete: Athl
   const home = session.location === 'home';
   const lightHome = !!session.light;
   const equipment = home ? (lightHome ? [] : athlete.homeEquipment ?? []) : program.equipment?.length ? program.equipment : ALL_EQUIPMENT;
-  const jumps = home && !lightHome && !!program.homeJumps && (program.phase === 'off' || program.phase === 'pre');
-  const easing = easingFor(athlete.logs, date);
+  const source = sourceOf(program, session);
+  const approach = source === 'approach';
+  // H7: home jumps when the coach turns them on; Approach's own sessions add them in off-season and preseason only.
+  const jumps = home && !lightHome && !!program.homeJumps && (!approach || program.phase === 'off' || program.phase === 'pre');
+  const adjust = levelAdjustFor(program, session, athlete.userId);
+  // G9 easing is part of the level adjustment (§1.2): off means exactly what the coach wrote.
+  const easing = adjust ? easingFor(athlete.logs, date) : { active: false };
   const team = !!program.teamId;
   const swaps: { from: string; to: string }[] = [];
   let dropped = 0;
   const out: ResolvedExercise[] = [];
   const usedHome = new Set<string>();
-  for (const pe of day.exercises) {
+  const restCtx = { phase: program.phase, equipment: home ? equipment : program.equipment, home, light: lightHome, free: !approach };
+  const target = targetFor(program, session, date);
+  const fitCtx: FitCtx = { rest: restCtx, warmup: warmupCtxFor(program, session, equipment, { deload: day.block.deload }), kind: home ? 'home' : 'school' };
+  // §1.4: Approach-generated sessions fit the day's target automatically (minus any trim the coach undid).
+  let written: ProgramExercise[] = day.exercises;
+  let compactWarmup = false;
+  let express = false;
+  if (approach && !lightHome && !session.mobility) {
+    const fit = fitSession({ ...session, exercises: day.exercises }, target.minutes, fitCtx, { skip: undoneTrims(session) });
+    const more = fit.trims.length || fit.express ? { session: fit.session } : addBack(fit.session, target.minutes, fitCtx);
+    written = more.session.exercises;
+    compactWarmup = fit.compactWarmup;
+    express = fit.express;
+  }
+  for (const pe of written) {
     const original = getExercise(pe.exerciseId);
-    // Every program resolves to the athlete's level (team programs per G8; personal and shared programs as a backstop to G1).
-    // Home sessions: the best exercise for the slot from the athlete's home equipment and level (H6 pool).
-    let resolved = home ? resolveHomeExercise(original, pe.role, athlete.level, equipment, jumps, usedHome) : resolveExercise(original, athlete.level, equipment);
+    // Every program resolves to the athlete's level (team programs per G8; personal and shared programs as a backstop to G1),
+    // unless "Adjust to level" is off for this athlete, session or program (2.4.0 §1.2).
+    // Home sessions: the best exercise for the slot from the athlete's home equipment and level (H6 pool). A coach's own
+    // exercise stays when the athlete has the equipment for it (H6 is a suggestion filter now, §1.1 item 7).
+    let resolved: Exercise | null;
+    if (!adjust) resolved = original;
+    else if (home && !approach && fits(original, equipment) && original.level <= athlete.level) resolved = original;
+    else resolved = home ? resolveHomeExercise(original, pe.role, athlete.level, equipment, jumps, usedHome) : resolveExercise(original, athlete.level, equipment);
     // Harder version the athlete accepted (only at or below their level, and allowed here).
-    const harderId = resolved ? athlete.harderPicks?.[resolved.id] : null;
+    const harderId = resolved && adjust ? athlete.harderPicks?.[resolved.id] : null;
     if (resolved && harderId && !lightHome) {
       const harder = EXERCISES.find((e) => e.id === harderId);
       if (harder && harder.level <= athlete.level && (!home || (homeAllowed(harder, jumps) && fits(harder, equipment)))) resolved = harder;
@@ -191,9 +300,14 @@ export function resolveSession(program: Program, session: Session, athlete: Athl
     let effort = pe.effort;
     if (resolved.id !== original.id) swaps.push({ from: original.name, to: resolved.name });
     if (isStrength(pe, resolved)) {
-      if (team && athlete.level === 1) effort = BEGINNER_EFFORT[effort] ?? effort;
-      // H2: light home day tops out at RPE 6.
-      effort = capEffort(effort, lightHome ? 6 : effortCeiling(athlete.level, program.phase, easing.active));
+      if (approach) {
+        // program-design §9 / R2 (generated sessions only): beginner effort, the ceilings, H2 light home day ≤ RPE 6.
+        if (team && athlete.level === 1) effort = BEGINNER_EFFORT[effort] ?? effort;
+        effort = capEffort(effort, lightHome ? 6 : effortCeiling(athlete.level, program.phase, easing.active));
+      } else if (easing.active) {
+        // Coach-built: exactly as written, except the G9 easing-back-in week while "Adjust to level" is on.
+        effort = capEffort(effort, 6);
+      }
     }
     const next: ProgramExercise = { ...pe, exerciseId: resolved.id, effort };
     out.push({
@@ -202,8 +316,8 @@ export function resolveSession(program: Program, session: Session, athlete: Athl
       restSecResolved: 0,
     });
   }
-  // C1: beginners see at most 3 in a circuit; a 4th is done as straight sets after it.
-  if (athlete.level === 1) {
+  // C1: beginners see at most 3 in a circuit; a 4th is done as straight sets after it (generated sessions only, §0.1).
+  if (athlete.level === 1 && approach && adjust) {
     for (const [g, idx] of blocksOf(out)) {
       if (idx.length < 4) continue;
       for (const i of idx.slice(3)) out[i] = { ...out[i], group: undefined, afterCircuit: true };
@@ -214,19 +328,25 @@ export function resolveSession(program: Program, session: Session, athlete: Athl
       out.splice(0, out.length, ...rest);
     }
   }
-  // Rest: straight-set rest (coach within floors, else auto), then blocks (15 s transitions, rest after the round).
-  const ctx = { phase: program.phase, equipment: home ? equipment : program.equipment, home, light: lightHome };
-  const rests = blockRests(out, out.map((pe) => restSecFor(pe, ctx)), ctx);
+  // Rest: straight-set rest (generated: within floors; coach-built: as typed), then blocks (15 s transitions, rest after the round).
+  const rests = blockRests(out, out.map((pe) => restSecFor(pe, restCtx)), restCtx);
   out.forEach((pe, i) => (pe.restSecResolved = rests[i]));
   // Stations: which station each block belongs to.
   if (session.format === 'stations') {
     for (const st of session.stations ?? []) for (const pe of out) if (pe.group && st.groups.includes(pe.group)) pe.stationId = st.id;
   }
-  const estMinutes = estimateMinutes(
-    out.map((e) => ({ ex: getExercise(e.exerciseId), sets: e.filler ? 0 : e.sets, reps: e.reps, restSec: e.restSecResolved })),
-    home ? 'home' : 'school',
-  );
-  return { session: day.session, exercises: out, dropped, swaps, block: day.block, light: day.light, easing, estMinutes, home, lightHome };
+  // The warm-up is built from what this athlete actually does today (their versions).
+  const mine: Session = { ...session, exercises: out };
+  const wctx = { ...fitCtx.warmup, compact: compactWarmup };
+  const warmup = warmupFor(mine, wctx);
+  const estMinutes = estimateSession(mine, { ...fitCtx, warmup: wctx }, { rests });
+  return { session: day.session, exercises: out, dropped, swaps, block: day.block, light: day.light, easing, estMinutes, home, lightHome, source, levelAdjust: adjust, warmup, target, express };
+}
+
+/** F51d / F51g athlete Today: "About 52 min" (+ " (planned for 45)" when a set target differs by 5+), "Express · " first. */
+export function lengthLine(r: Pick<ResolvedSession, 'estMinutes' | 'target' | 'express'>): { text: string; planned: string | null } {
+  const planned = r.target.source !== 'phase' && Math.abs(r.estMinutes - r.target.minutes) >= 5 ? `(planned for ${r.target.minutes})` : null;
+  return { text: `${r.express ? 'Express · ' : ''}About ${r.estMinutes} min`, planned };
 }
 
 /** Swaps an athlete at a given level would get on a session (coach athlete detail). */
@@ -278,26 +398,6 @@ export function adjustedFor(adjusted: Record<string, string | null> | undefined,
   return k in adjusted ? adjusted[k] : undefined;
 }
 
-/* ---------- 1.6 Coach effort clamp (builder, D-028) ---------- */
-export type EffortProblem = { block: boolean; message: string };
-
-/**
- * Strength slots: above RPE 8 (7 in-season), "failure", "to failure" and "max" are blocked for teams with any minor,
- * and a warning on adult-only teams. Power slots may keep "Max effort" (max speed). Other slots aren't clamped.
- */
-export function effortProblem(pe: Pick<ProgramExercise, 'role' | 'effort' | 'exerciseId'>, phase: Phase, hasMinor: boolean): EffortProblem | null {
-  const ex = getExercise(pe.exerciseId);
-  if (!isStrength(pe, ex)) return null;
-  const ceiling = phase === 'in' ? 7 : 8;
-  const nums = (pe.effort.match(/RPE\s*(\d+)(?:\s*[–-]\s*(\d+))?/i) ?? []).slice(1).filter(Boolean).map(Number);
-  const tooHard = /fail|\bmax\b/i.test(pe.effort) || nums.some((n) => n > ceiling);
-  if (!tooHard) return null;
-  return {
-    block: hasMinor,
-    message: `For athletes under 18, strength work stays at RPE ${ceiling} or below. Stop with about 2 reps left.`,
-  };
-}
-
 /* ---------- 2.3.0 general teams (adult-training-rules.md, adult-goals.md) ---------- */
 /**
  * The general-team version of resolveSession (same G-1 entry point; never called for volleyball programs):
@@ -312,14 +412,20 @@ function resolveGeneral(program: Program, session: Session, athlete: AthleteCont
   const pool = exercisePool(true);
   const home = session.location === 'home';
   const equipment = home ? athlete.homeEquipment ?? [] : program.equipment?.length ? program.equipment : ALL_EQUIPMENT;
-  const easing = easingFor(athlete.logs, date);
+  // 2.4.0: adult rules A1/A3/§4/§5 and the ramp weeks shape Approach's goal defaults only; a trainer-built session is as written.
+  const source = sourceOf(program, session);
+  const approach = source === 'approach';
+  const adjust = levelAdjustFor(program, session, athlete.userId);
+  const easing = adjust ? easingFor(athlete.logs, date) : { active: false };
   const w = weekIndex(program, date) ?? 0;
   const plan = program.weeks?.[w];
+  // The "Back after a break" ramp is part of the goal the trainer chose (adult-goals.md), not a builder limit: it stays for
+  // every session of that program (judgment call; its v2.3.0 check isn't in spec §0.3). Its level cap follows "Adjust to level".
   const ramp = program.goal === 'back_after_break' && w < 4 ? BACK_AFTER_BREAK_RAMP[(w + 1) as 1 | 2 | 3 | 4] : null;
   const light = !!program.lightDates?.includes(dateKey(date));
   const deload = !ramp && !!plan?.deload;
-  const level = (ramp?.maxLevel ? Math.min(athlete.level, ramp.maxLevel) : athlete.level) as Level;
-  const ceiling = easing.active ? 6 : RPE_CEILING;
+  const level = (adjust && ramp?.maxLevel ? Math.min(athlete.level, ramp.maxLevel) : athlete.level) as Level;
+  const ceiling = easing.active ? 6 : approach ? RPE_CEILING : null;
   const swaps: { from: string; to: string }[] = [];
   let dropped = 0;
   const out: ResolvedExercise[] = [];
@@ -330,18 +436,22 @@ function resolveGeneral(program: Program, session: Session, athlete: AthleteCont
     // No power (jumps or throws) in ramp weeks 1–2; light days drop power as built.
     if ((ramp && !ramp.power && (role === 'power' || original.tier === 'P')) || (light && role === 'power')) continue;
     if (pe.cardio || original.durationOnly) {
-      const resolved = resolveExercise(original, level, equipment, pool) ?? (fits(getExercise('walk-jog'), equipment) ? getExercise('walk-jog') : null);
+      const resolved = !adjust ? original : resolveExercise(original, level, equipment, pool) ?? (fits(getExercise('walk-jog'), equipment) ? getExercise('walk-jog') : null);
       if (!resolved) {
         dropped++;
         continue;
       }
       if (resolved.id !== original.id) swaps.push({ from: original.name, to: resolved.name });
-      const rx = clampCardio(pe.cardio ?? { minutes: 10, intensity: 'easy' }, program.goal);
+      // A4 stays (minutes + Easy/Moderate only). The 60-min and Back-after-a-break limits apply to Approach's defaults only (F41).
+      const rx = approach ? clampCardio(pe.cardio ?? { minutes: 10, intensity: 'easy' }, program.goal) : clampCardioFree(pe.cardio ?? { minutes: 10, intensity: 'easy' });
       out.push({ ...pe, exerciseId: resolved.id, sets: 1, reps: `${rx.minutes} min`, effort: rx.intensity === 'easy' ? 'Easy' : 'Moderate', cardio: rx, ...(resolved.id !== original.id ? { teamExerciseId: original.id } : {}), restSecResolved: 0 });
       continue;
     }
-    let resolved = home ? resolveHomeExercise(original, pe.role, level, equipment, false, usedHome) : resolveExercise(original, level, equipment, pool);
-    const harderId = resolved ? athlete.harderPicks?.[resolved.id] : null;
+    let resolved: Exercise | null;
+    if (!adjust) resolved = original;
+    else if (home && !approach && fits(original, equipment) && original.level <= level) resolved = original;
+    else resolved = home ? resolveHomeExercise(original, pe.role, level, equipment, false, usedHome) : resolveExercise(original, level, equipment, pool);
+    const harderId = resolved && adjust ? athlete.harderPicks?.[resolved.id] : null;
     if (resolved && harderId) {
       const harder = pool.find((e) => e.id === harderId);
       if (harder && harder.level <= level && fits(harder, equipment)) resolved = harder;
@@ -362,17 +472,17 @@ function resolveGeneral(program: Program, session: Session, athlete: AthleteCont
     } else if (plan?.rpe != null && mainish && !deload) {
       effort = withWeekRpe(effort, plan.rpe);
     }
-    if (strength && athlete.level === 1 && !ramp) effort = shiftBeginner(effort);
+    if (approach && strength && athlete.level === 1 && !ramp && adjust) effort = shiftBeginner(effort);
     if (deload || light) {
       if (strength || role === 'power') {
         sets = Math.max(1, Math.round(sets * 0.6));
         effort = role === 'power' ? 'Easy, fast' : light ? 'Easy' : 'RPE 6';
       }
     }
-    if (strength) effort = capEffort(effort, ceiling);
+    if (strength && ceiling != null) effort = capEffort(effort, ceiling);
     out.push({ ...pe, exerciseId: resolved.id, sets, reps, effort, ...(resolved.id !== original.id ? { teamExerciseId: original.id } : {}), restSecResolved: 0 });
   }
-  if (athlete.level === 1) {
+  if (athlete.level === 1 && approach && adjust) {
     for (const [g, idx] of blocksOf(out)) {
       if (idx.length < 4) continue;
       for (const i of idx.slice(3)) out[i] = { ...out[i], group: undefined, afterCircuit: true };
@@ -383,20 +493,19 @@ function resolveGeneral(program: Program, session: Session, athlete: AthleteCont
       out.splice(0, out.length, ...rest);
     }
   }
-  const ctx = { phase: program.phase, equipment: home ? equipment : program.equipment, home, light: false };
+  const ctx = { phase: program.phase, equipment: home ? equipment : program.equipment, home, light: false, free: !approach };
   // Cardio has no rest table: a 60 s transition after the block (general-library.md §4a).
   const rests = blockRests(out, out.map((pe) => (pe.cardio ? 60 : restSecFor(pe, ctx))), ctx);
   out.forEach((pe, i) => (pe.restSecResolved = rests[i]));
   if (session.format === 'stations') {
     for (const st of session.stations ?? []) for (const pe of out) if (pe.group && st.groups.includes(pe.group)) pe.stationId = st.id;
   }
-  const estMinutes =
-    estimateMinutes(
-      out.filter((e) => !e.cardio).map((e) => ({ ex: getExercise(e.exerciseId), sets: e.filler ? 0 : e.sets, reps: e.reps, restSec: e.restSecResolved })),
-      home ? 'home' : 'school',
-    ) +
-    out.reduce((n, e) => n + (e.cardio?.minutes ?? 0), 0) +
-    (session.warmup === null ? 0 : 7);
+  // 2.4.0: generated warm-up (easy cardio from the gym profile, then drills; replaces W1–W3) and the estimate against the target.
+  const target = targetFor(program, session, date);
+  const mine: Session = { ...session, exercises: out };
+  const wctx = warmupCtxFor(program, session, equipment, { deload });
+  const warmup = warmupFor(mine, wctx);
+  const estMinutes = estimateSession(mine, { rest: ctx, warmup: wctx, kind: home ? 'home' : 'school' }, { rests });
   const weeks = programWeeks(program);
   const block: BlockInfo = {
     week: w + 1,
@@ -404,5 +513,10 @@ function resolveGeneral(program: Program, session: Session, athlete: AthleteCont
     deload,
     label: ramp ? `Ramp week ${w + 1} of 4` : deload ? `Deload week (${w + 1} of ${weeks})` : `Week ${w + 1} of ${weeks}`,
   };
-  return { session, exercises: out, dropped, swaps, block, light, easing, estMinutes, home, lightHome: false };
+  return { session, exercises: out, dropped, swaps, block, light, easing, estMinutes, home, lightHome: false, source, levelAdjust: adjust, warmup, target, express: false };
+}
+
+/** F41 (2.4.0): a trainer's cardio block is minutes (5–180) + Easy/Moderate. Nothing else (adult rule A4). */
+export function clampCardioFree(rx: { minutes: number; intensity: 'easy' | 'moderate' }) {
+  return { minutes: Math.min(180, Math.max(5, Math.round(rx.minutes))), intensity: rx.intensity === 'moderate' ? ('moderate' as const) : ('easy' as const) };
 }

@@ -38,6 +38,7 @@ import {
   Rack,
   StationRun,
   clientOf,
+  WarmupTemplate,
 } from './types';
 import { TRAINER_TERMS_VERSION } from '../trainerTerms';
 
@@ -53,6 +54,8 @@ type DB = {
   /** 2.2.1 §8: coachTermsVersion / coachTermsAcceptedAt mirror profiles.coach_terms_* (only the user writes them). */
   users: (Account & { password: string; coachTermsVersion?: string | null; coachTermsAcceptedAt?: string | null })[];
   teams: Team[];
+  /** 2.4.0 (migration 011 warmup_templates): coach-private warm-up templates. */
+  warmupTemplates?: (WarmupTemplate & { createdBy: string })[];
   members: {
     teamId: string;
     userId: string;
@@ -686,9 +689,45 @@ export const localBackend: Backend = {
       .sort((a, b) => b.day.localeCompare(a.day));
   },
 
+  async listWarmupTemplates(teamId) {
+    const { db, user } = await me();
+    // Same as the RLS in migration 011: only the team's coach, only their own templates.
+    if (!isCoach(db, teamId, user.id)) return [];
+    return (db.warmupTemplates ?? [])
+      .filter((w) => w.teamId === teamId && w.createdBy === user.id)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map(({ createdBy: _c, ...w }) => w);
+  },
+
+  async saveWarmupTemplate(teamId, name, items) {
+    const { db, user } = await me();
+    coachOf(db, teamId, user.id);
+    const n = name.trim();
+    if (n.length < 1 || n.length > 60) throw new BackendError('Name the template (up to 60 characters).');
+    const row = { id: uid(), teamId, name: n, items, createdAt: new Date().toISOString(), createdBy: user.id };
+    db.warmupTemplates = [...(db.warmupTemplates ?? []), row];
+    await save(db);
+    const { createdBy: _c, ...w } = row;
+    return w;
+  },
+
+  async deleteWarmupTemplate(id) {
+    const { db, user } = await me();
+    const row = (db.warmupTemplates ?? []).find((w) => w.id === id);
+    if (!row || row.createdBy !== user.id) return;
+    db.warmupTemplates = (db.warmupTemplates ?? []).filter((w) => w.id !== id);
+    for (const t of db.teams) if (t.settings?.defaultWarmupTemplateId === id) t.settings = { ...t.settings, defaultWarmupTemplateId: null };
+    await save(db);
+  },
+
   async updateTeamSettings(teamId, patch) {
     const { db, user } = await me();
     const t = coachOf(db, teamId, user.id);
+    // Migration 011 trigger: the default template must be one of this team's templates.
+    if (patch.defaultWarmupTemplateId && !(db.warmupTemplates ?? []).some((w) => w.id === patch.defaultWarmupTemplateId && w.teamId === teamId)) {
+      throw new BackendError('That warm-up template belongs to another team.');
+    }
+    if (patch.defaultWarmup && !['approach', 'template', 'none'].includes(patch.defaultWarmup)) throw new BackendError('Choose Approach Strength, My template, or None.');
     t.settings = { ...DEFAULT_TEAM_SETTINGS, ...t.settings, ...patch };
     await save(db);
   },

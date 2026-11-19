@@ -9,9 +9,10 @@ const path = require('path') as { join: (...p: string[]) => string; resolve: (..
 import { EXERCISES, GENERAL_POOL, exercisePool, getExercise, whyFor, equipmentLabel, fits } from '../../src/lib/exercises';
 import { GENERAL_EQUIPMENT, GENERAL_EXERCISES, WARMUPS, WHY_GENERAL } from '../../src/lib/generalLibrary';
 import {
-  ADULT_GOAL_RX, BACK_AFTER_BREAK_RAMP, adultWave, endsSoon, endDate, cardioProblems, clampCardio, countsTowardCap, defaultWeeks, generalEffortProblem,
+  ADULT_GOAL_RX, BACK_AFTER_BREAK_RAMP, adultWave, endsSoon, endDate, clampCardio, countsTowardCap, defaultWeeks,
   GOALS, HEAD_INJURY_TRAINER, LEGAL, PAIN_TRAINER, postChecks, programChecks, shiftBeginner, STRENGTH_CAP, terms,
 } from '../../src/lib/general';
+import * as GEN from '../../src/lib/general';
 import { newGeneralProgram } from '../../src/lib/starter';
 import { resolveExercise, resolveSession } from '../../src/lib/resolve';
 import { tierOf } from '../../src/lib/rest';
@@ -50,11 +51,13 @@ const cardio = GENERAL_EXERCISES.filter((e) => e.category === 'cardio');
 ok(cardio.length === 7 && cardio.every((e) => e.scope === 'general' && e.durationOnly), '7 cardio exercises: scope general, duration only');
 ok(GENERAL_EXERCISES.filter((e) => e.category !== 'cardio').every((e) => e.scope === 'all'), 'the other 32 are scope all');
 ok(GENERAL_EQUIPMENT.length === 13 && equipmentLabel('cable', true) === 'Cable station' && equipmentLabel('cable', false) === 'Cable / machines', '13 equipment items; cable reads "Cable station" only in general teams');
-ok(Object.keys(WHY_GENERAL).length === 27 && Object.keys(WHY_GENERAL).every((id) => EXERCISES.some((e) => e.id === id)), 'whyGeneral for 27 existing exercises');
+// 2.4.0: + er-90-90-iso (catalog v3 Part 1 drill whose catalog line mentions hitting and serving).
+ok(Object.keys(WHY_GENERAL).length === 28 && Object.keys(WHY_GENERAL).every((id) => EXERCISES.some((e) => e.id === id)), 'whyGeneral for 27 existing exercises + 1 catalog v3 drill');
 ok(whyFor(getExercise('kb-swing'), true) === 'Teaches a fast, powerful hip snap.' && whyFor(getExercise('kb-swing'), false) === getExercise('kb-swing').howTo.why, 'whyGeneral in general teams; volleyball keeps why');
-ok(WARMUPS.map((w) => w.id).join() === 'W1,W2,W3', 'warm-ups W1–W3');
-// C1: 0 exercises hidden; the picker shows all 74 existing + 39.
-ok(EXERCISES.length === 74 && GENERAL_POOL.length === 113, `general picker: 74 existing + 39 general (${EXERCISES.length} + ${GENERAL_POOL.length - EXERCISES.length})`);
+// general-library §8 "Warm-ups W1–W3 available" → SUPERSEDED (§0.3; CLAUDE.md known conflict 9): generated warm-ups replace them.
+ok(true, 'SUPERSEDED (§0.3) → W1–W3 replaced by generated warm-ups (checked in v240-p1-check: trainer warm-up starts with easy cardio)');
+// C1: 0 exercises hidden; the picker shows all 74 existing + 39. 2.4.0 Part 1 adds 15 catalog v3 drills (scope all).
+ok(EXERCISES.length === 74 + 15 && GENERAL_POOL.length === 113 + 15, `general picker: 74 existing + 15 catalog v3 + 39 general (${EXERCISES.length} + ${GENERAL_POOL.length - EXERCISES.length})`);
 ok(!EXERCISES.some((e) => e.scope === 'general'), 'volleyball library never contains scope general (cardio)');
 // claim words and volleyball words in text shown in general teams
 const CLAIMS = /\b(prevent\w*|injury[- ]proof|injury prevention|safe for|guarantee\w*|proven|science-backed|clinically|#1|rehab\w*|treat\w*|cure\w*|heal\w*|weight loss|fat loss|burn fat|calorie\w*|tone|toning|durability|shin splints|strains|jammed|easy on the joints|joint[- ]friendly)\b/i;
@@ -79,31 +82,30 @@ ok(w8[3].deload === true && w8[7].deload === true && !w8[0].deload, '8-week Stre
 
 /* ---------- adult rules §10 ---------- */
 const pe = (id: string, effort: string, reps = '6–8', role: 'main' | 'secondary' | 'accessory' | 'power' = 'main') => ({ exerciseId: id, effort, reps, role, sets: 3 });
-ok(['RPE 9', 'RPE 10', 'to failure', 'failure', 'max'].every((e) => generalEffortProblem(pe('back-squat', e)) !== null), 'builder blocks RPE 9/10, failure, to failure, max in strength rows');
-ok(generalEffortProblem(pe('back-squat', 'RPE 7', 'AMRAP')) !== null && generalEffortProblem(pe('db-row', 'RPE 7', 'for time', 'secondary')) !== null, 'AMRAP and "for time" blocked in tier A/B');
-ok(generalEffortProblem(pe('plank', 'RPE 7', '30 s for time', 'accessory')) === null, 'timed work stays allowed on tier C/D');
-ok(generalEffortProblem(pe('box-jump', 'Max effort', '3', 'power')) === null, 'power keeps "Max effort"');
-ok(generalEffortProblem(pe('back-squat', 'RPE 8')) === null, 'RPE 8 allowed');
+// trainer-mode §B5/B11 and adult rules §10 row 1 (builder effort blocks) → SUPERSEDED (§0.3): no builder block exists.
+const sup = (c: boolean, m: string) => ok(c, `SUPERSEDED (§0.3) → ${m}`);
+sup(!('generalEffortProblem' in GEN), 'builder blocks RPE 9/10, failure, max, AMRAP, for time: the block function is gone (resolveSession caps Approach sessions at RPE 8)');
+void pe;
 ok(shiftBeginner('RPE 7–8') === 'RPE 6–7' && shiftBeginner('RPE 7') === 'RPE 6', 'beginner defaults one RPE lower');
-ok(JSON.stringify(clampCardio({ minutes: 90, intensity: 'moderate' })) === '{"minutes":60,"intensity":"moderate"}' && JSON.stringify(clampCardio({ minutes: 30, intensity: 'moderate' }, 'back_after_break')) === '{"minutes":15,"intensity":"easy"}' && clampCardio({ minutes: 2, intensity: 'easy' }).minutes === 5, 'cardio 5–60 min; Back after a break Easy ≤ 15');
+ok(JSON.stringify(clampCardio({ minutes: 90, intensity: 'moderate' })) === '{"minutes":60,"intensity":"moderate"}' && JSON.stringify(clampCardio({ minutes: 30, intensity: 'moderate' }, 'back_after_break')) === '{"minutes":15,"intensity":"easy"}' && clampCardio({ minutes: 2, intensity: 'easy' }).minutes === 5, "cardio defaults 5–60 min; Back after a break Easy ≤ 15 (Approach's defaults, still applied to generated sessions)");
 const cs: Session = { id: 's', name: 's', focus: '', exercises: [{ exerciseId: 'bike', sets: 1, reps: '40 min', effort: 'Easy', cardio: { minutes: 40, intensity: 'easy' } }, { exerciseId: 'rower', sets: 1, reps: '30 min', effort: 'Easy', cardio: { minutes: 30, intensity: 'easy' } }] };
-ok(cardioProblems(cs).includes('Keep cardio to 60 minutes or less per session.'), 'over 60 min cardio per session blocked');
+sup(!('cardioProblems' in GEN), 'over 60 min cardio per session: no block (F41 stepper 5–180; minutes + Easy/Moderate only)');
 ok(!countsTowardCap(cs) && !countsTowardCap({ id: 'm', name: 'm', focus: '', exercises: [{ exerciseId: 'arm-circles', sets: 1, reps: '10', effort: 'Easy' }] }), 'cardio-only and warm-up-only sessions do not count toward the cap');
-ok(STRENGTH_CAP[1] === 4 && STRENGTH_CAP[2] === 5 && STRENGTH_CAP[3] === 6, 'caps 4 / 5 / 6');
+ok(STRENGTH_CAP[1] === 4 && STRENGTH_CAP[2] === 5 && STRENGTH_CAP[3] === 6, 'caps 4 / 5 / 6 (data kept for Approach-built suggestions)');
 // combined caps across programs posted to one client
 const prog = (id: string, perWeek: number, goal: 'strength' | 'general' = 'strength'): Program =>
   ({ ...newGeneralProgram({ id, teamId: 't', teamName: 'T', groupKey: 'draft:x', goal, weeks: 4, perWeek, name: id, equipment: ['barbell', 'dumbbells', 'bench', 'cable', 'pullup-bar', 'bands', 'bike'] }), startDate: '2026-11-23', postedAt: 'x' });
 const group = prog('group', 3);
 const own = prog('own', 3);
 const msg = postChecks(own, [{ userId: 'a', name: 'Alex Client', level: 2, existing: [{ label: 'Mon/Wed 6am class', program: group, sameTarget: false }] }]);
-ok(msg.some((c) => c.kind === 'block' && c.message === "Alex already has 3 sessions a week from Mon/Wed 6am class. This program adds 3 (total 6, max 5 for Alex's level)."), 'combined over the cap → block with the combined-total message');
-ok(postChecks(prog('two', 2, 'general'), [{ userId: 'a', name: 'Alex Client', level: 2, existing: [{ label: 'Mon/Wed 6am class', program: group, sameTarget: false }] }]).every((c) => c.kind !== 'block'), 'combined within the cap → no block');
+sup(msg.every((c) => c.kind === 'info') && msg.some((c) => c.message === 'Alex: 6 sessions a week across all programs.'), `combined over the cap: no block; neutral readout "Alex: 6 sessions a week across all programs." (${msg.map((c) => c.message).join(' | ')})`);
+ok(postChecks(prog('two', 2, 'general'), [{ userId: 'a', name: 'Alex Client', level: 2, existing: [{ label: 'Mon/Wed 6am class', program: group, sameTarget: false }] }]).every((c) => c.kind === 'info'), 'combined within the cap → no block');
 const seven = { ...prog('seven', 6), liftSchedule: Array(7).fill(null) } as Program;
 seven.liftSchedule = [0, 1, 2, 3, 4, 5, 6].map((i) => seven.sessions[i % seven.sessions.length].id);
-ok(programChecks(seven, 3).some((c) => c.kind === 'block' && /day off/.test(c.message)), 'no rest day → block');
-ok(programChecks(prog('long', 3), 1).every((c) => c.kind !== 'block'), '3 strength sessions OK for a beginner');
+sup(programChecks(seven).every((c) => c.kind === 'info'), 'no rest day: no block (F39b); the week count shows as information');
+ok(programChecks(prog('long', 3)).every((c) => c.kind === 'info'), '3 strength sessions OK for a beginner');
 const longNoDeload = { ...prog('ln', 3), weeks: Array.from({ length: 8 }, () => ({ rpe: 7 })) };
-ok(programChecks(longNoDeload, 2).some((c) => c.kind === 'warn' && c.message === 'No deload in 7+ weeks. Most programs take one every 4–6 weeks.'), '7+ weeks without a deload → warning');
+sup(!programChecks(longNoDeload).some((c) => /deload/i.test(c.message)), '7+ weeks without a deload: no warning (F39b)');
 
 /* ---------- resolveSession, general branch ---------- */
 const base = prog('r', 3);
@@ -116,7 +118,10 @@ const day = (k: string) => new Date(`${k}T12:00:00`);
 const adv = resolveSession({ ...base, sessions: [ses] }, ses, { level: 3, logs: [] }, day('2026-11-23'));
 ok(adv.exercises[0].effort === 'RPE 7' && adv.exercises[0].exerciseId === 'back-squat', 'week 1 effort from the wave; strength capped (RPE 9 → week RPE ≤ 8)');
 const rp = { ...base, sessions: [ses], weeks: base.weeks!.map((w) => ({ ...w, rpe: 10 })) };
-ok(resolveSession(rp, ses, { level: 3, logs: [] }, day('2026-11-30')).exercises[0].effort === 'RPE 8', 'resolveSession caps strength at RPE 8 even if a week says more');
+// trainer-mode §B5 → SUPERSEDED (§0.3): the RPE 8 cap applies to Approach's goal-default sessions only.
+sup(resolveSession(rp, ses, { level: 3, logs: [] }, day('2026-11-30')).exercises[0].effort === 'RPE 10', 'a trainer-built session keeps the week RPE 10 as written');
+const sesA = { ...ses, source: 'approach' as const };
+ok(resolveSession({ ...rp, sessions: [sesA] }, sesA, { level: 3, logs: [] }, day('2026-11-30')).exercises[0].effort === 'RPE 8', '2.4.0: resolveSession caps an Approach goal-default session at RPE 8 even if a week says more');
 const beg = resolveSession({ ...base, sessions: [ses] }, ses, { level: 1, logs: [] }, day('2026-11-23'));
 ok(beg.exercises[0].exerciseId !== 'back-squat' && getExercise(beg.exercises[0].exerciseId).level === 1, `beginner in a class built at intermediate gets level 1 (${beg.exercises[0].exerciseId})`);
 ok(beg.exercises.find((e) => e.cardio)?.cardio?.minutes === 10 && beg.exercises.find((e) => e.cardio)?.sets === 1, 'cardio rows stay duration only');
@@ -143,12 +148,14 @@ const smoke: Session = { id: 'sm', name: 'sm', focus: '', format: 'stations', st
 ] };
 const sp = { ...base, sessions: [smoke], equipment: ['barbell', 'dumbbells', 'bench', 'cable', 'bands'] } as Program;
 const rs = resolveSession(sp, smoke, { level: 2, logs: [] }, day('2026-11-23'));
-ok(rs.exercises[0].restSecResolved >= 120, `rest floor: tier A at ≥ 2:00 even when the trainer typed 0:30 (${rs.exercises[0].restSecResolved}s)`);
+sup(rs.exercises[0].restSecResolved === 30, `rest floor: the trainer's 0:30 on a tier A lift saves and resolves as typed (${rs.exercises[0].restSecResolved}s)`);
+const smokeA = { ...smoke, source: 'approach' as const };
+const rsA = resolveSession({ ...sp, sessions: [smokeA] }, smokeA, { level: 2, logs: [] }, day('2026-11-23'));
+ok(rsA.exercises[0].restSecResolved >= 120, `2.4.0: an Approach-generated session keeps the tier A floor ≥ 2:00 (${rsA.exercises[0].restSecResolved}s)`);
 ok(rs.exercises.filter((e) => e.group === 'A').length === 2 && rs.exercises.filter((e) => e.group === 'B').length === 3, 'superset (A) and circuit (B) kept');
 ok(rs.exercises.filter((e) => e.group).every((e) => e.stationId), 'stations: every block is placed at its station');
-const youth = groupRows([smoke.exercises[0], { exerciseId: 'box-jump', sets: 3, reps: '3', effort: 'Max effort', role: 'power' }], [0, 1], sp.equipment, true);
-ok(!!youth.list && !!youth.warning, 'contrast pair: a warning (not a block) in general teams');
-ok(!!groupRows([smoke.exercises[0], { exerciseId: 'box-jump', sets: 3, reps: '3', effort: 'Max effort', role: 'power' }], [0, 1], sp.equipment).reason, 'contrast pair: still blocked for volleyball teams');
+const youth = groupRows([smoke.exercises[0], { exerciseId: 'box-jump', sets: 3, reps: '3', effort: 'Max effort', role: 'power' }], [0, 1]);
+sup(youth.list.filter((e) => e.group).length === 2 && !('warning' in youth) && !('reason' in youth), 'contrast pair: grouped with no warning (general) and no block (volleyball)');
 const homeS: Session = { ...smoke, id: 'h', location: 'home', format: undefined, stations: undefined, exercises: smoke.exercises.map((e) => ({ ...e, group: undefined })) };
 const rh = resolveSession({ ...sp, sessions: [homeS] }, homeS, { level: 2, logs: [], homeEquipment: ['dumbbells'] }, day('2026-11-23'));
 ok(rh.home && rh.exercises.every((e) => fits(getExercise(e.exerciseId), ['dumbbells'])), 'home workout: each exercise fits the client home equipment (device only)');

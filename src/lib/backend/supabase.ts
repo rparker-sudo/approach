@@ -19,6 +19,7 @@ import {
   Perms,
   permsFromStatus,
   TeamSettings,
+  WarmupTemplate,
   TestResult,
   TestSession,
   makeJoinCode,
@@ -68,6 +69,9 @@ type TeamRow = {
   accent_color?: string | null;
   kind?: TeamKind | null;
   gym_equipment?: string[] | null;
+  default_warmup?: 'approach' | 'template' | 'none' | null;
+  default_warmup_template_id?: string | null;
+  limited_space?: boolean | null;
 };
 
 /** team_members permission columns (migration 004). */
@@ -150,6 +154,9 @@ function toTeam(r: TeamRow): Team {
     teamGoal: r.team_goal ?? d.teamGoal,
     medBallLb: r.med_ball_lb != null ? Number(r.med_ball_lb) : d.medBallLb,
     accentColor: r.accent_color ?? d.accentColor,
+    defaultWarmup: r.default_warmup ?? d.defaultWarmup,
+    defaultWarmupTemplateId: r.default_warmup_template_id ?? d.defaultWarmupTemplateId,
+    limitedSpace: r.limited_space ?? d.limitedSpace,
   };
   return { id: r.id, name: r.name, joinCode: r.join_code, coachId: r.coach_id, coachName: r.coach?.name, createdAt: r.created_at, settings, kind: r.kind ?? 'volleyball', ...(r.gym_equipment ? { gymEquipment: r.gym_equipment as Equipment[] } : {}) };
 }
@@ -163,6 +170,9 @@ const SETTINGS_COLS: Record<keyof TeamSettings, string> = {
   teamGoal: 'team_goal',
   medBallLb: 'med_ball_lb',
   accentColor: 'accent_color',
+  defaultWarmup: 'default_warmup',
+  defaultWarmupTemplateId: 'default_warmup_template_id',
+  limitedSpace: 'limited_space',
 };
 
 type TestRow = {
@@ -252,10 +262,15 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
   const TEAM_P3 = `${TEAM_P2},accent_color`;
   const TEAM_P4 = `${TEAM_P3},kind`;
   const TEAM_P5 = `${TEAM_P4},gym_equipment`;
-  // Falls back to older columns until migrations 010 / 009 / 006 / 004 have run.
-  let TEAM_SELECT = TEAM_P5;
+  const TEAM_P6 = `${TEAM_P5},default_warmup,default_warmup_template_id,limited_space`;
+  // Falls back to older columns until migrations 011 / 010 / 009 / 006 / 004 have run.
+  let TEAM_SELECT = TEAM_P6;
   async function withTeamCols<T extends { error: { message: string } | null }>(run: (cols: string) => PromiseLike<T>): Promise<T> {
     let res = await run(TEAM_SELECT);
+    if (TEAM_SELECT === TEAM_P6 && isMissing(res.error)) {
+      TEAM_SELECT = TEAM_P5;
+      res = await run(TEAM_SELECT);
+    }
     if (TEAM_SELECT === TEAM_P5 && isMissing(res.error)) {
       TEAM_SELECT = TEAM_P4;
       res = await run(TEAM_SELECT);
@@ -696,6 +711,31 @@ export function createSupabaseBackend(url: string, anonKey: string): Backend {
       if (error) fail(error);
       const { data } = await sb.auth.getSession();
       return account(id, data.session?.user.email ?? '');
+    },
+
+    async listWarmupTemplates(teamId) {
+      const { data, error } = await sb.from('warmup_templates').select('id,team_id,name,items,created_at').eq('team_id', teamId).order('created_at', { ascending: false });
+      if (isMissing(error)) return [];
+      if (error) fail(error);
+      return (data as { id: string; team_id: string; name: string; items: WarmupTemplate['items']; created_at: string }[]).map((r) => ({
+        id: r.id,
+        teamId: r.team_id,
+        name: r.name,
+        items: r.items,
+        createdAt: r.created_at,
+      }));
+    },
+
+    async saveWarmupTemplate(teamId, name, items) {
+      const { data, error } = await sb.from('warmup_templates').insert({ team_id: teamId, name: name.trim(), items }).select('id,team_id,name,items,created_at').single();
+      if (error) fail(error);
+      const r = data as { id: string; team_id: string; name: string; items: WarmupTemplate['items']; created_at: string };
+      return { id: r.id, teamId: r.team_id, name: r.name, items: r.items, createdAt: r.created_at };
+    },
+
+    async deleteWarmupTemplate(id) {
+      const { error } = await sb.from('warmup_templates').delete().eq('id', id);
+      if (error) fail(error);
     },
 
     async updateTeamSettings(teamId, patch) {

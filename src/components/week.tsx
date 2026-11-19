@@ -4,7 +4,8 @@ import { breakOn, dateKey, eventsOn, fromKey, isHeavyLegs, mondayOf, today, week
 import { dayAdvice, liftCapMessage, pickLiftDays } from '../lib/generator';
 import type { DayType, Program } from '../lib/types';
 import { DAY_TYPES, WEEKDAYS } from '../lib/types';
-import { Body, Button, colors, Icon, Note, Row, Text } from './ui';
+import { Body, Button, colors, Icon, Note, Pill, Row, Text } from './ui';
+import { coachEstimate } from '../lib/resolve';
 import { capExperience } from '../lib/athlete';
 import { useStore } from '../lib/store';
 
@@ -138,6 +139,8 @@ export function LiftDayPicker({
   );
 }
 
+const WEEKDAY_PLURAL = ['Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays', 'Sundays'];
+
 /** One real week of a program, using calendar dates and automatic adjustments. */
 export function ProgramWeek({
   program,
@@ -149,6 +152,7 @@ export function ProgramWeek({
   monday?: Date;
 }) {
   const { data } = useStore();
+  const coach = data.profile?.role === 'coach';
   const plan = weekPlan(program, monday, capExperience(data));
   const types = plan.map((p) => p.dayType);
   const todayKey = dateKey(today());
@@ -213,6 +217,22 @@ export function ProgramWeek({
                   <Text style={{ color: colors.muted, fontSize: 13 }}>
                     {session.exercises.length} exercises · {vb === 'off' ? 'No volleyball' : `${vbLabel} day`}
                   </Text>
+                  {coach
+                    ? (() => {
+                        // F51b–d, F46b, F51g: length against the target (with its source), level adjust, Express.
+                        const est = coachEstimate(program, session, fromKey(p.date));
+                        const src = est.target.source === 'date' ? ' (this date)' : est.target.source === 'weekday' ? ` · Set for ${WEEKDAY_PLURAL[i]}.` : '';
+                        return (
+                          <>
+                            <Text style={{ color: colors.muted, fontSize: 13 }}>{`about ${est.minutes} / ${est.target.minutes} min${src}`}</Text>
+                            <Row style={{ gap: 6, flexWrap: 'wrap' }}>
+                              {est.express ? <Pill text="Express" /> : null}
+                              {program.levelAdjust !== false && session.levelAdjust === false ? <Text style={{ fontSize: 12, color: colors.muted }}>Level adjust off</Text> : null}
+                            </Row>
+                          </>
+                        );
+                      })()
+                    : null}
                 </>
               ) : (
                 <Text style={{ color: colors.muted, fontSize: 16, fontWeight: '500' }}>

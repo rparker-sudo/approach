@@ -8,7 +8,7 @@ import { backend, BoardMember, BoardTest, LiveProgress, Rack } from '../../lib/b
 import { addDays, breakOn, dateKey, formatKey, mondayOf, planForDate, today } from '../../lib/calendar';
 import { defaultTeamGoal, EffortMetric, formatMetric, liftDaysOf, METRICS, POINTS_LINE, rank, seasonStart, weeksRemaining } from '../../lib/effort';
 import { ALL_EQUIPMENT, getExercise } from '../../lib/exercises';
-import { adjustedFor, Level, resolveExercise } from '../../lib/resolve';
+import { adjustedFor, Level, levelAdjustFor, resolveExercise } from '../../lib/resolve';
 import { runState, stationFor, StationRun } from '../../lib/stations';
 import { BATTERY_LABEL } from '../../lib/testing';
 import { ALL, useTeams } from '../../lib/team';
@@ -31,7 +31,7 @@ const GAP = 12;
 const POWERED_BY = require('../../../assets/brand/powered-by-board.png');
 const POWERED_BY_RATIO = 680 / 72;
 
-type TileState = 'lifting' | 'resting' | 'not_started' | 'done';
+type TileState = 'warming_up' | 'lifting' | 'resting' | 'not_started' | 'done';
 type Tile = { member: BoardMember; live?: LiveProgress; prs: number; test?: BoardTest; state: TileState; upFirst?: string };
 type Moment = { at: number; text: string };
 
@@ -206,6 +206,8 @@ function Board({ teamId }: { teamId: string }) {
     const entry = today_.per.find((x) => x.key === k) ?? today_.per[0];
     const first = entry?.session?.exercises[0];
     if (!entry || !first) return undefined;
+    // 2.4.0 (§1.2): "Adjust to level" off for this athlete, session or program: the written exercise.
+    if (!levelAdjustFor(entry.prog, entry.session, m.userId)) return getExercise(first.exerciseId).name;
     const info = extras?.levels[m.userId];
     // 2.2.1 J1: an exercise adjusted because of another team comes from the server's list (no level is sent).
     const adj = adjustedFor(info?.adjusted, first.exerciseId, entry.prog.equipment);
@@ -221,9 +223,11 @@ function Board({ teamId }: { teamId: string }) {
     if (s === 'done') return 'done';
     if (s === 'resting') return secsTo(l.restEndsAt, now) > 0 ? 'resting' : 'lifting';
     if (s === 'lifting') return 'lifting';
+    // 2.4.0 F47: state only; no warm-up items on the board (G-4).
+    if (s === 'warming_up') return 'warming_up';
     return 'not_started';
   };
-  const ORDER: Record<TileState, number> = { resting: 0, lifting: 0, not_started: 1, done: 2 };
+  const ORDER: Record<TileState, number> = { resting: 0, lifting: 0, warming_up: 0, not_started: 1, done: 2 };
   // 3.1: athletes on a home day aren't on the live view (they aren't in the room).
   const atHome = (m: BoardMember) => {
     const k = m.groupId && today_.per.some((x) => x.key === m.groupId) ? m.groupId : ALL;
@@ -538,7 +542,9 @@ function BoardTile({
         ? { text: 'Done', fill: accent, ink: textOn(accent), border: accent }
         : tile.state === 'lifting'
           ? { text: 'Lifting', fill: '#3A3D42', ink: P.ink, border: '#3A3D42' }
-          : { text: 'Not started', fill: 'transparent', ink: P.ink, border: P.muted };
+          : tile.state === 'warming_up'
+            ? { text: 'Warming up', fill: '#3A3D42', ink: P.ink, border: '#3A3D42' }
+            : { text: 'Not started', fill: 'transparent', ink: P.ink, border: P.muted };
   let line2: string | null = null;
   let line3: string | null = null;
   if (test) {
@@ -546,8 +552,13 @@ function BoardTile({
     const t = tile.test;
     line2 = !t || t.jumpsDone < 3 ? `Jump tests ${t?.jumpsDone ?? 0} / 3` : test !== 'jump' && t.strengthDone ? 'Strength check ✓' : 'Jump tests ✓';
   } else if (tile.state === 'not_started') line2 = tile.upFirst ? `Up first: ${tile.upFirst}` : null;
+  else if (tile.state === 'warming_up') line2 = null;
   else if (done) line2 = l?.finishedAt ? `Finished ${new Date(l.finishedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Finished';
-  else if (l?.groupLabel) {
+  else if (l?.groupLabel?.startsWith('Ramp-up ')) {
+    // F48: work sets only are counted; during ramp-ups the tile reads "Ramp-up 2 of 3".
+    line2 = l.exerciseName ?? null;
+    line3 = l.groupLabel;
+  } else if (l?.groupLabel) {
     // F23: "A1 DB Bench · A2 One-Arm Row" then "Round 2 of 3".
     const cut = l.groupLabel.lastIndexOf(' · Round ');
     line2 = cut > 0 ? l.groupLabel.slice(0, cut) : l.groupLabel;

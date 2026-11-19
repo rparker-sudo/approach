@@ -136,6 +136,16 @@ Only the service role can change these two columns; a trigger rejects the change
 
 **Check query (optional):** `select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'teams' and column_name in ('kind', 'trainer_verified_at', 'trainer_verified_by', 'gym_equipment');` should return 4 after both migrations.
 
+### Upgrading from 2.3.1 (to 2.4.0, Training v3)
+Ryan runs these in order, after 010, in Supabase → SQL Editor. Each file is safe to run twice. Every change is recorded in `build-snapshot.md`.
+
+1. `supabase/migrations/011_training_v3_p1.sql` (Part 1): the `warmup_templates` table (a coach's or trainer's saved warm-ups; only that coach can read them), `teams.default_warmup` ('approach' / 'template' / 'none'), `teams.default_warmup_template_id`, `teams.limited_space`, and one more allowed live-board state (`warming_up`; no new column).
+2. Deploy 2.4.0 (push to `main`) after Ryan approves the deploy.
+
+Everything else in Training v3 Part 1 lives inside the existing program JSON (session source, level adjust, warm-ups, session length, Fit to time) and the existing team calendar JSON (weight room time per date).
+
+**Check query (optional):** `select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'teams' and column_name in ('default_warmup', 'default_warmup_template_id', 'limited_space');` should return 3 after 011.
+
 ## Browser version on GitHub Pages
 
 The repository includes `.github/workflows/deploy-web.yml`, which builds the browser version and publishes it every time you push to `main`. Team QR codes and join links point at it.

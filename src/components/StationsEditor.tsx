@@ -2,14 +2,12 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { backend } from '../lib/backend';
-import { getExercise } from '../lib/exercises';
+import { ALL_EQUIPMENT, getExercise } from '../lib/exercises';
 import { blocksOf, labelOf } from '../lib/groups';
 import {
   defaultStations,
-  mustBePart1,
   NAME_HELPER,
   NOT_HERE,
-  PART1_REASON,
   STATION_TRANSITION_SEC,
   stationChecks,
   stationMinutes,
@@ -18,7 +16,9 @@ import {
   suggestOrder,
   withBlockLetters,
 } from '../lib/stations';
-import { lengthTarget } from '../lib/rest';
+import { stationMinutesFrom, targetFor } from '../lib/fit';
+import { warmupCtxFor } from '../lib/resolve';
+import { warmupFor, warmupMinutes } from '../lib/warmup';
 import type { Program, Session, Station } from '../lib/types';
 import { uid } from '../lib/util';
 import { Button, Card, Chip, ChipRow, colors, Field, H2, Label, Row, Stepper, Text } from './ui';
@@ -28,7 +28,7 @@ import { Button, Card, Chip, ChipRow, colors, Field, H2, Label, Row, Stepper, Te
  * and the main tier A lift. Part 2: one block per station (straight sets, superset or circuit). Station names are
  * neutral (equipment names, never athletes, levels or positions; Legal §5).
  */
-export default function StationsEditor({ program, session, hasMinor, onChange }: { program: Program; session: Session; hasMinor: boolean; onChange: (s: Session) => void }) {
+export default function StationsEditor({ program, session, onChange }: { program: Program; session: Session; onChange: (s: Session) => void }) {
   const [racks, setRacks] = useState<number | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   useEffect(() => {
@@ -89,20 +89,18 @@ export default function StationsEditor({ program, session, hasMinor, onChange }:
     (blocksOf(list).get(g) ?? []).map((i) => `${labelOf(list, i) ?? ''} ${getExercise(list[i].exerciseId).name}`.trim()).join(' + ');
   const save = (next: Station[]) => onChange({ ...session, exercises: list, stations: next });
   const setStation = (k: number, patch: Partial<Station>) => save(stations.map((s, i) => (i === k ? { ...s, ...patch } : s)));
-  const checks = stationChecks(list, stations, racks ?? 0, ctx, hasMinor);
-  const est = stationsEstimate(list, stations, ctx);
-  const target = lengthTarget(program.phase, 'school');
+  const checks = stationChecks(list, stations, racks ?? 0, ctx);
+  // §1.4: station time = (session length − warm-up − Part 1 − finish) ÷ stations − 1 min transition.
+  const target = targetFor(program, session);
+  const warmMin = warmupMinutes(warmupFor(session, warmupCtxFor(program, session, program.equipment?.length ? program.equipment : ALL_EQUIPMENT)), { phase: program.phase });
+  const part1Only = stationsEstimate(list, stations, ctx).part1 - 8;
+  const fromLength = stations.length ? stationMinutesFrom(target.minutes, warmMin, Math.max(0, part1Only), 0, stations.length) : null;
+  const est = stationsEstimate(list, stations, ctx, fromLength);
+  const anyCoachTime = stations.some((st) => st.autoMinutes === false);
 
   function putBlock(k: number, g: string) {
-    const idx = blocksOf(list).get(g) ?? [];
-    if (idx.some((i) => mustBePart1(list[i], program.equipment))) {
-      // Minors: refused (snaps back). Adult-only: allowed with the same line as a warning.
-      if (hasMinor) {
-        setMsg(PART1_REASON);
-        return;
-      }
-      setMsg(`${PART1_REASON} (Warning: this team is all adults.)`);
-    } else setMsg(null);
+    // 2.4.0 (F45a): any exercise in any station, no message.
+    setMsg(null);
     // Each card holds exactly one block.
     save(stations.map((s, i) => (i === k ? { ...s, groups: [g] } : { ...s, groups: s.groups.filter((x) => x !== g) })));
   }
@@ -121,7 +119,7 @@ export default function StationsEditor({ program, session, hasMinor, onChange }:
       </Card>
       <Label>Part 2 · Stations</Label>
       {stations.map((st, k) => {
-        const need = stationMinutes(list, st, ctx);
+        const need = fromLength ?? stationMinutes(list, st, ctx);
         return (
           <Card key={st.id}>
             <Row style={{ justifyContent: 'space-between' }}>
@@ -158,14 +156,15 @@ export default function StationsEditor({ program, session, hasMinor, onChange }:
           <Button small kind="ghost" title="Suggest order" onPress={() => save(suggestOrder(list, stations, program.equipment))} />
         </View>
       </Row>
-      {msg ? <Text accessibilityRole="alert" style={{ fontSize: 13, color: hasMinor && msg === PART1_REASON ? colors.errorText : colors.warningText }}>{msg}</Text> : null}
       {checks.map((c, i) => (
-        <Text key={i} style={{ fontSize: 13, color: c.tone === 'block' ? colors.errorText : c.tone === 'warn' ? colors.warningText : colors.ink }}>{c.text}</Text>
+        <Text key={i} style={{ fontSize: 13, color: colors.ink }}>{c.text}</Text>
       ))}
-      <Text style={{ fontSize: 14, fontWeight: '600', color: est.total > target ? colors.warningText : colors.ink }}>
-        {`Part 1 · ${est.part1} min + ${stations.length} stations × (${est.per} + 1) min = about ${Math.round(est.total)} min · target ${target}${est.total > target ? ' ●' : ''}`}
+      <Text style={{ fontSize: 13, color: colors.muted }}>
+        {anyCoachTime ? 'Station time set by you.' : fromLength ? `${fromLength} min each, from your ${target.minutes}-min session.` : ''}
       </Text>
-      {est.total > target ? <Text style={{ fontSize: 13, color: colors.muted }}>Try fewer stations or cut a set.</Text> : null}
+      <Text style={{ fontSize: 14, fontWeight: '600', color: colors.ink }}>
+        {`Part 1 · ${est.part1} min + ${stations.length} stations × (${est.per} + 1) min = about ${Math.round(est.total)} min · target ${target.minutes}`}
+      </Text>
     </View>
   );
 }

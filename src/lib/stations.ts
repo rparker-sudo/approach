@@ -10,11 +10,10 @@ import { uid } from './util';
  */
 
 export const STATION_TRANSITION_SEC = 60;
-export const PART1_REASON = 'Power and heavy lifts are done in Part 1, fresh, so no group does them tired at the end.';
 export const NOT_HERE = 'Stations are for weight-room sessions with rack groups.';
 export const NAME_HELPER = "Name stations after equipment, like 'DB bench.'";
 
-/** Must stay in Part 1 for a team with a minor: tier P, and the main tier A lift. */
+/** Approach's suggested Part 1 (2.4.0: a suggestion only; the coach can move anything): tier P, and the main tier A lift. */
 export function mustBePart1(pe: ProgramExercise, equipment?: Equipment[]): boolean {
   const t = tierOf(getExercise(pe.exerciseId), equipment);
   return t === 'P' || (t === 'A' && pe.role === 'main');
@@ -55,8 +54,12 @@ export function stationMinutes(list: ProgramExercise[], st: Station, ctx: RestCo
   return Math.max(1, Math.ceil(sec / 60));
 }
 
-export const stationTime = (list: ProgramExercise[], stations: Station[], ctx: RestContext = {}) =>
-  Math.max(1, ...stations.map((st) => (st.autoMinutes === false ? st.minutes : stationMinutes(list, st, ctx))));
+/**
+ * Minutes per station. 2.4.0 (§1.4): auto stations take their time from the session length when there is one
+ * (`fromLength`); a coach-set station time wins.
+ */
+export const stationTime = (list: ProgramExercise[], stations: Station[], ctx: RestContext = {}, fromLength?: number | null) =>
+  Math.max(1, ...stations.map((st) => (st.autoMinutes === false ? st.minutes : fromLength ?? stationMinutes(list, st, ctx))));
 
 const legHeavy = (list: ProgramExercise[], st: Station, equipment?: Equipment[]) =>
   list.some((pe) => pe.group && st.groups.includes(pe.group) && isLegHeavy(getExercise(pe.exerciseId), equipment));
@@ -76,39 +79,33 @@ export function suggestOrder(list: ProgramExercise[], stations: Station[], equip
   return out;
 }
 
-export type StationCheck = { tone: 'ok' | 'warn' | 'block'; text: string; stationIndex?: number };
+export type StationCheck = { tone: 'info'; text: string; stationIndex?: number };
 
-/** F28c checks shown under the stations. */
-export function stationChecks(list: ProgramExercise[], stations: Station[], racks: number, ctx: RestContext = {}, hasMinor = true): StationCheck[] {
+/**
+ * F28c checks shown under the stations. 2.4.0 (F45a): neutral information only, never a block or warning on saving.
+ * "More racks than stations" stays as a setup check (whether the format can run), shown as information.
+ */
+export function stationChecks(list: ProgramExercise[], stations: Station[], racks: number, ctx: RestContext = {}): StationCheck[] {
   const out: StationCheck[] = [];
   const n = stations.length;
-  if (n === racks) out.push({ tone: 'ok', text: `${n} stations · ${racks} racks ✓` });
-  else if (n > racks) out.push({ tone: 'warn', text: `${n} stations, ${racks} racks. One station sits empty each round.` });
-  else out.push({ tone: 'block', text: `${racks} racks, ${n} stations. Add a station or merge two racks.` });
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    if (n > 1 && i !== j && legHeavy(list, stations[i], ctx.equipment) && legHeavy(list, stations[j], ctx.equipment)) {
-      out.push({ tone: 'warn', text: `Stations ${i + 1} and ${j + 1} are both leg-heavy, so groups do them back to back.` });
-    }
-  }
+  if (n === racks) out.push({ tone: 'info', text: `${n} stations · ${racks} racks ✓` });
+  else if (n > racks) out.push({ tone: 'info', text: `${n} stations, ${racks} racks. One station sits empty each round.` });
+  else out.push({ tone: 'info', text: `${racks} racks, ${n} stations. One rack has no station each round.` });
   stations.forEach((st, i) => {
     const need = stationMinutes(list, st, ctx);
-    if (st.autoMinutes === false && st.minutes < need) out.push({ tone: 'warn', text: `Station ${i + 1} needs about ${need} min. Add time or cut a set.`, stationIndex: i });
-    if (!st.name.trim()) out.push({ tone: 'block', text: `Station ${i + 1} needs a name.`, stationIndex: i });
-    if (!st.groups.length) out.push({ tone: 'block', text: `Station ${i + 1} has no exercises.`, stationIndex: i });
+    if (st.autoMinutes === false && st.minutes < need) out.push({ tone: 'info', text: `Station ${i + 1} has about ${need} min of work in ${st.minutes} min.`, stationIndex: i });
+    if (!st.groups.length) out.push({ tone: 'info', text: `Station ${i + 1} has no exercises yet.`, stationIndex: i });
   });
-  const part1Bad = list.some((pe) => pe.group && stations.some((st) => st.groups.includes(pe.group!)) && mustBePart1(pe, ctx.equipment));
-  if (part1Bad) out.push({ tone: hasMinor ? 'block' : 'warn', text: PART1_REASON });
   return out;
 }
 
 /** F28d: "Part 1 · 15 min + 4 stations × (8 + 1) min + Finish 0 min = about 56 min". */
-export function stationsEstimate(list: ProgramExercise[], stations: Station[], ctx: RestContext = {}): { part1: number; per: number; total: number } {
+export function stationsEstimate(list: ProgramExercise[], stations: Station[], ctx: RestContext = {}, fromLength?: number | null): { part1: number; per: number; total: number } {
   const inStation = new Set(stations.flatMap((s) => s.groups));
   const p1 = list.filter((pe) => !pe.group || !inStation.has(pe.group));
   const rests = blockRests(p1, straightRests(p1, ctx), ctx);
   const part1 = estimateMinutes(p1.map((pe, k) => ({ ex: getExercise(pe.exerciseId), sets: pe.sets, reps: pe.reps, restSec: rests[k] })));
-  const per = stationTime(list, stations, ctx);
+  const per = stationTime(list, stations, ctx, fromLength);
   return { part1, per, total: part1 + stations.length * (per + STATION_TRANSITION_SEC / 60) };
 }
 

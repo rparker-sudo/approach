@@ -27,10 +27,13 @@ import type { LoggedSet, WorkoutLog } from '../lib/types';
 import { estimateStrength, uid } from '../lib/util';
 import { goBack } from '../lib/nav';
 import { INTENSITY_LABEL, LEGAL, TALK_TEST, weekIndex } from '../lib/general';
+import WarmupCard from '../components/WarmupCard';
+import { needsRampUp, RAMP_REST_SEC, rampSetsFor, SESSION_TYPE_LABEL, sessionType, WARMUP_PARTS, warmupMinutes, type RampSet, type WarmupPart } from '../lib/warmup';
 
-/** minutesDone: 2.3.0 cardio blocks (minutes only). */
-type Entry = { exerciseId: string; sets: LoggedSet[]; minutesDone?: number };
-type Draft = { entries: Entry[]; index: number; note: string; startedAt: number };
+/** minutesDone: 2.3.0 cardio blocks (minutes only). rampDone: 2.4.0 ramp-up sets checked (by row). */
+type Entry = { exerciseId: string; sets: LoggedSet[]; minutesDone?: number; rampDone?: boolean[] };
+/** warmupDone: 2.4.0 warm-up parts checked Done (F47; on this device with the log, never counted). */
+type Draft = { entries: Entry[]; index: number; note: string; startedAt: number; warmupDone?: WarmupPart[] };
 type Summary = { sets: number; total: number; minutes: number; prs: string[]; team: boolean };
 
 const draftKey = (programId: string, sessionId: string) => `approach/workout-draft/${programId}/${sessionId}/${dateKey(today())}`;
@@ -51,7 +54,12 @@ export default function Workout() {
   useKeepAwake();
   const { programId, sessionId, recovery } = useLocalSearchParams<{ programId: string; sessionId: string; recovery?: string }>();
   const { data, addLog, activeProgram, mutate } = useStore();
-  const { consentFor, shareLiveProgress } = useTeams();
+  const { consentFor, shareLiveProgress, teams } = useTeams();
+  // 2.4.0: the first share can now happen before any set ("Warming up"); wait until this team has loaded.
+  const shareRef = useRef(shareLiveProgress);
+  useEffect(() => {
+    shareRef.current = shareLiveProgress;
+  }, [shareLiveProgress]);
   const insets = useSafeAreaInsets();
   // v2.2 extra recovery (T4): a Training Content session wrapped as a one-session program (still resolved, G-1).
   const recoverySession = recovery ? EXTRA_RECOVERY_SESSIONS.find((x) => x.id === recovery) : undefined;
@@ -120,6 +128,24 @@ export default function Workout() {
     [plan, data.strengthEstimates, program],
   );
 
+  /**
+   * F48 ramp-up sets for a loaded tier A or P exercise, from today's first working weight (recomputed if it changes).
+   * Not on testing days (the testing warm-up replaces them) or light/recovery days. Never work sets.
+   */
+  function rampFor(i: number): RampSet[] {
+    const pe = plan[i];
+    if (!pe || pe.cardio || isRecovery || day?.lightHome) return [];
+    const ex = getExercise(pe.exerciseId);
+    if (!needsRampUp(ex, program?.equipment)) return [];
+    const first = parseFloat(draft?.entries[i]?.sets[0]?.weight ?? '') || suggestions[i]?.weight || null;
+    const earlier = plan.slice(0, i).some((x) => {
+      const e = getExercise(x.exerciseId);
+      return needsRampUp(e, program?.equipment) && e.pattern === ex.pattern;
+    });
+    const est = data.strengthEstimates?.[pe.exerciseId]?.e1rm;
+    return rampSetsFor(ex, first, { samePatternBefore: earlier, heavyPct: !!(est && first && first / est >= 0.85), equipment: program?.equipment });
+  }
+
   const fresh = (): Draft => ({
     entries: plan.map((pe, i) => ({
       exerciseId: pe.exerciseId,
@@ -175,28 +201,35 @@ export default function Workout() {
       : Math.max(0, draft.entries.findIndex((e) => e.sets.some((x) => !x.done)))
     : 0;
   const curEntry = draft?.entries[curIndex];
+  // F47: "Warming up" while the warm-up is open and not done, before the first work set (state only, never items).
+  const warmingUp = !!day?.warmup && !!draft && doneCount === 0 && !WARMUP_PARTS.every((p) => draft.warmupDone?.includes(p));
+  // F48: during ramp-ups the tile reads "Ramp-up 2 of 3" (work sets only are counted).
+  const rampRows = curEntry && plan[curIndex] ? rampFor(curIndex) : [];
+  const rampLeft = curEntry && rampRows.length && !curEntry.sets.some((x) => x.done) ? (curEntry.rampDone ?? []).filter(Boolean).length : -1;
+  const rampLabel = rampLeft >= 0 && rampLeft < rampRows.length && (curEntry?.rampDone ?? []).some(Boolean) ? `Ramp-up ${rampLeft + 1} of ${rampRows.length}` : null;
   const livePayload =
     draft && plan[curIndex] && curEntry
       ? {
-          state: (rest ? 'resting' : 'lifting') as 'resting' | 'lifting',
+          state: (warmingUp && !(curEntry.rampDone ?? []).some(Boolean) ? 'warming_up' : rest ? 'resting' : 'lifting') as 'warming_up' | 'resting' | 'lifting',
           exerciseName: getExercise(plan[curIndex].exerciseId).name,
           setIndex: Math.min(curEntry.sets.filter((x) => x.done).length + 1, curEntry.sets.length),
           setCount: curEntry.sets.length,
           restEndsAt: rest ? new Date(rest.endAt).toISOString() : null,
-          groupLabel: groupLine(plan, curIndex, draft.entries),
+          groupLabel: rampLabel ?? groupLine(plan, curIndex, draft.entries),
           stationId: plan[curIndex].stationId ?? null,
           rotateAt: run && !run.endedAt ? new Date(runState(run, now).rotateAt).toISOString() : null,
         }
       : null;
-  const liveKey = livePayload ? JSON.stringify([doneCount, livePayload]) : '';
+  const teamReady = teams.some((x) => x.id === program?.teamId);
+  const liveKey = livePayload && teamReady ? JSON.stringify([doneCount, livePayload]) : '';
   const lastShared = useRef('');
   useEffect(() => {
     // Home sessions aren't on the live board (they aren't in the room).
     if (isRecovery || isHome || !program?.teamId || !session || !livePayload || summary || liveKey === lastShared.current) return;
-    if (doneCount === 0 && curIndex === 0) return; // nothing to show until the first set or a move
+    if (doneCount === 0 && curIndex === 0 && !warmingUp && !(curEntry?.rampDone ?? []).some(Boolean)) return; // nothing to show until the warm-up, the first set, or a move
     const timer = setTimeout(() => {
       lastShared.current = liveKey;
-      shareLiveProgress({
+      shareRef.current({
         teamId: program.teamId!,
         day: dateKey(today()),
         sessionId: session.id,
@@ -323,6 +356,29 @@ export default function Workout() {
     }
   }
 
+  /** F48: a ramp-up set's Done starts the same 60 s rest timer. */
+  function toggleRamp(ei: number, k: number) {
+    setDraft((d) => {
+      if (!d) return d;
+      return {
+        ...d,
+        entries: d.entries.map((e, i) => {
+          if (i !== ei) return e;
+          const list = [...(e.rampDone ?? [])];
+          list[k] = !list[k];
+          return { ...e, rampDone: list };
+        }),
+      };
+    });
+    if (!entries[ei].rampDone?.[k]) {
+      setRestDone(false);
+      setRest(startRest(RAMP_REST_SEC, `Ramp-up · ${getExercise(plan[ei].exerciseId).name}`));
+    }
+  }
+  function toggleWarmup(part: WarmupPart, value: boolean) {
+    update({ warmupDone: value ? [...new Set([...(draft!.warmupDone ?? []), part])] : (draft!.warmupDone ?? []).filter((p) => p !== part) });
+  }
+
   async function clearDraft() {
     await AsyncStorage.removeItem(draftKey(program!.id, session!.id)).catch(() => {});
   }
@@ -347,10 +403,18 @@ export default function Workout() {
       ...(isHome ? { location: 'home' as const } : {}),
     };
     // Stations: each exercise records the station it was done at (unfinished sets stay "not done").
-    log.entries = entries.map((e, i) => (plan[i]?.stationId ? { ...e, stationId: plan[i].stationId } : e));
+    // 2.4.0: ramp-up sets go in `warmupSets` (warmup: true), apart from the work sets (warmups §4).
+    log.entries = entries.map(({ rampDone, ...e }, i) => {
+      const rows = rampFor(i);
+      const warm = rows.length && (rampDone ?? []).some(Boolean)
+        ? { warmupSets: rows.map((r, k): LoggedSet => ({ weight: r.weight ? String(r.weight) : '', reps: String(r.reps), done: !!rampDone?.[k], warmup: true })) }
+        : {};
+      return { ...e, ...warm, ...(plan[i]?.stationId ? { stationId: plan[i].stationId } : {}) };
+    });
+    if (draft!.warmupDone?.length) log.warmupDone = draft!.warmupDone;
     // 2.3.0 cardio (adult rules A4): the log keeps minutes only, and only for a block marked done.
     log.entries = log.entries.map((e, i) =>
-      plan[i]?.cardio ? { exerciseId: e.exerciseId, sets: [], ...(e.sets[0]?.done && e.minutesDone ? { minutesDone: Math.min(60, Math.max(1, Math.round(e.minutesDone))) } : {}) } : e,
+      plan[i]?.cardio ? { exerciseId: e.exerciseId, sets: [], ...(e.sets[0]?.done && e.minutesDone ? { minutesDone: Math.min(180, Math.max(1, Math.round(e.minutesDone))) } : {}) } : e,
     );
     if (isHome && !data.homeHintSeen) mutate((d) => ({ ...d, homeHintSeen: true }));
     // New best estimated strength vs. earlier logs.
@@ -535,9 +599,20 @@ export default function Workout() {
       >
         {header}
 
+        {day.warmup ? (
+          <WarmupCard
+            warmup={day.warmup}
+            minutes={warmupMinutes(day.warmup, { phase: program.phase, home: day.home })}
+            typeLabel={SESSION_TYPE_LABEL[sessionType({ ...session, exercises: plan })]}
+            done={draft.warmupDone ?? []}
+            onToggle={toggleWarmup}
+            coachWord={general ? 'trainer' : 'coach'}
+          />
+        ) : null}
+
         {mode === 'focus' ? (
           <>
-            <ExerciseCard {...cardProps(idx)} general={general} setMinutes={setMinutes} pe={plan[idx]} teamId={program.teamId} entry={entries[idx]} suggestion={suggestions[idx]} ei={idx} big setSet={setSet} toggleDone={toggleDone} />
+            <ExerciseCard {...cardProps(idx)} general={general} setMinutes={setMinutes} pe={plan[idx]} teamId={program.teamId} entry={entries[idx]} suggestion={suggestions[idx]} ei={idx} big setSet={setSet} toggleDone={toggleDone} ramp={rampFor(idx)} toggleRamp={toggleRamp} />
             <Row>
               <View style={{ flex: 1 }}>
                 <Button large kind="ghost" title="Previous" disabled={idx === 0} onPress={() => update({ index: idx - 1 })} />
@@ -554,7 +629,7 @@ export default function Workout() {
           </>
         ) : (
           plan.map((pe, i) => (
-            <ExerciseCard key={i} {...cardProps(i)} general={general} setMinutes={setMinutes} pe={pe} teamId={program.teamId} entry={entries[i]} suggestion={suggestions[i]} ei={i} setSet={setSet} toggleDone={toggleDone} />
+            <ExerciseCard key={i} {...cardProps(i)} general={general} setMinutes={setMinutes} pe={pe} teamId={program.teamId} entry={entries[i]} suggestion={suggestions[i]} ei={i} setSet={setSet} toggleDone={toggleDone} ramp={rampFor(i)} toggleRamp={toggleRamp} />
           ))
         )}
 
@@ -638,6 +713,8 @@ function ExerciseCard({
   big,
   setSet,
   toggleDone,
+  ramp,
+  toggleRamp,
 }: {
   label?: string | null;
   blockLine?: string | null;
@@ -653,6 +730,8 @@ function ExerciseCard({
   toggleDone: (ei: number, si: number) => void;
   general?: boolean;
   setMinutes?: (ei: number, minutes: number) => void;
+  ramp?: RampSet[];
+  toggleRamp?: (ei: number, k: number) => void;
 }) {
   const info = getExercise(pe.exerciseId);
   const timed = !repRange(pe.reps);
@@ -697,6 +776,30 @@ function ExerciseCard({
       ) : null}
       {big ? <Body muted style={{ fontSize: 13 }}>{info.cue}</Body> : null}
 
+      {ramp?.length && toggleRamp ? (
+        <View style={{ gap: 6 }}>
+          <Label>Ramp-up</Label>
+          <Text style={{ fontSize: 13, color: colors.muted }}>Warm-up sets. They don&apos;t count toward your work sets.</Text>
+          {ramp.map((r, k) => {
+            const on = !!entry.rampDone?.[k];
+            return (
+              <Row key={k} style={{ gap: 8, backgroundColor: colors.card, borderRadius: BRAND.radius.md, paddingLeft: 8 }}>
+                <Text style={{ flex: 1, fontSize: 15, color: colors.muted }}>{r.label}</Text>
+                <Pressable
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: on }}
+                  aria-checked={on}
+                  accessibilityLabel={`Ramp-up ${r.label} done`}
+                  onPress={() => toggleRamp(ei, k)}
+                  style={{ width: big ? 72 : 56, height: 56, borderRadius: BRAND.radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? colors.achievement : 'transparent', borderWidth: on ? 0 : 2, borderColor: colors.line }}
+                >
+                  {on ? <Icon name="checkmark" size={18} color={colors.bg} /> : big ? <Text style={{ fontWeight: '600' }}>Done</Text> : null}
+                </Pressable>
+              </Row>
+            );
+          })}
+        </View>
+      ) : null}
       <Row style={{ gap: 8 }}>
         <Text style={{ width: 30, fontSize: 12, color: colors.muted }}>Set</Text>
         {info.weighted ? <Text style={{ flex: 1, fontSize: 12, color: colors.muted }}>{info.id === 'backpack-carry' ? 'Bag weight (lb)' : 'Weight (lb)'}</Text> : null}

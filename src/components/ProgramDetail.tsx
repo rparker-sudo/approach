@@ -10,6 +10,7 @@ import { useTeams } from '../lib/team';
 import { formatDate } from '../lib/util';
 import { Body, Button, Card, colors, Label, Pill, Row, Text } from './ui';
 import CapNotice from './CapNotice';
+import ProgramSettings from './ProgramSettings';
 import { ProgramWeek } from './week';
 import GeneralProgram from './general/GeneralProgram';
 
@@ -48,6 +49,7 @@ function VolleyballProgramDetail({ program, afterDelete }: { program: Program; a
         <Body muted style={{ fontSize: 13 }}>{phase.blurb}</Body>
       </View>
       {readOnly ? null : <CapNotice program={program} />}
+      {coach && !readOnly ? <ProgramSettings program={program} /> : null}
 
       <View style={{ gap: 4 }}>
         <Label>This week</Label>

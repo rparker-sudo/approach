@@ -165,16 +165,38 @@ export type ProgramExercise = {
   autoGroup?: boolean;
   /** 2.3.0 general teams: a cardio block, duration only (adult rules §6). sets/reps are unused. */
   cardio?: CardioRx;
+  /** 2.4.0 warm-up items only: a coach's own item with no library exercise (name shown, no how-to link). */
+  customName?: string;
 };
 
-/** Cardio prescription: 5–60 min, Easy or Moderate. Nothing else exists (no HR, pace, distance, calories). */
+/** Cardio prescription: minutes + Easy or Moderate (2.4.0: 5–180 in the builder, F41). Nothing else exists (no HR, pace, distance, calories). */
 export type CardioRx = { minutes: number; intensity: 'easy' | 'moderate' };
 
 /** 2.3.0 program goals (adult-goals.md §1). */
 export type Goal = 'strength' | 'muscle' | 'general' | 'back_after_break';
 
-/** 2.3.0 general warm-ups (general-library.md §6). */
+/** 2.3.0 general warm-ups (general-library.md §6). 2.4.0: replaced by generated warm-ups; stored values read as "generate". */
 export type WarmupId = 'W1' | 'W2' | 'W3';
+
+/** 2.4.0 (warmups.md §7): a session's warm-up. Generated unless `edited`; `template` names the coach template it came from. */
+export type SessionWarmup = {
+  raise: ProgramExercise[];
+  activate: ProgramExercise[];
+  potentiate: ProgramExercise[];
+  /** The coach changed it: it stops regenerating (F49). */
+  edited?: boolean;
+  /** Template name when it came from "Use a template" (F49 tag "Template: name"). */
+  template?: string;
+  /** Limited space for this session (in-place Raise drills). Missing = the team setting stamped at post. */
+  limitedSpace?: boolean;
+  /** Fit to time compacted it (program-design §4a step 4). */
+  compact?: boolean;
+  /** Stamped from the team default at post (F50); replaced when the team default changes. */
+  teamDefault?: boolean;
+};
+
+/** 2.4.0 (D-045): who wrote the session. */
+export type SessionSource = 'approach' | 'coach';
 
 /** 2.3.0: one week of a multi-week program (B2). */
 export type ProgramWeekPlan = {
@@ -204,8 +226,16 @@ export type Session = {
   format?: 'standard' | 'stations';
   stations?: Station[];
   stationTransitionSec?: number;
-  /** 2.3.0 general teams: general warm-up (default on, W1–W3). null = off. Missing = W1. */
-  warmup?: WarmupId | null;
+  /** 2.4.0 (warmups.md §7): the warm-up. Missing (or a 2.3.0 W1–W3 id) = generated from the session; null = removed by the coach. */
+  warmup?: SessionWarmup | WarmupId | null;
+  /** 2.4.0 (§0.1): 'approach' = generated; 'coach' = built or edited by a coach. Missing = migrated (see `sourceOf`). */
+  source?: SessionSource;
+  /** 2.4.0 (§1.2): session override of "Adjust exercises to each athlete's level". Missing = the program setting. */
+  levelAdjust?: boolean;
+  /** 2.4.0 (§1.4): the target the session was last fitted or estimated against (minutes). */
+  targetMinutes?: number;
+  /** 2.4.0 (§1.4): Fit to time lines. Generated sessions: `undo:<step>` marks a trim the coach undid. */
+  fitLog?: string[];
 };
 
 export type Program = {
@@ -263,6 +293,14 @@ export type Program = {
   templateOf?: string;
   /** 2.3.1: the coach's own exercises for this program (posted inside the program JSON; no new table). */
   customExercises?: Exercise[];
+  /** 2.4.0 (§1.2): "Adjust exercises to each athlete's level". Missing = on. */
+  levelAdjust?: boolean;
+  /** 2.4.0 (§1.2): athletes (user ids) who get exactly what the coach wrote in this program. */
+  levelAdjustOffFor?: string[];
+  /** 2.4.0 (§1.4): session length, minutes (20–120). Missing = the phase target. */
+  sessionMinutes?: number;
+  /** 2.4.0 (§1.4): per-weekday length, Monday first; null = program default. */
+  minutesByWeekday?: (number | null)[];
   /** 2.3.0 trainer device only: a duplicate's intended client (`client:<uid>`), preselected at Post. Never posted. */
   draftTarget?: string;
 };
@@ -272,7 +310,8 @@ export type Program = {
 export type TestBattery = 'full' | 'jump' | 'mid';
 /** A dated calendar entry. A testing day keeps its underlying day type and adds `test`. */
 /** v2.2: `break` (coach-set break, TM-3) runs from `date` to `endDate` (inclusive). `teamName` labels another team's events on the athlete's combined schedule (never stored). */
-export type CalendarEvent = { date: string; type: DayType | 'break'; label?: string; test?: TestBattery; endDate?: string; teamName?: string };
+/** 2.4.0: `roomMinutes` = weight room time on that date (§1.4); only the team's own coach and members see it. */
+export type CalendarEvent = { date: string; type: DayType | 'break'; label?: string; test?: TestBattery; endDate?: string; teamName?: string; roomMinutes?: number };
 
 export type Profile = {
   name: string;
@@ -295,7 +334,8 @@ export type Profile = {
   hasAccount?: boolean;
 };
 
-export type LoggedSet = { weight: string; reps: string; done: boolean };
+/** 2.4.0: `warmup` = a ramp-up set (warmups.md §4): never a work set, never used for suggestions or bests. */
+export type LoggedSet = { weight: string; reps: string; done: boolean; warmup?: boolean };
 
 export type WorkoutLog = {
   id: string;
@@ -305,7 +345,8 @@ export type WorkoutLog = {
   sessionName: string;
   /** stationId: the station the exercise was done at (stations format; progression ignores order). */
   /** minutesDone: 2.3.0 cardio blocks log minutes only (adult rules A4). */
-  entries: { exerciseId: string; sets: LoggedSet[]; stationId?: string; minutesDone?: number }[];
+  /** warmupSets: 2.4.0 ramp-up sets (each `warmup: true`), kept apart from the work sets so they never count (warmups §4). */
+  entries: { exerciseId: string; sets: LoggedSet[]; stationId?: string; minutesDone?: number; warmupSets?: LoggedSet[] }[];
   note?: string;
   /** Team this workout counts for (sent to the coach). */
   teamId?: string;
@@ -317,6 +358,8 @@ export type WorkoutLog = {
   durationMin?: number;
   /** v2.2 pass 3: where it was done (home sessions record 'home'). */
   location?: 'school' | 'home';
+  /** 2.4.0 (F47): warm-up parts the athlete checked Done. Never counts toward sets, sessions or points. */
+  warmupDone?: ('raise' | 'activate' | 'potentiate')[];
   /** v2.2: 'extra_recovery' sessions (T4) never count as prescribed sessions or feed weight suggestions. */
   kind?: 'lift' | 'extra_recovery';
 };

@@ -119,6 +119,15 @@ function capFor(experience: Experience, phase: Program['phase']) {
 }
 
 /**
+ * 2.4.0: Approach-generated (every lift session is `source = 'approach'`). Mirrors `sourceOf` in resolve.ts (a session saved
+ * before 2.4.0 counts as the coach's when the program was posted to a team or built for a trainer team).
+ */
+export function generatedWeek(program: Program): boolean {
+  const coachMade = !!(program.teamId || program.general || program.postedAt);
+  return program.sessions.filter((x) => !x.mobility).every((x) => (x.source ?? (coachMade ? 'coach' : 'approach')) === 'approach');
+}
+
+/**
  * The real plan for the 7 days starting at `monday`.
  * `athleteExperience`: the athlete's level (the lower of it and the program's sets the lift-day cap).
  * C14: every writer of lift days (onboarding, personal week, schedule, team calendar, coach lift days, automatic moves)
@@ -208,6 +217,8 @@ export function weekPlan(program: Program, monday: Date, athleteExperience?: Exp
   }
 
   // 6. C14 / G2: lift-day cap and at least one day with nothing scheduled. Mobility-only sessions don't count toward the cap.
+  // 2.4.0 (spec §0.3, §1.1 item 5): generated weeks only. A coach-built program keeps every day the coach chose.
+  if (!generatedWeek(program)) return plan;
   const exp =
     athleteExperience && EXP_RANK[athleteExperience] < EXP_RANK[program.experience] ? athleteExperience : program.experience;
   const cap = capFor(exp, program.phase);
@@ -284,10 +295,31 @@ export function withEvent(program: Program, key: string, type: DayType | null, l
   const rest = (program.events ?? []).filter((e) => !(e.date === key && own(e)));
   // A testing day stays on the date unless the day becomes a match (then it can't be a testing day).
   const test = existing?.test && type !== 'game' && type !== 'tournament' ? existing.test : undefined;
+  // 2.4.0: the date's weight room time stays with the date.
+  const room = typeof existing?.roomMinutes === 'number' ? { roomMinutes: existing.roomMinutes } : {};
   if (!type) {
-    return { ...program, events: test ? [...rest, { date: key, type: program.volleyballWeek[weekdayOf(fromKey(key))], test }] : rest };
+    return { ...program, events: test || room.roomMinutes ? [...rest, { date: key, type: program.volleyballWeek[weekdayOf(fromKey(key))], ...(test ? { test } : {}), ...room }] : rest };
   }
-  return { ...program, events: [...rest, { date: key, type, label: label?.trim() || undefined, ...(test ? { test } : {}) }] };
+  return { ...program, events: [...rest, { date: key, type, label: label?.trim() || undefined, ...(test ? { test } : {}), ...room }] };
+}
+
+/**
+ * 2.4.0 F51c: "Weight room time on Wed Dec 3: 30 min" (null removes it). Kept on this team's own event for the date (a
+ * usual-week event is added when there isn't one). Only this team's coach and members see it (V4).
+ */
+export function withRoomMinutes(program: Program, key: string, minutes: number | null): Program {
+  const own = (e: CalendarEvent) => e.type !== 'break' && !e.teamName;
+  const existing = (program.events ?? []).find((e) => e.date === key && own(e));
+  const rest = (program.events ?? []).filter((e) => !(e.date === key && own(e)));
+  const usual = program.volleyballWeek[weekdayOf(fromKey(key))];
+  if (minutes == null) {
+    if (!existing) return program;
+    const { roomMinutes: _r, ...ev } = existing;
+    // An event that only carried the room time goes away.
+    const onlyRoom = ev.type === usual && !ev.label && !ev.test;
+    return { ...program, events: onlyRoom ? rest : [...rest, ev] };
+  }
+  return { ...program, events: [...rest, { ...(existing ?? { date: key, type: usual }), roomMinutes: minutes }] };
 }
 
 /** Set (session id or null = rest) or clear (undefined = back to automatic) the lift for a date. */

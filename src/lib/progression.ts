@@ -80,7 +80,7 @@ function doneSets(log: WorkoutLog, exerciseId: string): SetRecord[] {
   const entry = log.entries.find((e) => e.exerciseId === exerciseId);
   if (!entry) return [];
   return entry.sets
-    .filter((s) => s.done)
+    .filter((s) => s.done && !s.warmup)
     .map((s) => ({ weight: parseFloat(s.weight) || 0, reps: parseFloat(s.reps) || 0 }))
     .filter((s) => s.weight > 0);
 }
@@ -214,12 +214,12 @@ export function harderSuggestion(logs: WorkoutLog[], exerciseId: string, reps: s
   if (!range) return null;
   const top = range[1];
   const recent = logs
-    .filter((l) => l.kind !== 'extra_recovery' && l.entries.some((e) => e.exerciseId === exerciseId && e.sets.some((x) => x.done)))
+    .filter((l) => l.kind !== 'extra_recovery' && l.entries.some((e) => e.exerciseId === exerciseId && e.sets.some((x) => x.done && !x.warmup)))
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 2);
   if (recent.length < 2) return null;
   const allTop = (l: WorkoutLog) => {
-    const sets = l.entries.find((e) => e.exerciseId === exerciseId)!.sets.filter((x) => x.done);
+    const sets = l.entries.find((e) => e.exerciseId === exerciseId)!.sets.filter((x) => x.done && !x.warmup);
     return sets.length > 0 && sets.every((x) => (parseFloat(x.reps) || 0) >= top);
   };
   return recent.every(allTop) ? harder : null;

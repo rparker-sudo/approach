@@ -25,6 +25,10 @@ add('D', [
   'tib-raise', 'ankle-balance', 'band-er', 'band-pull-apart', 'face-pull', 'ytw', 'scap-pushup', 'worlds-greatest', 'hip-90-90',
   'thoracic-rotation', 'crocodile-breathing', 'cat-camel', 'hip-flexor-stretch', 'ankle-rock', 'lat-reach', 'band-hamstring',
 ]);
+// 2.4.0 Part 1: catalog v3 §5 tiers for the 15 movement-prep and warm-up drills.
+add('P', ['cmj', 'line-hops', 'skater-hop']);
+add('C', ['short-lever-copenhagen', 'soleus-calf-raise']);
+add('D', ['push-up-plus', 'er-90-90-iso', 'wall-slide', 'band-lateral-walk', 'a-skip', 'lateral-shuffle', 'carioca', 'high-knees', 'walking-knee-hug', 'walking-quad-stretch']);
 
 /** Tier from §7. `hip-thrust` is tier A only when done with a barbell setup, otherwise B. Unknown ids fall back by category. */
 export function tierOf(ex: Exercise, equipment?: Equipment[]): Tier {
@@ -42,7 +46,7 @@ export function tierOf(ex: Exercise, equipment?: Equipment[]): Tier {
 
 export const TIER_IDS = TIERS;
 
-/** Floors (MUST): tier A ≥ 2:00, tier P ≥ 1:30, even if the coach typed less. */
+/** Floors: tier A ≥ 2:00, tier P ≥ 1:30. 2.4.0 (§1.1, program-design §9): Approach-generated sessions and auto rest only. */
 export const REST_FLOOR: Partial<Record<Tier, number>> = { A: 120, P: 90 };
 export const FLOOR_MESSAGE: Partial<Record<Tier, string>> = {
   A: 'Heavy lifts need at least 2:00 rest.',
@@ -58,6 +62,8 @@ export type RestContext = {
   light?: boolean;
   /** Testing-day load attempt. */
   testing?: boolean;
+  /** 2.4.0 (§1.1): a coach-built session. The coach's rest is used as typed (no floors); auto rest stays a suggestion. */
+  free?: boolean;
 };
 
 /** Top of the prescribed rep range; null for holds, carries and timed work. */
@@ -102,9 +108,9 @@ export function restFor(ex: Exercise, rx: Pick<ProgramExercise, 'reps' | 'effort
   return Math.max(REST_FLOOR[tier] ?? 0, round15(rest));
 }
 
-/** Apply the floors to any rest value (coach-set or auto). */
-export function withFloor(ex: Exercise, sec: number, equipment?: Equipment[]): number {
-  return Math.max(REST_FLOOR[tierOf(ex, equipment)] ?? 0, sec);
+/** Apply the floors to any rest value (coach-set or auto). 2.4.0: only for Approach-generated sessions (`free` skips them). */
+export function withFloor(ex: Exercise, sec: number, equipment?: Equipment[], free = false): number {
+  return free ? Math.max(0, sec) : Math.max(REST_FLOOR[tierOf(ex, equipment)] ?? 0, sec);
 }
 
 /** §5 session length targets, minutes. */

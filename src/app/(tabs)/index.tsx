@@ -35,8 +35,7 @@ import { addDays, breakOn, dateKey, dayTypeOn, eventsOn, formatKey, isHeavyLegs,
 import { getExercise } from '../../lib/exercises';
 import { captainLine, dayAdvice } from '../../lib/generator';
 import { cardsFor, fuelDay } from '../../lib/nutrition';
-import { easingFor } from '../../lib/resolve';
-import { formatMinutes } from '../../lib/rest';
+import { easingFor, lengthLine } from '../../lib/resolve';
 import { canCheckIn, canLog } from '../../lib/backend';
 import { useStore } from '../../lib/store';
 import { BATTERY_LABEL } from '../../lib/testing';
@@ -217,7 +216,7 @@ function Today() {
             {session.location === 'home' ? (
               <>
                 <Text style={{ fontSize: 13, fontWeight: '600' }}>{session.light ? '🏠 Light home' : '🏠 Home'}</Text>
-                <H2>{session.light ? `Light home day · ${formatMinutes(todaySession!.estMinutes)}` : `Home workout · ${formatMinutes(todaySession!.estMinutes)}`}</H2>
+                <H2>{session.light ? `Light home day · ${lengthLine(todaySession!).text}` : `Home workout · ${lengthLine(todaySession!).text}`}</H2>
                 <Body muted>{session.light ? 'Easy movement. No weights today.' : session.name}</Body>
                 {!data.homeEquipmentAsked ? (
                   <Text accessibilityRole="link" onPress={() => setHomeSheet(true)} style={{ fontSize: 14, textDecorationLine: 'underline' }}>
@@ -234,9 +233,11 @@ function Today() {
             {activeProgram.teamId && session.format === 'stations' ? <StationsCard teamId={activeProgram.teamId} session={session} exercises={todaySession!.exercises} /> : null}
             <Row style={{ gap: 6, flexWrap: 'wrap' }}>
               <Pill text={todaySession!.block.label} />
-              {session.location === 'home' ? null : <Pill text={formatMinutes(todaySession!.estMinutes)} />}
+              {session.location === 'home' ? null : <Pill text={lengthLine(todaySession!).text} />}
+              {lengthLine(todaySession!).planned ? <Text style={{ fontSize: 13, color: colors.muted }}>{lengthLine(todaySession!).planned}</Text> : null}
               {todaySession!.light ? <Pill text="Lightened by coach" bg={colors.day.game} /> : null}
             </Row>
+            {todaySession!.express ? <Text style={{ fontSize: 13, color: colors.muted }}>Short session today: the essentials only.</Text> : null}
             {todaySession!.light ? <Note>Coach lightened today&apos;s lift. Same exercises, fewer sets, easy effort.</Note> : null}
             {!todaySession!.light && todaySession!.block.deload ? <Note>Deload week: fewer sets, easy effort. Let your body catch up.</Note> : null}
             <View style={{ gap: 4 }}>

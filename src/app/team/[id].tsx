@@ -12,7 +12,8 @@ import StationControls from '../../components/StationControls';
 import TestsSection from '../../components/TestsSection';
 import ClientsScreen from '../../components/general/ClientsScreen';
 import { isGeneral } from '../../lib/general';
-import { LevelChip, LevelSwaps, levelSetLine, SetLevelSheet } from '../../components/LevelRoster';
+import WarmupSettings from '../../components/WarmupSettings';
+import { AdjustToLevel, exactProgram, LevelChip, LevelSwaps, levelSetLine, SetLevelSheet } from '../../components/LevelRoster';
 import { defaultTeamGoal, liftDaysOf, weeksRemaining } from '../../lib/effort';
 import { weekStart } from '../../components/TeamHome';
 import { Body, Button, Card, Chip, ChipRow, colors, display, Field, Icon, Label, Note, Pill, Row, StatusChip, Text } from '../../components/ui';
@@ -468,13 +469,17 @@ function TeamScreen() {
                           <Text style={{ fontSize: 12, color: colors.warningText }}>{`Check in with ${m.name.split(' ')[0] || m.name} in person.`}</Text>
                         ) : null}
                       </View>
-                      <Pill text={`${week} this week`} achievement={week > 0} />
+                      <View style={{ gap: 4, alignItems: 'flex-end' }}>
+                        <Pill text={`${week} this week`} achievement={week > 0} />
+                        {exactProgram(programFor(m.groupId ?? null), m.userId) ? <Text style={{ fontSize: 12, color: colors.muted }}>Exact program</Text> : null}
+                      </View>
                     </Row>
                   </Pressable>
                   {open ? (
                     <View style={{ gap: 8 }}>
                       {levelSetLine(m) ? <Text style={{ fontSize: 13, color: colors.muted }}>{levelSetLine(m)}</Text> : null}
                       {extras?.returning.includes(m.userId) ? <StatusChip label="Returning from a break: lighter week" /> : null}
+                      <AdjustToLevel program={programFor(m.groupId ?? null)} member={m} />
                       <LevelSwaps program={programFor(m.groupId ?? null)} member={m} info={extras?.levels[m.userId]} />
                       {chips.length ? (
                         <>
@@ -538,6 +543,7 @@ function TeamScreen() {
         </View>
       ) : null}
 
+      <WarmupSettings team={team} />
       <TeamSettingsCard
         key={JSON.stringify(team.settings)}
         team={team}

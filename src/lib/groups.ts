@@ -88,15 +88,6 @@ export function blockReason(exs: Exercise[], gym?: Equipment[]): string | null {
   return circuitReason(exs, gym);
 }
 
-/** C5: no AMRAP / "max reps" / "for time" on tier B in a circuit for minors (warning on adult teams). */
-export const CLOCK_REASON = 'For athletes under 18, strength work in a circuit keeps its reps. No racing the clock.';
-export function clockProblem(pe: ProgramExercise, inCircuit: boolean, gym?: Equipment[]): boolean {
-  if (!inCircuit) return false;
-  const ex = getExercise(pe.exerciseId);
-  if (tierOf(ex, gym) !== 'B') return false;
-  return /amrap|max reps|as many|for time/i.test(`${pe.reps} ${pe.effort}`);
-}
-
 /** Blocks in list order: letter → indexes. */
 export function blocksOf(list: ProgramExercise[]): Map<string, number[]> {
   const m = new Map<string, number[]>();
@@ -138,9 +129,10 @@ export function blockRests(list: ProgramExercise[], straight: number[], ctx: Res
         return;
       }
       const pe = list[i];
-      const coach = pe.restSetByCoach && typeof pe.restSec === 'number' ? withFloor(getExercise(pe.exerciseId), pe.restSec, ctx.equipment) : null;
+      const coach = pe.restSetByCoach && typeof pe.restSec === 'number' ? withFloor(getExercise(pe.exerciseId), pe.restSec, ctx.equipment, ctx.free) : null;
       const auto = idx.length === 2 ? Math.max(15, longest - 15) : Math.max(45, longest - 15 * (idx.length - 1));
-      out[i] = coach != null ? (idx.length >= 3 ? Math.max(45, coach) : coach) : auto;
+      // 2.4.0: a coach-built session keeps the coach's rest as typed (no 45 s circuit minimum).
+      out[i] = coach != null ? (idx.length >= 3 && !ctx.free ? Math.max(45, coach) : coach) : auto;
     });
   }
   return out;
@@ -150,7 +142,7 @@ export function blockRests(list: ProgramExercise[], straight: number[], ctx: Res
 export function straightRests(list: ProgramExercise[], ctx: RestContext = {}): number[] {
   return list.map((pe) => {
     const ex = getExercise(pe.exerciseId);
-    if (pe.restSetByCoach && typeof pe.restSec === 'number' && !pe.group) return withFloor(ex, pe.restSec, ctx.equipment);
+    if (pe.restSetByCoach && typeof pe.restSec === 'number' && !pe.group) return withFloor(ex, pe.restSec, ctx.equipment, ctx.free);
     return restFor(ex, pe, ctx);
   });
 }
@@ -238,22 +230,17 @@ export function autoGroup(session: Session, opts: { target: number; enabled: boo
 }
 
 /**
- * Coach: group rows into one block (pair or circuit). Returns the new list, or a reason.
- * 2.3.0 general teams (adult rules §5): the youth items (power or heavy lifts in a pair or circuit, contrast pairs) become a
- * warning: the block is made and `warning` carries the same line. Every other rule still blocks.
+ * Coach: group rows into one block (2 = superset, 3+ = circuit). 2.4.0 (§1.1 item 3, F45a): any exercises, any number,
+ * any tiers, any order; no blocked pairs, no reasons. The pairing rules (`pairReason`, `circuitReason`) now shape only
+ * Approach's auto-pairing (`autoGroup`).
  */
-export function groupRows(list: ProgramExercise[], rows: number[], gym?: Equipment[], general = false): { list?: ProgramExercise[]; reason?: string; warning?: string } {
+export function groupRows(list: ProgramExercise[], rows: number[]): { list: ProgramExercise[] } {
   const sorted = [...rows].sort((a, b) => a - b);
-  if (sorted.length > 4) return { reason: CIRCUIT_REASONS.size };
-  const reason = blockReason(sorted.map((i) => getExercise(list[i].exerciseId)), gym);
-  const youth = [PAIR_REASONS.power, PAIR_REASONS.heavy, CIRCUIT_REASONS.heavy];
-  if (reason && !(general && youth.includes(reason))) return { reason };
-  const warning = reason ?? undefined;
   const g = nextLetter(list);
   const picked = sorted.map((i) => ({ ...list[i], group: g, autoGroup: false }));
   const rest = list.filter((_, i) => !sorted.includes(i));
   rest.splice(Math.min(sorted[0], rest.length), 0, ...picked);
-  return warning ? { list: rest, warning } : { list: rest };
+  return { list: rest };
 }
 
 /** Coach: ungroup a block (rows keep their order). */

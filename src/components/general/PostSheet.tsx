@@ -55,10 +55,10 @@ export default function PostSheet({ team, program, gate, onClose }: { team: Team
       })),
     );
   }, [targetKey, start, program, affected, team, data.programs, teamGroups]);
-  const blocks = checks.filter((c) => c.kind === 'block');
   const validDate = /^\d{4}-\d{2}-\d{2}$/.test(start) && !Number.isNaN(new Date(`${start}T12:00:00`).getTime());
   const gateLine = gate === 'not_open' || gate === 'paused' ? GATE.cantPost : gate === 'terms' ? GATE.termsChanged : null;
-  const canPost = !!targetKey && validDate && !blocks.length && !gateLine && !busy;
+  // 2.4.0 (F36): Post is always enabled, subject only to F45b (the team is open, Trainer Terms current).
+  const canPost = !!targetKey && validDate && !gateLine && !busy;
   const who = (uid?: string) => roster.find((m) => m.userId === uid)?.name ?? '';
   const filtered = roster.filter((m) => m.name.toLowerCase().includes(search.trim().toLowerCase()));
   const today = new Date();
@@ -118,11 +118,8 @@ export default function PostSheet({ team, program, gate, onClose }: { team: Team
 
       {targetKey ? (
         <View style={{ gap: 6 }}>
-          {checks.length === 0 && affected.length ? <Text style={{ fontSize: 13, color: colors.muted }}>✓ Fits everyone&apos;s weekly limit.</Text> : null}
           {checks.map((c, i) => (
-            <Text key={i} accessibilityRole={c.kind === 'block' ? 'alert' : undefined} style={{ fontSize: 13, lineHeight: 19, color: c.kind === 'block' ? colors.errorText : colors.warningText }}>
-              {`${c.kind === 'block' ? 'Blocked: ' : 'Note: '}${c.message}`}
-            </Text>
+            <Text key={i} style={{ fontSize: 13, lineHeight: 19, color: colors.ink }}>{c.message}</Text>
           ))}
         </View>
       ) : null}

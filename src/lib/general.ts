@@ -1,6 +1,6 @@
 import type { Team, TeamKind } from './backend/types';
 import { getExercise } from './exercises';
-import type { CardioRx, Goal, Program, ProgramExercise, Session, SlotRole } from './types';
+import type { CardioRx, Goal, Program, Session, SlotRole } from './types';
 
 /**
  * 2.3.0 trainer mode (general teams). One place for: the team-kind check, the Trainer/Client word set (design §S1),
@@ -211,31 +211,11 @@ export function defaultWeeks(goal: Goal, count: number) {
 
 /* ---------- Adult rules (adult-training-rules.md) ---------- */
 export const RPE_CEILING = 8;
-export const EFFORT_BLOCK = 'Strength work stays at RPE 8 or below. Stop with about 2 reps left.';
-export const CIRCUIT_LINE = 'Strength work in a circuit keeps its reps. No racing the clock.';
-export const CARDIO_SESSION_MAX = 60;
-export const CARDIO_SESSION_BLOCK = 'Keep cardio to 60 minutes or less per session.';
-export const CARDIO_BREAK_LINE = 'Easy only, up to 15 min, while easing back.';
 export const TALK_TEST: Record<CardioRx['intensity'], string> = {
   easy: 'You can hold a full conversation.',
   moderate: 'You can talk in short sentences, but not sing.',
 };
 export const INTENSITY_LABEL: Record<CardioRx['intensity'], string> = { easy: 'Easy', moderate: 'Moderate' };
-
-/** A1/A3: in tier A/B rows, RPE 9–10, failure, to failure, max, AMRAP and "for time" are blocked. Power keeps "Max effort". */
-export function generalEffortProblem(pe: Pick<ProgramExercise, 'exerciseId' | 'effort' | 'reps' | 'role'>): string | null {
-  const ex = getExercise(pe.exerciseId);
-  if (ex.durationOnly) return null;
-  const tier = ex.tier;
-  if (pe.role === 'power' || tier === 'P') return null;
-  const nums = (pe.effort.match(/RPE\s*(\d+)(?:\s*[–-]\s*(\d+))?/i) ?? []).slice(1).filter(Boolean).map(Number);
-  const text = `${pe.effort} ${pe.reps}`;
-  const strength = tier === 'A' || tier === 'B' || pe.role === 'main' || pe.role === 'secondary' || pe.role === 'accessory';
-  if (!strength) return null;
-  if (nums.some((n) => n > RPE_CEILING) || /fail|\bmax\b/i.test(pe.effort)) return EFFORT_BLOCK;
-  if ((tier === 'A' || tier === 'B') && /amrap|as many|for time/i.test(text)) return EFFORT_BLOCK;
-  return null;
-}
 
 /** Beginners (adult rules §3): goal defaults shift down one RPE. A default, not a cap. */
 export function shiftBeginner(effort: string): string {
@@ -244,9 +224,10 @@ export function shiftBeginner(effort: string): string {
   );
 }
 
-/** Week effort: replaces the RPE on main/secondary with the week's value (capped at 8). */
+/** Week effort: replaces the RPE on main/secondary with the week's value. 2.4.0 (F39b): any value; the RPE 8 cap is applied
+ *  by resolveSession to Approach's goal-default sessions only. */
 export function withWeekRpe(effort: string, rpe: number): string {
-  const r = Math.min(RPE_CEILING, rpe);
+  const r = rpe;
   return /RPE/i.test(effort) ? effort.replace(/RPE\s*\d+(?:\s*[–-]\s*\d+)?/i, `RPE ${r}`) : effort;
 }
 
@@ -262,8 +243,6 @@ export function countsTowardCap(session: Session | undefined): boolean {
   });
 }
 
-/** Moderate cardio counts as training on the rest day. */
-const hasModerate = (s: Session | undefined) => !!s?.exercises.some((pe) => pe.cardio?.intensity === 'moderate');
 
 const LEG_PATTERNS = new Set(['squat', 'hinge', 'single-leg', 'knee-ext', 'knee-flex']);
 /** Lower-body heavy: two or more tier A/B lower-body slots. */
@@ -328,98 +307,43 @@ export function weekSessions(p: Program, w = 0): (Session | undefined)[] {
 }
 
 /* ---------- Weekly checks: one program (F39b) or everything posted to a client (F36, adult rules §4 MUST) ---------- */
-export type Check = { kind: 'block' | 'warn' | 'ok'; message: string; who?: string };
+/** 2.4.0 (F45a): trainer checks are neutral information only. Combined caps aren't enforced at post (spec §0.3). */
+export type Check = { kind: 'info'; message: string; who?: string };
 
 /** Combined Monday-first days: the sessions each day across several programs (same week index for each). */
 function combinedDays(programs: Program[], w = 0): (Session | undefined)[][] {
   return Array.from({ length: 7 }, (_, d) => programs.map((p) => weekSessions(p, Math.min(w, programWeeks(p) - 1))[d]).filter(Boolean));
 }
 
-/** Strength sessions per week across programs (max over each program's weeks). */
-function strengthCount(programs: Program[]): number {
+/** Sessions per week across programs (the busiest week). Counts every scheduled session. */
+export function sessionsPerWeek(programs: Program[]): number {
   const most = Math.max(1, ...programs.map(programWeeks));
   let max = 0;
-  for (let w = 0; w < most; w++) max = Math.max(max, combinedDays(programs, w).flat().filter(countsTowardCap).length);
+  for (let w = 0; w < most; w++) max = Math.max(max, combinedDays(programs, w).flat().length);
   return max;
 }
 
-function restProblem(days: (Session | undefined)[][]): boolean {
-  // At least one day with no strength training and no Moderate cardio.
-  return !days.some((list) => !list.some((s) => countsTowardCap(s) || hasModerate(s)));
-}
-
-function legPairs(days: (Session | undefined)[][]): [number, number] | null {
-  for (let i = 0; i < 7; i++) {
-    const j = (i + 1) % 7;
-    if (days[i].some(legHeavy) && days[j].some(legHeavy)) return [i, j];
-  }
-  return null;
-}
-
-const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
-/** F39b: one program, against the lowest level among its targets. */
-export function programChecks(p: Program, lowestLevel: 1 | 2 | 3): Check[] {
-  const out: Check[] = [];
-  const cap = STRENGTH_CAP[lowestLevel];
-  const count = strengthCount([p]);
-  if (count > cap) out.push({ kind: 'block', message: `${plural(count, 'strength session')} a week. Max ${cap} for ${LEVEL_WORD[lowestLevel]} clients.` });
-  const most = programWeeks(p);
-  for (let w = 0; w < most; w++) {
-    const days = combinedDays([p], w);
-    if (restProblem(days)) {
-      out.push({ kind: 'block', message: 'Keep at least one day off each week.' });
-      break;
-    }
-  }
-  const legs = legPairs(combinedDays([p]));
-  if (legs) out.push({ kind: 'warn', message: `Leg-heavy sessions ${DAY_NAMES[legs[0]]} and ${DAY_NAMES[legs[1]]}. Try an upper-body or full-body session here.` });
-  if (programWeeks(p) >= 7 && p.goal !== 'back_after_break' && !p.weeks?.some((w) => w.deload)) {
-    out.push({ kind: 'warn', message: 'No deload in 7+ weeks. Most programs take one every 4–6 weeks.' });
-  }
-  return out;
+/** F39b: the week's count, as information. No caps, day-off, leg-heavy or deload messages. */
+export function programChecks(p: Program): Check[] {
+  return [{ kind: 'info', message: `${plural(sessionsPerWeek([p]), 'session')} a week.` }];
 }
 
 export type ClientForCheck = { userId: string; name: string; level: 1 | 2 | 3; existing: { label: string; program: Program; sameTarget: boolean }[] };
 
-/** F36 step 3: per affected client, combined with everything else posted to them. Blocks first. */
+/** F36: a neutral readout per client ("Alex: 5 sessions a week across all programs"). Never a block or warning. */
 export function postChecks(newProgram: Program, clients: ClientForCheck[]): Check[] {
-  const blocks: Check[] = [];
-  const warns: Check[] = [];
+  const out: Check[] = [];
   for (const c of clients) {
     const first = c.name.split(' ')[0] || c.name;
     const others = c.existing.filter((e) => !e.sameTarget);
     const replaced = c.existing.find((e) => e.sameTarget);
-    const all = [...others.map((e) => e.program), newProgram];
-    const cap = STRENGTH_CAP[c.level];
-    const before = others.length ? strengthCount(others.map((e) => e.program)) : 0;
-    const adds = strengthCount([newProgram]);
-    const total = strengthCount(all);
-    if (total > cap) {
-      const from = others.length ? ` from ${others.map((e) => e.label).join(' and ')}` : '';
-      blocks.push({
-        kind: 'block',
-        who: c.userId,
-        message: others.length
-          ? `${first} already has ${plural(before, 'session')} a week${from}. This program adds ${adds} (total ${total}, max ${cap} for ${first}'s level).`
-          : `This program has ${plural(adds, 'strength session')} a week (max ${cap} for ${first}'s level).`,
-      });
-    }
-    const most = Math.max(...all.map(programWeeks));
-    for (let w = 0; w < most; w++) {
-      if (restProblem(combinedDays(all, w))) {
-        blocks.push({ kind: 'block', who: c.userId, message: `${first} would train 7 days in a row. Keep at least one day off.` });
-        break;
-      }
-    }
-    if (others.length) {
-      const legs = legPairs(combinedDays(all));
-      if (legs) warns.push({ kind: 'warn', who: c.userId, message: `${first} has leg-heavy sessions ${DAY_NAMES[legs[0]]} and ${DAY_NAMES[legs[1]]}. Try an upper-body or full-body session here.` });
-    }
-    if (replaced) warns.push({ kind: 'warn', who: c.userId, message: `This replaces ${replaced.label} for ${first}.` });
+    const total = sessionsPerWeek([...others.map((e) => e.program), newProgram]);
+    out.push({ kind: 'info', who: c.userId, message: `${first}: ${plural(total, 'session')} a week across all programs.` });
+    if (replaced) out.push({ kind: 'info', who: c.userId, message: `This replaces ${replaced.label} for ${first}.` });
   }
-  return [...blocks, ...warns];
+  return out;
 }
 
 /** "Strength · week 3 of 8" (F37/F42). */
@@ -433,18 +357,7 @@ export function programLine(p: Program, date: Date = new Date(), withTotal = tru
   return withTotal ? `${goal} · week ${w + 1} of ${programWeeks(p)}` : `${goal} · week ${w + 1}`;
 }
 
-/** Cardio checks for one session (F41). */
-export function cardioProblems(session: Session, goal?: Goal): string[] {
-  const out: string[] = [];
-  const total = session.exercises.reduce((n, pe) => n + (pe.cardio?.minutes ?? 0), 0);
-  if (total > CARDIO_SESSION_MAX) out.push(CARDIO_SESSION_BLOCK);
-  if (goal === 'back_after_break' && session.exercises.some((pe) => pe.cardio && (pe.cardio.intensity !== 'easy' || pe.cardio.minutes > 15))) {
-    out.push(CARDIO_BREAK_LINE);
-  }
-  return out;
-}
-
-/** Clamp a cardio prescription to the adult rules (5–60 min; Back after a break: Easy, ≤ 15). */
+/** Approach's cardio defaults (adult rules; generated sessions only since 2.4.0): 5–60 min; Back after a break: Easy, ≤ 15. */
 export function clampCardio(rx: CardioRx, goal?: Goal): CardioRx {
   const max = goal === 'back_after_break' ? 15 : 60;
   return { minutes: Math.min(max, Math.max(5, Math.round(rx.minutes))), intensity: goal === 'back_after_break' ? 'easy' : rx.intensity };

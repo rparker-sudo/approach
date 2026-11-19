@@ -13,6 +13,7 @@ import { ALL, isDraftKey, summarizeReadiness, useTeams } from '../../lib/team';
 import EffortBoard from '../EffortBoard';
 import StationControls from '../StationControls';
 import { BoardColor } from '../TeamSettingsCard';
+import WarmupSettings from '../WarmupSettings';
 import Sheet from '../Sheet';
 import { Body, Button, Card, Checkbox, Chip, ChipRow, colors, display, Field, H2, Icon, Label, Note, Pill, Row, StatusChip, Text, Toggle } from '../ui';
 import { GateBanner } from './TrainerTerms';
@@ -388,6 +389,7 @@ function GeneralSettings({ team }: { team: Team }) {
         <BoardColor team={team} />
       </Card>
       <Button kind="secondary" title="Gym equipment" onPress={() => router.push({ pathname: '/gym', params: { teamId: team.id } })} />
+      <WarmupSettings team={team} />
       {renaming ? (
         <Card>
           <Field label="Team name" value={name} onChangeText={setName} autoFocus maxLength={40} />

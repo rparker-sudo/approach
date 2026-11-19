@@ -1,4 +1,4 @@
-import { ALL_EQUIPMENT, EXERCISES, fits, getExercise } from './exercises';
+import { ALL_EQUIPMENT, CATALOG_V3_IDS, EXERCISES, fits, getExercise } from './exercises';
 import { lengthTarget, restFor, RestContext, withFloor } from './rest';
 import { autoGroup } from './groups';
 import type {
@@ -325,7 +325,7 @@ export const REST_BY_ROLE: Record<SlotRole, number> = {
  */
 export function restSecFor(pe: ProgramExercise, ctx: RestContext = {}): number {
   const ex = getExercise(pe.exerciseId);
-  if (isCoachRest(pe)) return withFloor(ex, pe.restSec!, ctx.equipment);
+  if (isCoachRest(pe)) return withFloor(ex, pe.restSec!, ctx.equipment, ctx.free);
   return restFor(ex, pe, ctx);
 }
 
@@ -341,7 +341,7 @@ export function formatRest(sec: number): string {
   return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 }
 
-export const HOLDS = new Set(['plank', 'side-plank', 'wall-sit', 'spanish-squat', 'copenhagen', 'hip-flexor-stretch', 'lat-reach', 'band-hamstring']);
+export const HOLDS = new Set(['plank', 'side-plank', 'wall-sit', 'spanish-squat', 'copenhagen', 'hip-flexor-stretch', 'lat-reach', 'band-hamstring', 'er-90-90-iso', 'short-lever-copenhagen']);
 const CARRIES = new Set(['suitcase-carry', 'farmer-carry']);
 
 /** Reps written the way athletes read them: holds in seconds, one-sided work "each". */
@@ -359,6 +359,16 @@ const REP_OVERRIDE: Record<string, string> = {
   'ankle-rock': '10 each',
   'lat-reach': '20s each',
   'band-hamstring': '30s each',
+  // 2.4.0 catalog v3 notation (holds, line hops, movement prep in yards)
+  'er-90-90-iso': '15s each',
+  'short-lever-copenhagen': '15s each',
+  'line-hops': '20',
+  'a-skip': '10 yd',
+  'lateral-shuffle': '10 yd',
+  carioca: '10 yd',
+  'high-knees': '10 yd',
+  'walking-knee-hug': '10 yd',
+  'walking-quad-stretch': '10 yd',
 };
 
 function repsFor(ex: Exercise, rx: Rx, phase: Phase): string {
@@ -386,11 +396,12 @@ const CARE_BY_POSITION: Record<ProgramPosition, Pattern[]> = {
   'Libero / DS': ['ankle-care', 'knee-care'],
 };
 
-type PickCtx = { equipment: Equipment[]; maxLevel: number; usedWeek: Set<string>; usedSession: Set<string>; allow?: (e: Exercise) => boolean };
+type PickCtx = { equipment: Equipment[]; maxLevel: number; usedWeek: Set<string>; usedSession: Set<string>; allow?: (e: Exercise) => boolean; v3?: boolean };
 
 /** Best exercise for a slot, or undefined when nothing fits at all. */
 export function pickExercise(patterns: Pattern[], role: SlotRole, ctx: PickCtx): Exercise | undefined {
-  const pool = EXERCISES.filter((e) => patterns.includes(e.pattern) && !ctx.usedSession.has(e.id) && (!ctx.allow || ctx.allow(e)));
+  // 2.4.0: the 2.3.0 generator never picks catalog v3 exercises (its output stays unchanged until generatorV3).
+  const pool = EXERCISES.filter((e) => patterns.includes(e.pattern) && !ctx.usedSession.has(e.id) && (ctx.v3 || !CATALOG_V3_IDS.has(e.id)) && (!ctx.allow || ctx.allow(e)));
   // Olympic lifts only for experienced lifters with a barbell.
   const allowed = pool.filter((e) => e.pattern !== 'olympic' || ctx.maxLevel >= 3);
   const usable = allowed.filter((e) => fits(e, ctx.equipment));
@@ -598,7 +609,9 @@ export function generateProgram(input: GeneratorInput): Program {
 function withAutoGroups(program: Program, input: GeneratorInput): Program {
   return {
     ...program,
-    sessions: program.sessions.map((s) => {
+    // 2.4.0 (§0.1): everything the generator writes is Approach's until a coach edits it.
+    sessions: program.sessions.map((s0) => {
+      const s: Session = { ...s0, source: 'approach' };
       if (s.mobility || s.light) return s;
       const home = s.location === 'home';
       const enabled = input.supersets ?? (input.phase === 'in' || home);
@@ -692,7 +705,7 @@ export function mobilitySession(program: Program): Session {
     liftDaysPerWeek: liftDayCount(program),
     equipment: program.equipment,
   };
-  return { ...buildSession(A.recovery('Mobility'), input, new Set(), { n: 0 }), mobility: true };
+  return { ...buildSession(A.recovery('Mobility'), input, new Set(), { n: 0 }), mobility: true, source: 'approach' };
 }
 
 /** Short reasons shown under each day, so athletes understand the plan. */

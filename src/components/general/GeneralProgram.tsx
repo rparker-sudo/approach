@@ -6,7 +6,6 @@ import { showAlert } from '../../lib/dialog';
 import {
   adultWave,
   BACK_AFTER_BREAK_RAMP,
-  EFFORT_BLOCK,
   endDate,
   endsSoon,
   gateState,
@@ -16,7 +15,6 @@ import {
   programChecks,
   programLine,
   programWeeks,
-  RPE_CEILING,
   scheduleFor,
   weekIndex,
 } from '../../lib/general';
@@ -27,6 +25,7 @@ import { WEEKDAYS } from '../../lib/types';
 import { uid } from '../../lib/util';
 import Sheet from '../Sheet';
 import { Body, Button, Card, Checkbox, ChipRow, colors, Field, H2, Label, OptionCard, Pill, Row, Stepper, Text, Toggle } from '../ui';
+import ProgramSettings from '../ProgramSettings';
 import NewProgramSheet from './NewProgramSheet';
 import PostSheet from './PostSheet';
 
@@ -80,7 +79,6 @@ function TrainerProgram({ program }: { program: Program }) {
   const [dup, setDup] = useState<string | null>(null);
   const [dupPick, setDupPick] = useState(false);
   const [newFrom, setNewFrom] = useState(false);
-  const [rpeMsg, setRpeMsg] = useState<string | null>(null);
   if (!team || !isGeneral(team)) return <Body muted>Program not found.</Body>;
   const gate = gateState(t.trainerStatus[team.id], (data.openSeen ?? []).includes(team.id));
   const draft = isDraftKey(program.groupKey);
@@ -89,9 +87,7 @@ function TrainerProgram({ program }: { program: Program }) {
   const plan = plans[week];
   const schedule = scheduleFor(program, week);
   const target = program.groupKey;
-  const targets = draft ? roster : target === 'all' ? roster : target?.startsWith('client:') ? roster.filter((m) => m.userId === target.slice(7)) : roster.filter((m) => m.groupId === target);
-  const lowest = (targets.length ? Math.min(...targets.map((m) => m.level ?? 1)) : 3) as 1 | 2 | 3;
-  const checks = programChecks(program, lowest);
+  const checks = programChecks(program);
   const who = target?.startsWith('client:') ? roster.find((m) => m.userId === target.slice(7)) : undefined;
   const first = who ? who.name.split(' ')[0] : null;
   const original = program.draftTarget ? roster.find((m) => m.userId === program.draftTarget!.slice(7)) : undefined;
@@ -100,16 +96,12 @@ function TrainerProgram({ program }: { program: Program }) {
   const setPlan = (i: number, next: ProgramWeekPlan) => save({ weeks: plans.map((p, k) => (k === i ? next : p)) });
   const setDay = (d: number, sessionId: string | null) => setPlan(week, { ...plan, schedule: schedule.map((x, k) => (k === d ? sessionId : x)) });
 
+  /** F39b (2.4.0): per-week effort accepts any value. */
   function setRpe(n: number) {
-    if (n > RPE_CEILING) {
-      setRpeMsg(EFFORT_BLOCK);
-      return;
-    }
-    setRpeMsg(null);
-    setPlan(week, { ...plan, rpe: Math.max(5, n) });
+    setPlan(week, { ...plan, rpe: Math.min(10, Math.max(5, n)) });
   }
   function addSession() {
-    const s: Session = { id: uid(), name: `Session ${program.sessions.length + 1}`, focus: 'Full body', exercises: [], warmup: 'W1' };
+    const s: Session = { id: uid(), name: `Session ${program.sessions.length + 1}`, focus: 'Full body', exercises: [], source: 'coach' };
     save({ sessions: [...program.sessions, s] });
     router.push({ pathname: '/session', params: { programId: program.id, sessionId: s.id } });
   }
@@ -171,6 +163,9 @@ function TrainerProgram({ program }: { program: Program }) {
       </ChipRow>
       {weeks < 16 ? <Button small kind="ghost" title="Add a week" onPress={() => save({ weeks: [...plans, { ...plans[weeks - 1], deload: false }] })} /> : null}
 
+      {/* 2.4.0 F46a / F51a: level adjust and session length. */}
+      <ProgramSettings program={program} />
+
       {/* Per-week effort */}
       <Card>
         {ramp && week < 4 ? (
@@ -182,9 +177,8 @@ function TrainerProgram({ program }: { program: Program }) {
           <>
             <Row style={{ justifyContent: 'space-between' }}>
               <Text style={{ fontSize: 15, fontWeight: '600', flex: 1 }}>{`Week ${week + 1} effort: RPE ${plan.rpe ?? 7} (main and secondary)`}</Text>
-              <Stepper value={plan.rpe ?? 7} min={5} max={RPE_CEILING + 1} onChange={setRpe} />
+              <Stepper value={plan.rpe ?? 7} min={5} max={10} onChange={setRpe} />
             </Row>
-            {rpeMsg ? <Text accessibilityRole="alert" style={{ fontSize: 13, color: colors.errorText }}>{rpeMsg}</Text> : null}
             <Row style={{ justifyContent: 'space-between', minHeight: 44 }}>
               <Text style={{ fontSize: 14, flex: 1 }}>{`Make week ${week + 1} a deload (fewer sets, same rest)`}</Text>
               <Toggle accessibilityLabel={`Make week ${week + 1} a deload`} value={!!plan.deload} onValueChange={(v) => setPlan(week, { ...plan, deload: v, ...(v ? { rpe: 6 } : {}) })} />
@@ -214,9 +208,7 @@ function TrainerProgram({ program }: { program: Program }) {
       {checks.length ? (
         <View style={{ gap: 4 }}>
           {checks.map((c, i) => (
-            <Text key={i} accessibilityRole={c.kind === 'block' ? 'alert' : undefined} style={{ fontSize: 13, color: c.kind === 'block' ? colors.errorText : colors.warningText }}>
-              {`${c.kind === 'block' ? 'Blocked: ' : 'Note: '}${c.message}`}
-            </Text>
+            <Text key={i} style={{ fontSize: 13, color: colors.muted }}>{c.message}</Text>
           ))}
         </View>
       ) : null}
@@ -241,7 +233,7 @@ function TrainerProgram({ program }: { program: Program }) {
       ))}
       <Button kind="ghost" title="Add session" icon="plus" onPress={addSession} />
 
-      <Button large title="Post" icon="square.and.arrow.up" disabled={checks.some((c) => c.kind === 'block')} onPress={() => setPosting(true)} />
+      <Button large title="Post" icon="square.and.arrow.up" onPress={() => setPosting(true)} />
       {gate === 'not_open' || gate === 'paused' ? <Text style={{ fontSize: 13, color: colors.muted }}>You can post once your team is open.</Text> : null}
       <Button kind="secondary" title="Save as template" onPress={() => setTemplate(true)} />
       {!draft ? <Button kind="secondary" title="Duplicate to another client" onPress={() => setDupPick(true)} /> : null}

@@ -1,11 +1,13 @@
 import { router } from 'expo-router';
 import { liftDayCap, liftDayCount, overCap } from '../lib/generator';
+import { generatedWeek } from '../lib/calendar';
 import type { Program } from '../lib/types';
 import { Button, Card, Text } from './ui';
 
 /** G2: plans made before the lift-day caps get an offer to rebuild within the cap. */
 export default function CapNotice({ program }: { program: Program }) {
-  if (!overCap(program)) return null;
+  // 2.4.0: Approach-generated programs only; coach-built programs accept any number of days (§1.1 item 5).
+  if (!generatedWeek(program) || !overCap(program)) return null;
   const cap = liftDayCap(program.experience, program.phase);
   return (
     <Card>

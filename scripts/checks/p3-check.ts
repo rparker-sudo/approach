@@ -67,10 +67,15 @@ ok(circuitReason([g('db-row'), g('farmer-carry'), g('pallof')]) === CIRCUIT_REAS
 ok(circuitReason([g('pushup'), g('db-bench'), g('pallof')]) === CIRCUIT_REASONS.pattern, 'same pattern blocked');
 ok(circuitReason([g('cable-row'), g('db-bench'), g('pallof')]) === CIRCUIT_REASONS.station, 'mixed stations blocked');
 // Beginner circuit cap
-const circ = { id: 'c', name: 'C', focus: '', exercises: [{ exerciseId: 'db-bench', sets: 3, reps: '8', effort: 'RPE 7', group: 'A' }, { exerciseId: 'db-row', sets: 3, reps: '8', effort: 'RPE 7', group: 'A' }, { exerciseId: 'pallof', sets: 3, reps: '8', effort: 'Controlled', group: 'A' }, { exerciseId: 'band-er', sets: 3, reps: '15', effort: 'Light', group: 'A' }] } as any;
+// 2.4.0 (spec §0.1): C1 applies to Approach-generated sessions; this fixture is a generated session (source 'approach').
+const circ = { id: 'c', name: 'C', focus: '', source: 'approach', exercises: [{ exerciseId: 'db-bench', sets: 3, reps: '8', effort: 'RPE 7', group: 'A' }, { exerciseId: 'db-row', sets: 3, reps: '8', effort: 'RPE 7', group: 'A' }, { exerciseId: 'pallof', sets: 3, reps: '8', effort: 'Controlled', group: 'A' }, { exerciseId: 'band-er', sets: 3, reps: '15', effort: 'Light', group: 'A' }] } as any;
 const pc = { ...p, sessions: [circ] };
 const rb = resolveSession(pc, circ, { level: 1, logs: [] });
 ok(rb.exercises.filter((e) => e.group === 'A').length === 3 && !!rb.exercises[3].afterCircuit && !rb.exercises[3].group, 'beginner: circuit of 3, 4th after as straight sets');
+// 2.4.0: a coach-built circuit of 4 stays as written for beginners (C1 builder rule superseded, §0.3).
+const coachCirc = { ...circ, source: 'coach' };
+const rc = resolveSession({ ...pc, sessions: [coachCirc] }, coachCirc, { level: 1, logs: [] });
+ok(rc.exercises.filter((e) => e.group === 'A').length === 4, '2.4.0: coach-built circuit of 4 stays 4 for beginners');
 const ra = resolveSession(pc, circ, { level: 2, logs: [] });
 ok(ra.exercises.filter((e) => e.group === 'A').length === 4, 'intermediate: circuit of 4');
 // Auto-pairing only until fits

@@ -24,7 +24,9 @@ import {
   withOverride,
   withBreak,
   withoutBreak,
+  withRoomMinutes,
 } from '../lib/calendar';
+import { LENGTH_PICKS } from '../lib/fit';
 import { showAlert } from '../lib/dialog';
 import { useStore } from '../lib/store';
 import { isDraftKey, useTeams } from '../lib/team';
@@ -386,9 +388,12 @@ function DaySheet({
   const hasOverride = !!program.overrides && dateKeyStr in program.overrides;
   const [lift, setLift] = useState<string | null | 'auto'>(hasOverride ? program.overrides![dateKeyStr] : 'auto');
   const [test, setTest] = useState<TestBattery | null>(existing?.test ?? null);
+  // 2.4.0 F51c: weight room time for this date (team calendars).
+  const ownRoom = (program.events ?? []).find((e) => e.date === dateKeyStr && e.type !== 'break' && !e.teamName)?.roomMinutes ?? null;
+  const [room, setRoom] = useState<number | null>(ownRoom);
 
   // Preview the automatic plan with the event edits applied.
-  let draft = withEvent(program, dateKeyStr, type, label);
+  let draft = withRoomMinutes(withEvent(program, dateKeyStr, type, label), dateKeyStr, room);
   const nextKey = dateKey(addDays(date, 1));
   if (nextDayToo && type === 'tournament') draft = withEvent(draft, nextKey, 'tournament', label);
   draft = withTest(draft, dateKeyStr, canTest ? test : existing?.test ?? null);
@@ -428,6 +433,7 @@ function DaySheet({
                 {current.event?.label ? ` · ${current.event.label}` : ''}
               </Text>
               <Text style={{ fontSize: 16, fontWeight: '600' }}>{current.test ? `Testing day: ${BATTERY_LABEL[current.test]}` : `Lift: ${currentName}`}</Text>
+              {ownRoom ? <Text style={{ fontSize: 13, color: colors.muted }}>{`Room ${ownRoom} min`}</Text> : null}
               {current.note ? <Note>{current.note}</Note> : null}
               <Button title="Close" onPress={onClose} />
             </>
@@ -505,8 +511,22 @@ function DaySheet({
                 ))}
               </ChipRow>
               {lift === 'auto' && auto.note ? <Note>{auto.note}</Note> : null}
-              {lift !== 'auto' && (type === 'game' || type === 'tournament' || (type === null && (usual === 'game' || usual === 'tournament'))) && lift ? (
+              {/* 2.4.0 (§1.1): no warning on a coach's lift-day choice for a team program; a personal plan keeps the note. */}
+              {!program.teamId && lift !== 'auto' && (type === 'game' || type === 'tournament' || (type === null && (usual === 'game' || usual === 'tournament'))) && lift ? (
                 <Text style={{ fontSize: 13, color: colors.warningText }}>Lifting on a match day is not recommended.</Text>
+              ) : null}
+              {program.teamId ? (
+                <>
+                  <Label>{`Weight room time on ${formatKey(dateKeyStr)}`}</Label>
+                  <ChipRow>
+                    <Chip label="Not set" selected={room == null} onPress={() => setRoom(null)} />
+                    {LENGTH_PICKS.map((m) => (
+                      <Chip key={m} label={`${m} min`} selected={room === m} onPress={() => setRoom(m)} />
+                    ))}
+                  </ChipRow>
+                  {room != null && !LENGTH_PICKS.includes(room) ? <Text style={{ fontSize: 13 }}>{`${room} min`}</Text> : null}
+                  <Text style={{ fontSize: 13, color: colors.muted }}>That date&apos;s session refits (Approach Strength&apos;s) or shows the new target (yours). The rest of the week doesn&apos;t change.</Text>
+                </>
               ) : null}
 
               <Row>

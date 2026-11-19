@@ -225,6 +225,7 @@ export function Button({
   disabled,
   small,
   large,
+  accessibilityLabel,
 }: {
   title: string;
   onPress: () => void;
@@ -234,6 +235,8 @@ export function Button({
   small?: boolean;
   /** 56 pt: in-workout primary actions and the Welcome buttons (F-7). Every button is at least 44 pt. */
   large?: boolean;
+  /** When the visible title is a symbol (↑, ⋯). */
+  accessibilityLabel?: string;
 }) {
   const bg = kind === 'primary' ? colors.primaryBg : kind === 'secondary' ? colors.raised : 'transparent';
   const fg = kind === 'primary' ? colors.primaryText : kind === 'danger' ? colors.errorText : colors.ink;
@@ -241,6 +244,7 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [

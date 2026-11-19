@@ -32,7 +32,7 @@ export default function Progress() {
         let best = 0;
         let bestLabel = '';
         for (const s of e.sets) {
-          if (!s.done) continue;
+          if (!s.done || s.warmup) continue;
           const w = parseNum(s.weight);
           const r = parseNum(s.reps);
           const est = estimateStrength(w, r);
@@ -140,7 +140,7 @@ export default function Progress() {
       <Label>History</Label>
       {data.logs.length === 0 ? <Body muted>No workouts logged yet.</Body> : null}
       {data.logs.slice(0, 30).map((l) => {
-        const sets = l.entries.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0);
+        const sets = l.entries.reduce((n, e) => n + e.sets.filter((s) => s.done && !s.warmup).length, 0);
         return (
           <Pressable
             key={l.id}

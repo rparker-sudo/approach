@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { Body, Button, Card, Chip, ChipRow, colors, H2, Label, Note, Screen, Text } from '../components/ui';
 import { WeekEditor } from '../components/week';
-import { isHeavyLegs } from '../lib/calendar';
+import { generatedWeek, isHeavyLegs } from '../lib/calendar';
 import { dayAdvice, liftCapMessage, liftDayCap, mobilitySession } from '../lib/generator';
 import { useStore } from '../lib/store';
 import type { DayType } from '../lib/types';
@@ -37,12 +37,19 @@ export default function ScheduleScreen() {
   const liftSessions = program.sessions.filter((s) => !s.mobility);
   const unused = liftSessions.filter((s) => !lifts.includes(s.id));
   // G2: lift-day cap for the program's level and time of year, and one day fully off.
-  const cap = liftDayCap(program.experience, program.phase);
+  // 2.4.0 (§1.1 item 5): Approach-generated programs only. A coach-built program takes any number of days; the count shows.
+  const free = !generatedWeek(program);
+  const cap = free ? 7 : liftDayCap(program.experience, program.phase);
   const isLift = (sid: string | null) => !!sid && sid !== MOBILITY;
   const liftCount = lifts.filter(isLift).length;
 
   function assign(i: number, sid: string | null) {
     const next = lifts.map((x, k) => (k === i ? sid : x));
+    if (free) {
+      setLimit(null);
+      setLifts(next);
+      return;
+    }
     if (sid && isLift(sid) && !isLift(lifts[i]) && liftCount >= cap) {
       setLimit(liftCapMessage(cap));
       return;
@@ -108,13 +115,14 @@ export default function ScheduleScreen() {
         })}
       </View>
 
+      {free ? <Text style={{ fontSize: 13, color: colors.muted }}>{`${liftCount} lift day${liftCount === 1 ? '' : 's'} this week`}</Text> : null}
       {limit ? <Note>{limit}</Note> : null}
-      {liftCount > cap ? <Note>{`${liftCapMessage(cap)} This plan has ${liftCount}. Set some days to Mobility or Rest, or rebuild the program.`}</Note> : null}
+      {!free && liftCount > cap ? <Note>{`${liftCapMessage(cap)} This plan has ${liftCount}. Set some days to Mobility or Rest, or rebuild the program.`}</Note> : null}
       {unused.length ? <Note>{`Not on any day: ${unused.map((s) => s.name).join(', ')}.`}</Note> : null}
       {program.teamId ? (
         <Body muted style={{ fontSize: 13 }}>After saving, post the team workout to send the new days to athletes.</Body>
       ) : null}
-      <Button title="Save lift days" disabled={!changed || !lifts.some(isLift) || liftCount > cap || lifts.every(Boolean)} onPress={save} />
+      <Button title="Save lift days" disabled={!changed || !lifts.some(isLift) || (!free && (liftCount > cap || lifts.every(Boolean)))} onPress={save} />
     </Screen>
   );
 }

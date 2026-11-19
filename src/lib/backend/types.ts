@@ -74,6 +74,11 @@ export type TeamSettings = {
   medBallLb: number;
   /** v2.2 board accent color (#RRGGBB); null = the default (Silver). The coach's original choice (adjusted at render time). */
   accentColor: string | null;
+  /** 2.4.0 F50 (migration 011): team default warm-up. */
+  defaultWarmup: 'approach' | 'template' | 'none';
+  defaultWarmupTemplateId: string | null;
+  /** 2.4.0 F50: "Limited space": in-place Raise drills. */
+  limitedSpace: boolean;
 };
 export const DEFAULT_TEAM_SETTINGS: TeamSettings = {
   practiceMin: 120,
@@ -84,6 +89,18 @@ export const DEFAULT_TEAM_SETTINGS: TeamSettings = {
   teamGoal: null,
   medBallLb: 6,
   accentColor: null,
+  defaultWarmup: 'approach',
+  defaultWarmupTemplateId: null,
+  limitedSpace: false,
+};
+
+/** 2.4.0 F49 (migration 011 `warmup_templates`): a coach's saved warm-up. Coach-private; no athlete data. */
+export type WarmupTemplate = {
+  id: string;
+  teamId: string;
+  name: string;
+  items: Pick<import('../types').SessionWarmup, 'raise' | 'activate' | 'potentiate'>;
+  createdAt: string;
 };
 
 export type Team = {
@@ -241,7 +258,7 @@ export type LiveProgress = {
   stationId?: string | null;
   rotateAt?: string | null;
 };
-export type LiveState = 'idle' | 'lifting' | 'resting' | 'done';
+export type LiveState = 'idle' | 'warming_up' | 'lifting' | 'resting' | 'done';
 
 /** Testing-day board mode (P3.6, P6.10): jump changes only (null delta = first result), strength check done or not. */
 export type BoardTest = {
@@ -346,6 +363,10 @@ export interface Backend {
   acceptTrainerTerms(teamId: string): Promise<void>;
   /** 2.3.0 F40 (migration 010): the trainer saves the gym equipment profile. */
   setGymEquipment(teamId: string, equipment: import('../types').Equipment[]): Promise<void>;
+  /** 2.4.0 F49/F50: the team coach's warm-up templates (coach only). */
+  listWarmupTemplates(teamId: string): Promise<WarmupTemplate[]>;
+  saveWarmupTemplate(teamId: string, name: string, items: WarmupTemplate['items']): Promise<WarmupTemplate>;
+  deleteWarmupTemplate(id: string): Promise<void>;
   /** 2.3.0 F43 / compliance T5: the client deletes all their check-ins (server and this device). Returns rows deleted. */
   deleteMyCheckins(): Promise<number>;
   /** 2.3.0 F38: one client's recent logs with entries (sets, reps, weights, notes, cardio minutes). Trainer only (RLS). */
@@ -461,5 +482,6 @@ export function boardName(fullName: string, mode: BoardNameMode = 'short'): stri
 }
 
 export function setsDone(log: WorkoutLog): number {
-  return log.entries.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0);
+  // 2.4.0: ramp-up sets (warmup: true) never count as work sets.
+  return log.entries.reduce((n, e) => n + e.sets.filter((s) => s.done && !s.warmup).length, 0);
 }

@@ -1,7 +1,7 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { LevelSwaps, SetLevelSheet } from '../components/LevelRoster';
+import { AdjustToLevel, LevelSwaps, SetLevelSheet } from '../components/LevelRoster';
 import { Body, Button, Card, colors, H2, Label, Row, Screen, StatusChip, Text } from '../components/ui';
 import { LEVEL_NAME } from '../lib/athlete';
 import { backend, Readiness, TeamLog } from '../lib/backend';
@@ -69,6 +69,7 @@ export default function ClientScreen() {
           {p.groupKey === 'all' ? <Text style={{ fontSize: 13, color: colors.muted }}>All clients</Text> : p.groupName ? <Text style={{ fontSize: 13, color: colors.muted }}>{p.groupName}</Text> : null}
           <Button small kind="ghost" title="Open in builder" onPress={() => router.push(`/program/${p.id}`)} />
           {/* 6. Adjustments */}
+          <AdjustToLevel program={p} member={member} />
           <LevelSwaps program={p} member={member} info={t.coachExtras[team.id]?.levels[member.userId]} />
         </Card>
       ))}

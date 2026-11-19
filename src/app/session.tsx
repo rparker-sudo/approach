@@ -1,26 +1,29 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
-import { Body, Button, Card, colors, Field, H2, Label, Row, Screen, Stepper, Text, TextInput, Toggle, display, Icon } from '../components/ui';
-import WarmupCard from '../components/general/WarmupCard';
+import { Body, Button, Card, colors, Field, H2, Label, Pill, Row, Screen, Stepper, Text, TextInput, Toggle, display, Icon } from '../components/ui';
+import WarmupCard from '../components/WarmupCard';
+import WarmupRow from '../components/WarmupEditor';
+import { FitBanner, FitSheet } from '../components/FitToTime';
 import CustomExerciseSheet from '../components/CustomExerciseSheet';
 import { CustomInput, inputOf, roleOf } from '../lib/customExercise';
 import { ALL_EQUIPMENT, CATEGORY_LABEL, EXERCISES, exercisePool, fits, getExercise } from '../lib/exercises';
-import { CARDIO_BREAK_LINE, cardioProblems, CIRCUIT_LINE, clampCardio, generalEffortProblem, INTENSITY_LABEL, TALK_TEST } from '../lib/general';
-import { WARMUPS } from '../lib/generalLibrary';
+import { clampCardio, INTENSITY_LABEL, TALK_TEST } from '../lib/general';
 import { cardioFor, rxFor } from '../lib/starter';
-import { formatRest, restSecFor } from '../lib/generator';
+import { formatRest, homeAllowed, restSecFor } from '../lib/generator';
 import { useStore } from '../lib/store';
 import { resolveFor } from '../lib/athlete';
-import { estimateMinutes, FLOOR_MESSAGE, formatMinutes, REST_FLOOR, tierOf , lengthTarget } from '../lib/rest';
-import { effortProblem } from '../lib/resolve';
-import { blockRests, blocksOf, clockProblem, CLOCK_REASON, groupRows, labelOf, straightRests, ungroup } from '../lib/groups';
+import { restFor, tierOf } from '../lib/rest';
+import { clampCardioFree, coachEdit, levelAdjustFor, sourceOf, warmupCtxFor } from '../lib/resolve';
+import { blockRests, blocksOf, groupRows, labelOf, straightRests, ungroup } from '../lib/groups';
+import { estimateSession, fitSession, targetFor, type FitCtx } from '../lib/fit';
+import { SESSION_TYPE_LABEL, sessionType, warmupMinutes } from '../lib/warmup';
 import StationsEditor from '../components/StationsEditor';
-import { useTeams } from '../lib/team';
 import VersionLine, { DroppedLine } from '../components/VersionLine';
 import type { Exercise, ExerciseCategory, ProgramExercise, Session, SlotRole } from '../lib/types';
 
 const CATS: ExerciseCategory[] = ['power', 'lower', 'upper', 'core', 'prehab'];
+
 const TIER_WORD = { P: 'Power', A: 'Heavy', B: 'Compound', C: 'Accessory', D: 'Care' } as const;
 
 export default function SessionScreen() {
@@ -31,11 +34,9 @@ export default function SessionScreen() {
   const [picker, setPicker] = useState<{ replaceIndex: number | null } | null>(null);
   // 2.3.1: create or edit a custom exercise; `replaceIndex` is where it goes once saved (null = add, undefined = edit only).
   const [custom, setCustom] = useState<{ initial?: CustomInput; replaceIndex?: number | null } | null>(null);
-  const [floorNote, setFloorNote] = useState<Record<number, string>>({});
   const [selected, setSelected] = useState<number[]>([]);
-  const [groupMsg, setGroupMsg] = useState<string | null>(null);
-  const [groupWarn, setGroupWarn] = useState<string | null>(null);
-  const { members } = useTeams();
+  const [fitOpen, setFitOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   if (!program || !session) return <Screen><Body muted>Session not found.</Body></Screen>;
   const coach = data.profile?.role === 'coach';
@@ -45,7 +46,7 @@ export default function SessionScreen() {
   // Athletes see their version of the team's workout (G-1: resolveSession).
   if (program.teamId && !coach) {
     const resolved = resolveFor(data, program, session);
-    const warm = general && session.warmup !== null ? WARMUPS.find((w) => w.id === (session.warmup ?? 'W1')) : undefined;
+    const differs = Math.abs(resolved.estMinutes - resolved.target.minutes) >= 5 && resolved.target.source !== 'phase';
     return (
       <Screen>
         <Stack.Screen options={{ title: session.name }} />
@@ -56,8 +57,19 @@ export default function SessionScreen() {
             onPress={() => router.push({ pathname: '/workout', params: { programId: program.id, sessionId: session.id } })}
           />
         ) : null}
-        <Body muted style={{ fontSize: 13 }}>{`${session.focus} · ${formatMinutes(resolved.estMinutes)}`}</Body>
-        {warm ? <WarmupCard id={warm.id} /> : null}
+        <Text style={{ fontSize: 13, color: colors.muted }}>
+          {`${session.focus} · ${resolved.express ? 'Express · ' : ''}About ${resolved.estMinutes} min`}
+          {differs ? <Text style={{ color: colors.muted }}>{` (planned for ${resolved.target.minutes})`}</Text> : null}
+        </Text>
+        {resolved.warmup ? (
+          <WarmupCard
+            warmup={resolved.warmup}
+            minutes={warmupMinutes(resolved.warmup, { phase: program.phase, home: resolved.home })}
+            typeLabel={SESSION_TYPE_LABEL[sessionType({ ...session, exercises: resolved.exercises })]}
+            done={[]}
+            coachWord={general ? 'trainer' : 'coach'}
+          />
+        ) : null}
         {resolved.exercises.map((e, i) => {
           const info = getExercise(e.exerciseId);
           if (e.cardio) {
@@ -92,29 +104,38 @@ export default function SessionScreen() {
 
   const gym = program.equipment ?? ALL_EQUIPMENT;
   const home = session.location === 'home';
-  const restCtx = { phase: program.phase, equipment: home ? [] : program.equipment, home, light: !!session.light };
-  const rests = blockRests(session.exercises, session.exercises.map((e) => (e.group ? straightRests([e], restCtx)[0] : restSecFor(e, restCtx))), restCtx);
-  const minutes = estimateMinutes(
-    session.exercises.map((e, i) => ({ ex: getExercise(e.exerciseId), sets: e.filler ? 0 : e.sets, reps: e.reps, restSec: rests[i] })),
-    home ? 'home' : 'school',
-  );
-  const target = lengthTarget(program.phase, session.light ? 'light' : home ? 'home' : 'school');
-  const hasMinor = !!program.teamId && (members[program.teamId] ?? []).some((m) => m.isMinor !== false);
+  const source = sourceOf(program, session);
+  const approach = source === 'approach';
+  // 2.4.0: coach-built sessions use the coach's rest as typed; auto rest is a suggestion beside the field (§1.1 item 2).
+  const restCtx = { phase: program.phase, equipment: home ? [] : program.equipment, home, light: !!session.light, free: !approach };
+  const rests = blockRests(session.exercises, session.exercises.map((e) => (e.cardio ? 60 : e.group ? straightRests([e], restCtx)[0] : restSecFor(e, restCtx))), restCtx);
+  const wctx = warmupCtxFor(program, session, home ? [] : gym);
+  const fitCtx: FitCtx = { rest: restCtx, warmup: wctx, kind: home ? 'home' : 'school' };
+  const target = targetFor(program, session);
+  const minutes = estimateSession(session, fitCtx, { rests });
+  // Generated sessions show what fitting does (F51f); coach-built sessions show the estimate and offer Fit to time (F51e).
+  const fitted = approach && !session.light && !session.mobility ? fitSession(session, target.minutes, fitCtx, { skip: (session.fitLog ?? []).filter((l) => l.startsWith('undo:')).map((l) => l.slice(5)) }) : null;
+  const shownMinutes = fitted ? fitted.after : minutes;
   const swapping = picker?.replaceIndex != null ? getExercise(session.exercises[picker.replaceIndex].exerciseId) : null;
   // 2.3.0: general teams pick from the whole library + the general library, limited to the gym equipment profile (F39c).
+  // 2.4.0 (§1.1 item 7): home sessions open on the H6 filter (no barbell/cable at home) with "Show all exercises".
   const pool = exercisePool(general);
-  const usable = pool.filter((x) => fits(x, gym));
+  const homeFilter = (x: Exercise) => !home || showAll || homeAllowed(x, true);
+  const usable = pool.filter((x) => fits(x, gym) && homeFilter(x));
   const pickerGroups: { title: string; items: typeof EXERCISES; dim?: boolean }[] = [
     ...(swapping ? [{ title: 'Same movement', items: usable.filter((x) => x.pattern === swapping.pattern && x.id !== swapping.id) }] : []),
     ...(general ? [...CATS, 'cardio' as ExerciseCategory] : CATS).map((c) => ({
       title: CATEGORY_LABEL[c],
       items: usable.filter((x) => x.category === c && (!swapping || x.pattern !== swapping.pattern)),
     })),
-    ...(general ? [] : [{ title: 'Needs other equipment', items: EXERCISES.filter((x) => !fits(x, gym)), dim: true }]),
+    ...(general ? [] : [{ title: 'Needs other equipment', items: EXERCISES.filter((x) => !fits(x, gym) && homeFilter(x)), dim: true }]),
   ];
   const goal = program.goal ?? 'general';
-  const sessionProblems = general ? cardioProblems(session, program.goal) : [];
+  const adjust = levelAdjustFor(program, session);
+  /** Approach's auto rest for a row (the suggestion chip). */
+  const autoRestOf = (e: ProgramExercise, _i: number) => (e.cardio ? 60 : restFor(getExercise(e.exerciseId), e, { ...restCtx, free: false }));
 
+  /** Saves the session as it is: warm-up, length and level-toggle changes keep the session's source (§0.1). */
   function update(next: Session) {
     saveProgram({
       ...program!,
@@ -123,42 +144,47 @@ export default function SessionScreen() {
       ...(program!.teamId ? { unposted: true } : null),
     });
   }
+  /** Any change to an exercise, set, rep, effort, rest, grouping, order or station: the session becomes the coach's (§0.1). */
+  function edit(next: Session) {
+    update(coachEdit(next));
+  }
   function setEx(i: number, patch: Partial<ProgramExercise>) {
     // Any manual change to a grouped row removes its "Auto" tag.
-    update({ ...session!, exercises: session!.exercises.map((e, k) => (k === i ? { ...e, ...patch, ...(e.group ? { autoGroup: false } : {}) } : e)) });
+    edit({ ...session!, exercises: session!.exercises.map((e, k) => (k === i ? { ...e, ...patch, ...(e.group ? { autoGroup: false } : {}) } : e)) });
   }
   function toggleSelect(i: number) {
-    setGroupMsg(null);
     setSelected((sel) => (sel.includes(i) ? sel.filter((x) => x !== i) : [...sel, i]));
   }
   function groupSelected() {
-    const res = groupRows(session!.exercises, selected, program!.equipment, !!program!.general);
-    if (res.reason) {
-      setGroupMsg(res.reason);
-      return;
-    }
-    update({ ...session!, exercises: res.list! });
+    // 2.4.0 (F45a): any two or more exercises; no blocked pairs, no reasons.
+    edit({ ...session!, exercises: groupRows(session!.exercises, selected).list });
     setSelected([]);
-    // General teams: the youth rule shows as a warning (amber), the block is made.
-    if (res.warning) setGroupWarn(res.warning);
   }
   function move(i: number, dir: -1 | 1) {
     const j = i + dir;
     if (j < 0 || j >= session!.exercises.length) return;
     const list = [...session!.exercises];
     [list[i], list[j]] = [list[j], list[i]];
-    update({ ...session!, exercises: list });
+    edit({ ...session!, exercises: list });
   }
-  /** Coach rest wins, within the floors (tier A ≥ 2:00, tier P ≥ 1:30). Below the floor resets to it, with the reason. */
+  /** Any rest, including 0:00 (§1.1 item 2). Saved as typed. */
   function setRest(i: number, sec: number) {
-    const ex = getExercise(session!.exercises[i].exerciseId);
-    const floor = REST_FLOOR[tierOf(ex, program!.equipment)] ?? 0;
-    const next = Math.min(600, Math.max(floor, sec));
-    setFloorNote((n) => ({ ...n, [i]: sec < floor ? FLOOR_MESSAGE[tierOf(ex, program!.equipment)] ?? '' : '' }));
-    setEx(i, { restSec: next, restSetByCoach: true });
+    setEx(i, { restSec: Math.min(600, Math.max(0, sec)), restSetByCoach: true });
+  }
+  /** "Auto 3:00" chip: back to the automatic value. */
+  function autoRest(i: number) {
+    setEx(i, { restSec: undefined, restSetByCoach: undefined });
+  }
+  /**
+   * The level toggle never changes the session's source (§0.1 and the Part 1 criterion). §1.2's "becomes 'coach'" sentence
+   * conflicts with that criterion; resolveSession honors "off" on a generated session too (athletes get the written
+   * exercises, Approach's limits still apply). Reported for Product.
+   */
+  function setLevelAdjust(v: boolean) {
+    update({ ...session!, levelAdjust: v });
   }
   function remove(i: number) {
-    update({ ...session!, exercises: session!.exercises.filter((_, k) => k !== i) });
+    edit({ ...session!, exercises: session!.exercises.filter((_, k) => k !== i) });
   }
   /** The row a new exercise gets: goal defaults in trainer teams; custom exercises follow their type. */
   function rowFor(ex: Exercise): ProgramExercise {
@@ -184,7 +210,7 @@ export default function SessionScreen() {
     saveProgram({
       ...program!,
       customExercises: list,
-      sessions: program!.sessions.map((s) => (s.id === session!.id ? { ...session!, exercises } : s)),
+      sessions: program!.sessions.map((s) => (s.id === session!.id ? { ...session!, exercises, source: 'coach' as const, fitLog: undefined } : s)),
       ...(program!.teamId ? { unposted: true } : null),
     });
     setCustom(null);
@@ -192,11 +218,11 @@ export default function SessionScreen() {
   function pick(exerciseId: string) {
     const ex = getExercise(exerciseId);
     if (general && ex.durationOnly) {
-      // F41: a cardio block is minutes + Easy/Moderate only.
+      // F41: a cardio block is minutes + Easy/Moderate only (Back after a break defaults to Easy, 10 min).
       const rx = clampCardio(cardioFor(goal), program!.goal);
       const row: ProgramExercise = { exerciseId, sets: 1, reps: `${rx.minutes} min`, effort: INTENSITY_LABEL[rx.intensity], cardio: rx };
-      if (picker?.replaceIndex != null) update({ ...session!, exercises: session!.exercises.map((e, k) => (k === picker.replaceIndex ? row : e)) });
-      else update({ ...session!, exercises: [...session!.exercises, row] });
+      if (picker?.replaceIndex != null) edit({ ...session!, exercises: session!.exercises.map((e, k) => (k === picker.replaceIndex ? row : e)) });
+      else edit({ ...session!, exercises: [...session!.exercises, row] });
       setPicker(null);
       return;
     }
@@ -204,7 +230,7 @@ export default function SessionScreen() {
       setEx(picker.replaceIndex, { exerciseId, ...(general ? { cardio: undefined } : {}) });
     } else {
       // The goal fills the slot's defaults in trainer teams (adult-goals.md §2); custom exercises follow their type.
-      update({ ...session!, exercises: [...session!.exercises, rowFor(ex)] });
+      edit({ ...session!, exercises: [...session!.exercises, rowFor(ex)] });
     }
     setPicker(null);
   }
@@ -237,25 +263,25 @@ export default function SessionScreen() {
             : 'Each athlete gets the best version for their home equipment and level. Your sets, reps, and effort stay the same.'}
         </Body>
       ) : null}
-      {general ? (
-        <Card>
-          <Row style={{ justifyContent: 'space-between', minHeight: 44 }}>
-            <Text style={{ fontSize: 15, fontWeight: '600', flex: 1 }}>General warm-up</Text>
-            <Toggle accessibilityLabel="General warm-up" value={session.warmup !== null} onValueChange={(v) => update({ ...session, warmup: v ? 'W1' : null })} />
-          </Row>
-          {session.warmup !== null ? (
-            <Row style={{ gap: 6, flexWrap: 'wrap' }}>
-              {WARMUPS.map((w) => (
-                <Button key={w.id} small kind={(session.warmup ?? 'W1') === w.id ? 'primary' : 'ghost'} title={w.name} onPress={() => update({ ...session, warmup: w.id })} />
-              ))}
-            </Row>
-          ) : null}
-        </Card>
-      ) : null}
-      {sessionProblems.map((m) => (
-        <Text key={m} accessibilityRole="alert" style={{ fontSize: 13, color: colors.errorText }}>{m}</Text>
-      ))}
-      {program.teamId ? <StationsEditor program={program} session={session} hasMinor={hasMinor} onChange={update} /> : null}
+      {fitted?.express ? <Pill text="Express" /> : null}
+      {/* F46b (spec §1.2; CLAUDE.md known conflict 3): stays enabled when the program setting is off. */}
+      <Card>
+        <Row style={{ justifyContent: 'space-between', minHeight: 44 }}>
+          <Text style={{ fontSize: 15, fontWeight: '600', flex: 1 }}>Adjust to level</Text>
+          <Toggle accessibilityLabel="Adjust to level" value={adjust} onValueChange={setLevelAdjust} />
+        </Row>
+        <Text style={{ fontSize: 13, color: colors.muted }}>
+          {`Program setting: ${program.levelAdjust === false ? 'Off' : 'On'}${typeof session.levelAdjust === 'boolean' ? ' · this session is set separately' : ''}`}
+        </Text>
+        {typeof session.levelAdjust === 'boolean' ? (
+          <Text accessibilityRole="button" onPress={() => update({ ...session, levelAdjust: undefined })} style={{ fontSize: 13, textDecorationLine: 'underline', minHeight: 44, paddingVertical: 12 }}>
+            Use the program setting
+          </Text>
+        ) : null}
+      </Card>
+      {!session.light && !session.mobility ? <WarmupRow session={session} ctx={wctx} teamId={program.teamId} general={general} onChange={update} /> : null}
+      {fitted ? <FitBanner session={session} target={target.minutes} ctx={fitCtx} onChange={update} /> : null}
+      {program.teamId ? <StationsEditor program={program} session={session} onChange={edit} /> : null}
 
       {session.exercises.map((e, i) => {
         const info = getExercise(e.exerciseId);
@@ -264,11 +290,7 @@ export default function SessionScreen() {
         const block = e.group ? blocksOf(session.exercises).get(e.group) ?? [] : [];
         const firstInBlock = block.length >= 2 && block[0] === i;
         const lastInBlock = block.length >= 2 && block[block.length - 1] === i;
-        const generalProblem = general ? generalEffortProblem(e) : null;
-        const problem = general ? (generalProblem ? { block: true, message: generalProblem } : null) : program.teamId ? effortProblem(e, program.phase, hasMinor) : null;
-        const clock = clockProblem(e, block.length >= 3, program.equipment);
         if (general && e.cardio) {
-          const max = program.goal === 'back_after_break' ? 15 : 60;
           return (
             <Card key={`${e.exerciseId}-${i}`}>
               <Text style={[display(12), { color: colors.muted }]}>Cardio</Text>
@@ -277,7 +299,8 @@ export default function SessionScreen() {
               </Pressable>
               <Row style={{ justifyContent: 'space-between' }}>
                 <Label>Minutes</Label>
-                <Stepper value={e.cardio.minutes} min={5} max={max} onChange={(n) => setEx(i, { cardio: clampCardio({ ...e.cardio!, minutes: n }, program.goal), reps: `${n} min` })} />
+                {/* F41 (2.4.0): 5–180 min; minutes and Easy/Moderate stay the only fields (adult rule A4). */}
+                <Stepper value={e.cardio.minutes} min={5} max={180} onChange={(n) => setEx(i, { cardio: clampCardioFree({ ...e.cardio!, minutes: n }), reps: `${n} min` })} />
               </Row>
               <Label>Effort</Label>
               <Row style={{ gap: 6 }}>
@@ -287,14 +310,12 @@ export default function SessionScreen() {
                       small
                       kind={e.cardio!.intensity === k ? 'primary' : 'ghost'}
                       title={INTENSITY_LABEL[k]}
-                      disabled={k === 'moderate' && program.goal === 'back_after_break'}
                       onPress={() => setEx(i, { cardio: { ...e.cardio!, intensity: k }, effort: INTENSITY_LABEL[k] })}
                     />
                   </View>
                 ))}
               </Row>
               <Text style={{ fontSize: 13, color: colors.muted }}>{TALK_TEST[e.cardio.intensity]}</Text>
-              {program.goal === 'back_after_break' ? <Text style={{ fontSize: 13, color: colors.muted }}>{CARDIO_BREAK_LINE}</Text> : null}
               <Row>
                 <View style={{ flex: 1 }}>
                   <Button small kind="ghost" title="Swap" onPress={() => setPicker({ replaceIndex: i })} />
@@ -367,31 +388,23 @@ export default function SessionScreen() {
               </View>
               <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
                 <Label>Effort</Label>
-                <TextInput
-                  style={{ minWidth: 0, ...(problem ? { borderColor: problem.block ? colors.error : colors.warning, borderWidth: 2 } : null) }}
-                  value={e.effort}
-                  onChangeText={(t) => setEx(i, { effort: t })}
-                  accessibilityHint={problem?.message}
-                />
+                {/* 2.4.0 (§1.1 item 1, D-049): any text or RPE saves. No block, warning, or note. */}
+                <TextInput style={{ minWidth: 0 }} value={e.effort} onChangeText={(t) => setEx(i, { effort: t })} />
               </View>
             </Row>
-            {problem ? (
-              <Text accessibilityRole="alert" style={{ fontSize: 13, color: problem.block ? colors.errorText : colors.warningText }}>
-                {problem.block || general ? problem.message : `${problem.message} This team is all adults, so you can still post it.`}
-              </Text>
-            ) : null}
-            {clock ? (
-              <Text accessibilityRole="alert" style={{ fontSize: 13, color: !general && hasMinor ? colors.errorText : colors.warningText }}>{general ? CIRCUIT_LINE : CLOCK_REASON}</Text>
-            ) : null}
-            <Row style={{ justifyContent: 'space-between' }}>
+            <Row style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
               <Label>Rest</Label>
               <Row style={{ gap: 6 }}>
-                <Button small kind="ghost" title="−15s" onPress={() => setRest(i, rest - 15)} />
+                <Button small kind="ghost" title="−15s" accessibilityLabel="Rest minus 15 seconds" onPress={() => setRest(i, rest - 15)} />
                 <Text style={{ minWidth: 64, textAlign: 'center', fontWeight: '600' }}>{formatRest(rest)}</Text>
-                <Button small kind="ghost" title="+15s" onPress={() => setRest(i, rest + 15)} />
+                <Button small kind="ghost" title="+15s" accessibilityLabel="Rest plus 15 seconds" onPress={() => setRest(i, rest + 15)} />
               </Row>
             </Row>
-            {floorNote[i] ? <Text style={{ fontSize: 13, color: colors.muted }}>{floorNote[i]}</Text> : null}
+            {autoRestOf(e, i) !== rest && !e.group ? (
+              <Pressable accessibilityRole="button" accessibilityLabel={`Use auto rest ${formatRest(autoRestOf(e, i))}`} onPress={() => autoRest(i)} style={{ alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center' }}>
+                <Text style={{ fontSize: 12, borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>{`Auto ${formatRest(autoRestOf(e, i))}`}</Text>
+              </Pressable>
+            ) : null}
             {block.length >= 2 ? (
               <Text style={{ fontSize: 13, color: colors.muted }}>
                 {lastInBlock ? `Rest ${formatRest(rest)} after the ${block.length === 2 ? 'pair' : 'round'}.` : `15 s to ${labelOf(session.exercises, block[block.indexOf(i) + 1])}.`}
@@ -418,8 +431,8 @@ export default function SessionScreen() {
               </View>
             </Row>
           </Card>
-          {lastInBlock && block.length === 4 ? (
-            <Text style={{ fontSize: 13, color: colors.muted }}>Beginners do A1–A3 as the circuit, then A4 as straight sets after.</Text>
+          {lastInBlock && block.length >= 4 && approach ? (
+            <Text style={{ fontSize: 13, color: colors.muted }}>Beginners do the first 3 as the circuit, then the rest as straight sets after.</Text>
           ) : null}
           {lastInBlock && new Set(block.map((k) => session.exercises[k].sets)).size > 1 ? (
             <Text style={{ fontSize: 13, color: colors.muted }}>Extra sets are done on their own at the end.</Text>
@@ -431,15 +444,16 @@ export default function SessionScreen() {
       {selected.length >= 2 ? (
         <Card>
           <Button title={selected.length === 2 ? 'Pair as superset' : 'Group as circuit'} onPress={groupSelected} />
-          {groupMsg ? <Text accessibilityRole="alert" style={{ fontSize: 13, color: colors.errorText }}>{groupMsg}</Text> : null}
           <Button small kind="ghost" title="Clear selection" onPress={() => setSelected([])} />
         </Card>
       ) : null}
 
-      {groupWarn ? <Text accessibilityRole="alert" style={{ fontSize: 13, color: colors.warningText }}>{`Warning: ${groupWarn}`}</Text> : null}
-      <Text style={{ fontSize: 14, fontWeight: '600', color: minutes > target ? colors.warningText : colors.ink }}>
-        {`${formatMinutes(minutes)} · target ${target}${minutes > target ? ' ●' : ''}`}
+      {/* F51d: text only, no warning color (it isn't an error). */}
+      <Text style={{ fontSize: 14, fontWeight: '600', color: colors.ink }}>
+        {`about ${shownMinutes} min · target ${target.minutes}${shownMinutes - target.minutes > 0 ? ` · ${shownMinutes - target.minutes} over` : target.minutes - shownMinutes >= 8 ? ` · ${target.minutes - shownMinutes} under` : ''}`}
       </Text>
+      <Text style={{ fontSize: 13, color: colors.muted }}>{target.label}</Text>
+      {!approach && minutes > target.minutes ? <Button small kind="secondary" title="Fit to time" onPress={() => setFitOpen(true)} /> : null}
       {general ? (
         <Text accessibilityRole="link" onPress={() => router.push({ pathname: '/gym', params: { teamId: program.teamId! } })} style={{ fontSize: 13, textDecorationLine: 'underline', minHeight: 44, paddingVertical: 12 }}>
           Missing something? Add equipment in Gym equipment.
@@ -450,11 +464,7 @@ export default function SessionScreen() {
 
       <Card>
         <Label>What does effort mean?</Label>
-        <Body style={{ fontSize: 14 }}>
-          {general
-            ? 'RPE is how hard a set feels, 1–10. RPE 7 means about 3 reps left in the tank. Strength sets stop with about 2 reps left: RPE 8 or below.'
-            : 'RPE is how hard a set feels, 1–10. RPE 7 means about 3 reps left in the tank. Strength sets stop with about 2 reps left: RPE 8 or below, RPE 7 in-season.'}
-        </Body>
+        <Body style={{ fontSize: 14 }}>RPE is how hard a set feels, 1–10. RPE 7 means about 3 reps left in the tank.</Body>
       </Card>
 
       <Modal visible={!!picker} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setPicker(null)}>
@@ -466,6 +476,12 @@ export default function SessionScreen() {
             </Pressable>
           </Row>
           <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 0, gap: 8, paddingBottom: 48 }}>
+            {home ? (
+              <Row style={{ justifyContent: 'space-between', minHeight: 44 }}>
+                <Text style={{ fontSize: 15, flex: 1 }}>Show all exercises</Text>
+                <Toggle accessibilityLabel="Show all exercises" value={showAll} onValueChange={setShowAll} />
+              </Row>
+            ) : null}
             {/* 2.3.1: the coach's own exercises for this program. */}
             <Button
               kind="secondary"
@@ -516,6 +532,7 @@ export default function SessionScreen() {
           </ScrollView>
         </View>
       </Modal>
+      {fitOpen ? <FitSheet session={session} target={target.minutes} ctx={fitCtx} onChange={edit} onClose={() => setFitOpen(false)} /> : null}
       {custom ? (
         <CustomExerciseSheet initial={custom.initial} general={general} onClose={() => setCustom(null)} onSave={(ex) => saveCustom(ex, custom.initial ? undefined : custom.replaceIndex)} />
       ) : null}

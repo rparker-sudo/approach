@@ -34,9 +34,15 @@ export function followsLowerLevel(data: AppData): boolean {
   return lv.length > 1 && new Set(lv).size > 1;
 }
 
+/** 2.4.0: the signed-in account id (set by the team provider), for the per-athlete "Adjust to level" override (§1.2). */
+let currentUserId: string | null = null;
+export function setCurrentUserId(id: string | null | undefined) {
+  currentUserId = id ?? null;
+}
+
 /** The one way screens get an athlete's session. */
 export function resolveFor(data: AppData, program: Program, session: Session, date: Date = today()): ResolvedSession {
-  return resolveSession(program, session, { level: athleteLevel(data), logs: data.logs, homeEquipment: data.homeEquipment ?? [], harderPicks: data.harderPicks }, date);
+  return resolveSession(program, session, { level: athleteLevel(data), logs: data.logs, homeEquipment: data.homeEquipment ?? [], harderPicks: data.harderPicks, userId: currentUserId }, date);
 }
 
 /** Load-test level rule on the athlete's device (mirrors can_load_test; the server decides). */

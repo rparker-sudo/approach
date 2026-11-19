@@ -1,5 +1,6 @@
 import { generateProgram } from '../../src/lib/generator';
-import { defaultStations, stationChecks, stationFor, runState, mustBePart1, stationsEstimate, stationMinutes, stationsAllowed, PART1_REASON } from '../../src/lib/stations';
+import { defaultStations, stationChecks, stationFor, runState, mustBePart1, stationsEstimate, stationMinutes, stationsAllowed } from '../../src/lib/stations';
+import { stationMinutesFrom } from '../../src/lib/fit';
 let f = 0; const ok = (c: boolean, m: string) => { console.log(c ? 'pass' : 'FAIL', m); if (!c) f++; };
 const p = generateProgram({ position: 'Setter', phase: 'off', experience: 'advanced', volleyballWeek: ['off','off','off','off','off','off','off'] as any, liftDaysPerWeek: 3 });
 const s = p.sessions[0];
@@ -9,11 +10,14 @@ const inSt = new Set(stations.flatMap((x) => x.groups));
 ok(exercises.filter((e) => mustBePart1(e, p.equipment)).every((e) => !inSt.has(e.group!)), 'tier P and main tier A stay in Part 1');
 const bad = [...stations]; const p1 = exercises.find((e) => mustBePart1(e, p.equipment))!; bad[0] = { ...bad[0], groups: [...bad[0].groups, p1.group!] };
 const named = (l: any[]) => l.map((x) => ({ ...x, name: 'DB bench' }));
-ok(stationChecks(exercises, named(bad), stations.length, { equipment: p.equipment }, true).some((c) => c.tone === 'block' && c.text === PART1_REASON), 'minor team: power/heavy as a station blocked');
-ok(stationChecks(exercises, named(bad), stations.length, { equipment: p.equipment }, false).some((c) => c.tone === 'warn' && c.text === PART1_REASON), 'adult team: warning');
-ok(stationChecks(exercises, named(stations), stations.length + 1, {}).some((c) => c.tone === 'block' && /racks, \d stations/.test(c.text)), 'more racks than stations blocks');
+// 2.4.0 (spec §0.3, F45a): station placement is free; these v2.2 builder blocks are superseded and now test the opposite.
+const sup = (c: boolean, m: string) => ok(c, `SUPERSEDED (§0.3) → ${m}`);
+sup(!stationChecks(exercises, named(bad), stations.length, { equipment: p.equipment }).some((c) => /Part 1/.test(c.text)), 'power/heavy lift in a station: no message (minor team)');
+sup(stationChecks(exercises, named(bad), stations.length, { equipment: p.equipment }).every((c) => c.tone === 'info'), 'adult team: no warning either; checks are info only');
+ok(stationChecks(exercises, named(stations), stations.length + 1, {}).some((c) => c.tone === 'info' && /racks, \d stations\. One rack has no station each round\./.test(c.text)), '2.4.0: more racks than stations is an info line (setup check, not a block)');
 const short = named(stations).map((x, i) => (i === 0 ? { ...x, autoMinutes: false, minutes: 1 } : x));
-ok(stationChecks(exercises, short, stations.length, {}).some((c) => /Station 1 needs about \d+ min/.test(c.text)), 'too-short station time warns (rest never shortened)');
+ok(stationChecks(exercises, short, stations.length, {}).some((c) => c.tone === 'info' && /Station 1 has about \d+ min of work in 1 min/.test(c.text)), 'too-short station time shows as info (rest never shortened)');
+ok(stationMinutesFrom(60, 10, 15, 0, 4) === 7, `2.4.0 §1.4: station time from the session length ((60 − 10 − 15 − 0) ÷ 4 − 1 = ${stationMinutesFrom(60, 10, 15, 0, 4)})`);
 ok(stationFor(0, 0, 4) === 0 && stationFor(1, 0, 4) === 1 && stationFor(3, 1, 4) === 0, 'racks start at different stations and rotate the same way');
 const e = stationsEstimate(exercises, stations, { equipment: p.equipment });
 console.log('estimate', e, 'per-station', stations.map((x) => stationMinutes(exercises, x, {})));

@@ -146,7 +146,7 @@ const S = process.argv[2];
   // edit
   await click('Add exercise'); await p.waitForTimeout(500);
   t = await body(); check(/Your exercises/i.test(t) && /Banded Lateral Walk/.test(t), "picker lists the program's own exercises");
-  await p.getByRole('button', { name: 'Edit' }).first().click(); await p.waitForTimeout(500);
+  await p.getByRole('button', { name: 'Edit', exact: true }).nth(1).click(); await p.waitForTimeout(500); // 2.4.0: nth(1) — the session's Warm-up row (F49) has the first Edit button
   await p.getByPlaceholder('e.g. Banded Lateral Walk').fill('Banded Side Walk'); await click('Save exercise'); await p.waitForTimeout(800);
   a = await app(); prog = a.programs.find(x => x.id === prog.id);
   check(prog.customExercises.length === 2 && prog.customExercises.some(x => x.id === cx.id && x.name === 'Banded Side Walk'), 'edit keeps the id, changes the name');

@@ -6,7 +6,7 @@ import { canCheckIn } from '../../lib/backend';
 import { breakOn, dateKey, today } from '../../lib/calendar';
 import { getExercise } from '../../lib/exercises';
 import { INTENSITY_LABEL, PAIN_TRAINER, programLine, scheduleFor, weekIndex } from '../../lib/general';
-import { formatMinutes } from '../../lib/rest';
+import { lengthLine } from '../../lib/resolve';
 import { useStore } from '../../lib/store';
 import { useTeams } from '../../lib/team';
 import type { Program } from '../../lib/types';
@@ -88,7 +88,7 @@ export default function ClientToday() {
             <Label>{programLine(program, day, false)}</Label>
             {program.groupName ? <Text style={{ fontSize: 13, color: colors.muted }}>{program.groupName}</Text> : null}
             <H2>{session.name}</H2>
-            <Text style={{ fontSize: 15, color: colors.muted }}>{formatMinutes(resolved.estMinutes)}</Text>
+            <Text style={{ fontSize: 15, color: colors.muted }}>{`${lengthLine(resolved).text}${lengthLine(resolved).planned ? ` ${lengthLine(resolved).planned}` : ''}`}</Text>
             {resolved.block.deload ? <Text style={{ fontSize: 13, color: colors.muted }}>Lighter week: fewer sets.</Text> : null}
             {resolved.light ? <Note>Your trainer lightened today&apos;s session. Same exercises, fewer sets, easy effort.</Note> : null}
             {session.location === 'home' && !data.homeEquipmentAsked ? (

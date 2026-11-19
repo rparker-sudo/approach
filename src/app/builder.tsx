@@ -78,7 +78,7 @@ function BuilderForm() {
     experience,
     volleyballWeek: week,
     liftDaysPerWeek: homeMode ? Math.min(total, cap) : liftDays.length,
-    ...(homeMode ? { weightRoomDays: roomDays, homeJumps: homeJumps && jumpsAllowed } : { liftDays }),
+    ...(homeMode ? { weightRoomDays: roomDays, homeJumps } : { liftDays }),
     equipment,
     ...(supersets != null ? { supersets } : {}),
   });
@@ -202,14 +202,11 @@ function BuilderForm() {
           {total > cap ? <Text style={{ fontSize: 13, color: colors.muted }}>{`Max ${cap} full lift days for this level and time of year.`}</Text> : null}
           <Row style={{ justifyContent: 'space-between', minHeight: 44 }}>
             <Text style={{ fontSize: 15, flex: 1 }}>Jumps at home</Text>
-            <Toggle accessibilityLabel="Jumps at home" disabled={!jumpsAllowed} value={homeJumps && jumpsAllowed} onValueChange={setHomeJumps} />
+            {/* 2.4.0 F19a: always available; the phase note is the description. */}
+            <Toggle accessibilityLabel="Jumps at home" value={homeJumps} onValueChange={setHomeJumps} />
           </Row>
           <Text style={{ fontSize: 13, color: colors.muted }}>
-            {jumpsAllowed
-              ? homeJumps
-                ? 'Level 1 jumps only, up to 20 contacts. Athletes see: Clear space, no low ceilings, sneakers on.'
-                : 'Off by default.'
-              : 'Home jumps are for off-season and preseason only.'}
+            {`Approach Strength adds level 1 jumps (up to 20 contacts) to home sessions in off-season and preseason.${jumpsAllowed ? '' : ' Not added at this time of year.'} Athletes see: Clear space, no low ceilings, sneakers on.`}
           </Text>
           <Row style={{ justifyContent: 'space-between', minHeight: 44 }}>
             <Text style={{ fontSize: 15, flex: 1 }}>Save time with supersets</Text>

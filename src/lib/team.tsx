@@ -28,13 +28,12 @@ import {
   TrainerConfirmations,
   TrainerStatus,
 } from './backend';
-import { generalEffortProblem, isGeneral } from './general';
+import { isGeneral } from './general';
 import { dateKey, today } from './calendar';
-import { LEVEL_OF } from './athlete';
+import { LEVEL_OF, setCurrentUserId } from './athlete';
 import { isLow } from './readiness';
-import { effortProblem, levelTable } from './resolve';
-import { blocksOf, clockProblem, CLOCK_REASON } from './groups';
-import { mustBePart1, PART1_REASON } from './stations';
+import { levelTable } from './resolve';
+import { withTeamWarmup } from './warmupTeam';
 import { useStore } from './store';
 import type { AppData, CalendarEvent, LocalTeamCalendar, Position, Program, ReadinessEntry, TestBattery } from './types';
 
@@ -255,7 +254,7 @@ function applyPosted(d: AppData, role: 'coach' | 'athlete', snap: Snapshot): App
     const liftTeam = snap.teams.find((t) => t.isLiftProgram) ?? snap.teams[0];
     const otherEvents: CalendarEvent[] = snap.teams
       .filter((t) => t.id !== liftTeam?.id)
-      .flatMap((t) => (snap.calendars.find((c) => c.teamId === t.id)?.events ?? []).map((e) => ({ ...e, teamName: t.name, test: undefined })))
+      .flatMap((t) => (snap.calendars.find((c) => c.teamId === t.id)?.events ?? []).map((e) => ({ ...e, teamName: t.name, test: undefined, roomMinutes: undefined })))
       .map(({ test: _t, ...e }) => e);
     for (const t of snap.teams) {
       if (t.id !== liftTeam?.id) {
@@ -342,6 +341,8 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const store = useStore();
   const { mutate, data } = store;
   const [account, setAccount] = useState<Account | null>(null);
+  // 2.4.0: resolveFor needs the athlete's id for the per-athlete level toggle.
+  setCurrentUserId(account?.id);
   const [checked, setChecked] = useState(false);
   const [accountUnknown, setAccountUnknown] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -570,27 +571,17 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     async (teamId: string, groupKey: string) => {
       const local = dataRef.current.programs.find((p) => p.id === teamProgramId(teamId, groupKey));
       if (!local) throw new BackendError('Build a workout for this group first.');
-      // 2.3.0 adult rules A1/A3: general teams block RPE above 8, failure, max, AMRAP and "for time" in strength rows.
-      if (isGeneral(teamsRef.current.find((x) => x.id === teamId))) {
-        const bad = local.sessions.flatMap((s) => s.exercises).map(generalEffortProblem).find(Boolean);
-        if (bad) throw new BackendError(`${bad} Fix the effort on the highlighted exercises, then post.`);
-      }
-      // 1.6 backstop: a team with any minor can't post strength effort above the ceiling.
-      const hasMinor = (membersRef.current[teamId] ?? []).some((m) => m.isMinor !== false);
-      const blocked = local.sessions.flatMap((s) => s.exercises).map((e) => effortProblem(e, local.phase, hasMinor)).find((x) => x?.block);
-      if (blocked) throw new BackendError(`${blocked.message} Fix the effort on the highlighted exercises, then post.`);
-      if (hasMinor) {
-        for (const ses of local.sessions) {
-          const blocks = blocksOf(ses.exercises);
-          if (ses.exercises.some((e) => clockProblem(e, (blocks.get(e.group ?? '')?.length ?? 0) >= 3, local.equipment))) throw new BackendError(CLOCK_REASON);
-          if (ses.format === 'stations' && ses.exercises.some((e) => e.group && (ses.stations ?? []).some((st) => st.groups.includes(e.group!)) && mustBePart1(e, local.equipment))) {
-            throw new BackendError(PART1_REASON);
-          }
-        }
-      }
+      // 2.4.0 (§1.1, D-045): no builder blocks at post (effort, circuits, stations, weekly days). Only the §0.2 items
+      // (consent, verification, testing rules) still stop anything, and those live in their own flows and the server.
+      // F50: stamp the team's default warm-up and limited-space setting into sessions the coach hasn't edited.
+      const settings = teamsRef.current.find((x) => x.id === teamId)?.settings;
+      const tpl = settings?.defaultWarmup === 'template' && settings.defaultWarmupTemplateId
+        ? (await backend.listWarmupTemplates(teamId).catch(() => [])).find((w) => w.id === settings.defaultWarmupTemplateId)
+        : undefined;
+      const local2 = { ...local, sessions: local.sessions.map((ses) => withTeamWarmup(ses, settings, tpl)) };
       const team = teamsRef.current.find((t) => t.id === teamId);
       // The calendar travels separately (team_calendars); per-date lift choices stay with the program.
-      const { unposted: _u, postedAt: _p, lightDates: _l, ...program } = local;
+      const { unposted: _u, postedAt: _p, lightDates: _l, ...program } = local2;
       const tp = await backend.postProgram(teamId, groupKey, { ...program, author: accountRef.current?.name, forName: team?.name });
       mutate((d) => ({
         ...d,

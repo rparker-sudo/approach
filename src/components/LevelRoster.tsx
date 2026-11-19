@@ -3,12 +3,13 @@ import { Pressable, View } from 'react-native';
 import { LEVEL_NAME } from '../lib/athlete';
 import type { Member, MemberLevel } from '../lib/backend';
 import { getExercise } from '../lib/exercises';
-import { adjustedFor, Level, swapsFor } from '../lib/resolve';
+import { adjustedFor, Level, levelAdjustFor, swapsFor } from '../lib/resolve';
+import { useStore } from '../lib/store';
 import type { Program } from '../lib/types';
 import { formatDate } from '../lib/util';
 import Sheet from './Sheet';
 import { LEVEL_CHECKLIST, LEVEL_DESCRIPTIONS, LEVEL_PRINCIPLES } from '../lib/levelChecklist';
-import { BRAND, Button, colors, OptionCard, Text, TextLink } from './ui';
+import { BRAND, Button, colors, OptionCard, Row, Text, TextLink, Toggle } from './ui';
 
 /** F24a: level chip. Coach-set = solid outline; self-reported = dotted outline (and "Level not confirmed" text in the row). */
 export function LevelChip({ member, onPress }: { member: Member; onPress: () => void }) {
@@ -127,7 +128,13 @@ export function SetLevelSheet({ member, onClose, onSave, general }: { member: Me
  */
 export function LevelSwaps({ program, member, info }: { program?: Program; member: Member; info?: MemberLevel }) {
   const [open, setOpen] = useState(false);
-  if (!program || !member.level) return null;
+  if (!program) return null;
+  // 2.4.0 F46d: off for this athlete (or the whole program): no "adjusted to level" chip.
+  if (!levelAdjustFor(program, null, member.userId)) {
+    const first = member.name.split(' ')[0] || member.name;
+    return <Text style={{ fontSize: 13, color: colors.muted }}>{`Exercises not adjusted for ${first}.`}</Text>;
+  }
+  if (!member.level) return null;
   const teamLevel = member.level as Level;
   const uniq = (list: { from: string; to: string | null }[]) => [...new Map(list.map((x) => [`${x.from}>${x.to}`, x])).values()];
   const own = uniq(program.sessions.flatMap((s) => swapsFor(program, s, teamLevel)));
@@ -164,6 +171,38 @@ export function LevelSwaps({ program, member, info }: { program?: Program; membe
     </View>
   );
 }
+
+/**
+ * 2.4.0 F46c: "Adjust exercises to Jordan's level" for one program. Off: the athlete gets exactly what the coach writes in
+ * every session of this program (stored in the program as `levelAdjustOffFor`; sent with the next post). Testing
+ * eligibility doesn't change (F46d).
+ */
+export function AdjustToLevel({ program, member }: { program?: Program; member: Member }) {
+  const { data, saveProgram } = useStore();
+  const local = program ? data.programs.find((p) => p.id === program.id) : undefined;
+  if (!local) return null;
+  const first = member.name.split(' ')[0] || member.name;
+  const off = (local.levelAdjustOffFor ?? []).includes(member.userId);
+  const programOff = local.levelAdjust === false;
+  function set(on: boolean) {
+    const list = (local!.levelAdjustOffFor ?? []).filter((u) => u !== member.userId);
+    saveProgram({ ...local!, levelAdjustOffFor: on ? list : [...list, member.userId], ...(local!.teamId ? { unposted: true } : null) });
+  }
+  return (
+    <View style={{ gap: 4 }}>
+      <Row style={{ justifyContent: 'space-between', minHeight: 44 }}>
+        <Text style={{ fontSize: 14, fontWeight: '600', flex: 1 }}>{`Adjust exercises to ${first}'s level`}</Text>
+        <Toggle accessibilityLabel={`Adjust exercises to ${first}'s level`} value={!off && !programOff} disabled={programOff} onValueChange={set} />
+      </Row>
+      {off ? <Text style={{ fontSize: 13, color: colors.muted }}>{`${first} gets exactly what you write, in every session of this program.`}</Text> : null}
+      {programOff ? <Text style={{ fontSize: 13, color: colors.muted }}>Program setting: Off</Text> : null}
+      {local.unposted ? <Text style={{ fontSize: 12, color: colors.muted }}>Post the program to send this change.</Text> : null}
+    </View>
+  );
+}
+
+/** F46c roster tag when the athlete's level adjust is off for their program. */
+export const exactProgram = (program: Program | undefined, userId: string) => !!program && !levelAdjustFor(program, null, userId);
 
 export function levelSetLine(member: Member) {
   return member.levelConfirmed && member.levelSetAt ? `Level set by you · ${formatDate(member.levelSetAt)}` : null;

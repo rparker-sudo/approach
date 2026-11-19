@@ -165,7 +165,7 @@ const S = process.argv[2];
   // try to go above 8
   await click('W3'); await p.waitForTimeout(300);
   await p.getByLabel('Increase').last().click(); await p.waitForTimeout(300);
-  t = await body(); check(t.includes('Strength work stays at RPE 8 or below. Stop with about 2 reps left.'), 'RPE above 8 blocked with the A1 line');
+  t = await body(); check(/Week 3 effort: RPE 9/.test(t) && !t.includes('Strength work stays at RPE 8 or below'), 'SUPERSEDED (§0.3) → RPE above 8 saves in the week view with no A1 line (F39b)');
   await click('W4'); await p.waitForTimeout(300); t = await body(); check(/Week 4 effort: RPE 6/.test(t), 'week 4 deload RPE 6');
   await s04('trainer program builder');
   let a = await app(); let draft = a.programs.find(x => x.teamId === team.id);
@@ -234,7 +234,7 @@ const S = process.argv[2];
   a = await app(); draft = a.programs.find(x => x.teamId === team.id && x.groupKey.startsWith('draft:'));
   await p.goto(`http://localhost:8099/program/${draft.id}`); await p.waitForTimeout(1500);
   await click('Post'); await p.waitForTimeout(400); await click('A group'); await click('Mon/Wed 6am class'); await p.waitForTimeout(300);
-  t = await body(); check(/Fits everyone's weekly limit\./.test(t), 'F36 checks: fits');
+  t = await body(); check(/Alex: 3 sessions a week across all programs\./.test(t) && !/Blocked:|weekly limit/.test(t), 'SUPERSEDED (§0.3) → F36 checks: neutral per-client readout "Alex: 3 sessions a week across all programs."');
   await p.getByRole('button', { name: 'Post' }).last().click(); await p.waitForTimeout(1800);
   t = await body(); check(/Mon\/Wed 6am class has the new program\./.test(t), 'F36 group toast'); await click('OK').catch(() => {});
   // second program, 3/week Muscle, to Alex alone → 6 > cap 5 (intermediate) → block
@@ -242,9 +242,9 @@ const S = process.argv[2];
   await click('New program'); await p.waitForTimeout(300); await click('Muscle'); await click('Create'); await p.waitForTimeout(1500);
   await click('Post'); await p.waitForTimeout(400); await click('One client'); await click('Alex Client'); await p.waitForTimeout(400);
   t = await body(); await shot('f36-combined-block');
-  check(/Alex already has 3 sessions a week from Mon\/Wed 6am class\. This program adds 3 \(total 6, max 5 for Alex's level\)\./.test(t), 'F36 combined-cap block message');
+  check(/Alex: 6 sessions a week across all programs\./.test(t) && !/max 5 for Alex/.test(t), 'SUPERSEDED (§0.3) → F36 combined count shown as information ("Alex: 6 sessions a week across all programs.")');
   const pb = p.getByRole('button', { name: 'Post' }).last();
-  check((await pb.getAttribute('aria-disabled')) === 'true' || await pb.isDisabled(), 'Post blocked over the combined cap');
+  check(!((await pb.getAttribute('aria-disabled')) === 'true' || await pb.isDisabled()), 'SUPERSEDED (§0.3) → Post stays enabled over the combined cap');
   await click('Cancel');
   // make it 2 sessions: set Wednesday to Rest in week view for all weeks? simpler: new 2/week General fitness program
   await p.goto(`http://localhost:8099/team/${team.id}`); await p.waitForTimeout(1500);
@@ -317,7 +317,7 @@ const S = process.argv[2];
   await p.goto(`http://localhost:8099/invite?teamId=${team.id}`); await p.waitForTimeout(1500); await s04('trainer invite');
   await p.goto(`http://localhost:8099/program/${anyP.id}`); await p.waitForTimeout(1500); await s04('trainer posted program');
   await p.goto(`http://localhost:8099/session?programId=${anyP.id}&sessionId=${anyP.sessions[0].id}`); await p.waitForTimeout(1500);
-  t = await body(); check(/General warm-up/.test(t) && /Missing something\? Add equipment in Gym equipment\./.test(t), 'F39c warm-up row and the gym equipment link'); await s04('trainer session editor');
+  t = await body(); check(/Warm-up · .* · about \d+ min/.test(t) && !/General warm-up/.test(t) && /Missing something\? Add equipment in Gym equipment\./.test(t), 'SUPERSEDED (§0.3, W1–W3) → F39c: generated warm-up row (F49) and the gym equipment link'); await s04('trainer session editor');
   await click('Add exercise'); await p.waitForTimeout(600); t = await body();
   // The gym profile wasn't saved in this run, so the standard 10 items apply: Walk or Jog yes, machines no.
   check(/Cardio/i.test(t) && /Walk or Jog/.test(t) && /Lateral Raise/.test(t) && !/Stationary Bike|Leg Press|Needs other equipment/.test(t), 'picker: general library + cardio, limited to the gym profile'); await click('Cancel');

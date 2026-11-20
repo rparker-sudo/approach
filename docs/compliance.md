@@ -1,5 +1,5 @@
 # Compliance: Hard Rules (v2.2 live → 2.2.1 + marketing site → 2.3.0 trainer mode)
-Owner: Legal & Compliance (07) · Updated Thu Nov 19, 2026 (2.4.0 build rulings; 2.4.1 check) · Not legal advice. **No attorney has reviewed this (TM-6). Legal still recommends one before any minor signs, and before the trainer's first client.**
+Owner: Legal & Compliance (07) · Updated Thu Nov 19, 2026 (2.4.0 build rulings; 2.4.1 check; 2.4.2 check) · Not legal advice. **No attorney has reviewed this (TM-6). Legal still recommends one before any minor signs, and before the trainer's first client.**
 Source of truth: Approach project → `legal/compliance-v2.1.md`. `legal/data-requirements.md` holds the long-range rules for a public launch. This file is the subset that applies **now**. Every MUST is tested. Sections marked **v2.2** are new for Product's `product/specs/v2.2.md` (pass 1 unless noted).
 
 **Changes on 11/10:**
@@ -42,6 +42,8 @@ Source of truth: Approach project → `legal/compliance-v2.1.md`. `legal/data-re
 **Changes on 11/19 (2.4.0 pre-deploy rulings):** § 2.4.0 build rulings: `session.source` approved; per-athlete level-adjust keys need a keyed hash; `my_index`, the spot line, and box 4 for spot names OK; per-rack pause clock left out (shape pre-approved); TR3-1/TR3-2 updated; Terms update must go live **with** the app deploy, with a Terms version bump.
 
 **Changes on 11/19 (2.4.1 check):** D-059 recorded as Ryan's written re-acceptance in TR3-2 (generator v3 on by default, minors included, interim limits not built). § 2.4.1 check: no new fields confirmed; two copy fixes.
+
+**Changes on 11/19 (2.4.2 check):** § 2.4.2 check: `program.endDate`, `program.endType`, and `program.generatedFormat` approved and added to V4; claim check clean (one recommended wording change); auto-created rack groups and plan testing suggestions raise nothing new, with conditions.
 
 **Contact email for all legal pages, the consent form, and the AD letter: `ryan@approachstrength.com`** (TM-10, D-033). The club address `Ryan@thehbcvbc.com` must not appear anywhere users can see. **C13 and C18 closed.**
 - MUST (2.2.1): legal pages are generated **only** from Legal's text in `docs/legal/`. Remove the build script's find-and-replace of the email (build review §5). No build step may edit legal wording.
@@ -461,6 +463,7 @@ Other lines checked and fine: Olympic and plyo how-tos (technique only); `er-90-
 | `levelAdjust` (program / session / athlete) | Coach config | Coach-only. The per-athlete flag is never shown to teammates or other teams' coaches, and isn't level data |
 | Ramp-up sets in logs (`warmup: true`) | Workout logs (box 1) | Same retention as logs |
 | `session.source` ('approach' \| 'coach'), added 11/19 | Program metadata | § 2.4.0 build rulings #1 |
+| `program.endDate`, `program.endType`, `program.generatedFormat`, added 11/19 (2.4.2) | Program settings, not about athletes | § 2.4.2 check #1 |
 **Anything else** new in `training-v3.md` → stop for Legal (G-5).
 
 **V5. Accepted risks (founder direction 11/18)** → rows TR3-1 and TR3-2 in § Accepted risks.
@@ -494,6 +497,34 @@ Claude Code's questions on the Training v3 build. Answered from the description 
 
   Fine as written: the R-2 note ("1 jump set dropped to stay under today's jump limit"); the mobility effort line ("Easy. Move slowly and breathe. Nothing here should feel hard."); "After your match"; the Week setup labels and summary lines; "Light day"; the home-jump cue ("Clear space, no low ceilings, sneakers on."); "Shoulder circuit is on Saturday's home workout." Exercise names in the mobility pool are existing catalog items. Re-run the claim-word search (with "durability") on the built strings.
 
+## 2.4.2 check (11/19: `product/specs/v2.4.2.md` v1.0 and `content/programs/program-planner-v3.md` v1.0)
+Not legal advice; no attorney or CSCS review.
+
+**1. Three program keys: approved (G-5, spec §4).** None is data about athletes. All three are program settings with the program's existing access (`team_programs.program`, or the device for personal programs). Added to V4.
+| Key | Verdict | Conditions |
+|---|---|---|
+| `program.endDate` | ✅ | ISO date only. When suggested from the calendar, use **only that team's own** first match or practice. Never pre-fill it from another team's events on the combined calendar (§ Multiple teams 2). Store the date, not the event id, opponent, or location. |
+| `program.endType` | ✅ | Fixed values `'season' \| 'testing' \| 'break' \| 'none'`. No free text. |
+| `program.generatedFormat` | ✅ | Fixed values `'standard' \| 'stations' \| 'rack_rotation'`. Per program, never per athlete. |
+- **Not stored, confirmed:** athletes per session (setup input only) and the plan timeline (derived). Acceptance: empty schema diff; these three are the only new program JSON keys; athletes per session is in no request body (network check).
+- Trainer programs keep their own `startDate`/`weeks`; keep the names distinct from the `general.ts` `endDate()` helper (spec §4).
+- **Done 11/19:** this file is copied to `~/Projects/approach/docs/compliance.md` (uncommitted, for the 2.4.2 hand-off), so spec Step 0.3 passes.
+
+**2. Claim check: clean.** Checked every `INTENT_CUES` and `ROLE_CUES` string and the six week notes (§3c), the session summary lines (§3b), the cooldown items (§3d), and the setup reason lines (§2a), plus the block headers (§3a) and plan lines (§1d). No injury-prevention, medical, treatment, or results claims, and no claim-list words.
+- Cooldown items are existing catalog entries (`hip-flexor-stretch`, `band-hamstring`, `crocodile-breathing`, `lat-reach`, `thoracic-rotation`) whose how-to text was already reviewed. "Cooldown" is fine as the card label. Don't add a purpose line such as "helps you recover" or "reduces soreness."
+- "Spotter on every set." (bench, incline bench) is fine as a training instruction. The coach still supervises (Terms §4.1); keep "Spot" as the position label (V3).
+- **One recommended change (not a gate):** the §1d plan summary "**Ends fresh** for the first match on Jan 26." reads as a promised outcome. Use "**Tapers into** the first match on Jan 26." → **Training/UX.**
+- Percentages and loads in week notes and "changed from last week" stay in the session for the athlete and coach only. Never on any board (G-4; spec Part D last criterion).
+- Re-run the claim-word search (with "durability") on the built strings.
+
+**3. Auto-created rack groups: nothing new.** Same tables and the same balanced-mix auto-assign (D-026: roster, level, and position only; never test results, loads, check-ins, body weight, or age; neutral names). Using level here is already allowed (§ Level 6) and it never shows. For athletes on two teams, use the D-031 lower level without revealing the other team. Partner names on rack cards and the rotation ring still follow B5 (box 4 / boards toggle, Hidden respected). The out-of-range layouts (D-068.3) add no data.
+
+**4. Testing suggestions: existing rules unchanged, with these conditions.**
+- A suggestion is only a date marker and unlocks nothing. On the day, load tests still need the supervision lock, a coach-confirmed level ≥ 2 for minors, box 6 (or the adult testing toggle), and the pain/run-down skip, all enforced on the server.
+- The 48-hour rule checks **every** team's matches on the athlete's combined calendar, with neutral reasons for the coach. "Season starts" ends on the first match, so the last-week test must land ≥ 48 h before it. If no lift day qualifies, suggest an earlier day or none; never relax the rule.
+- Week-1 baseline ("no result in the last 12 weeks"): base it on **this team's** testing days only. A coach never learns about another team's results or testing (§ Multiple teams 5).
+- Labels on the timeline and prompts: "Testing day" or "Strength check." Never "max test," "1RM," or "max out."
+
 ## Still open for Legal
 - Zoho conditions 1–3 (two-factor, DPA, no forwarding): Ryan to confirm.
 - Trademark attorney opinion before the App Store, paid promotion, or the first outside coach's forms (R12).
@@ -502,3 +533,4 @@ Claude Code's questions on the Training v3 build. Answered from the description 
 - 2.3.1 AI provider review (T7) when Product hands off B10.
 - Re-check `product/specs/training-v3.md` against § Training v3 review once Product saves it.
 - 2.4.0: confirm the keyed-hash fix (#2) and the Terms version bump (#7) in the acceptance report.
+- 2.4.2: Training/UX to change "Ends fresh" (recommended); check the acceptance report's schema diff and claim-word search.

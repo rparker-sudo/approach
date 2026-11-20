@@ -2,6 +2,7 @@
 Owner: Training Content / Sports Science (02) · v3.0 · Wed Nov 18, 2026
 Status: **Draft for founder approval. Replaces the v2.0 generator design** (`generator.ts` archetypes, `RX` table) for Approach-built programs. **Unreviewed by a CSCS** (§13).
 Founder direction (11/18): (0) **Coaches set how long each session can be** (§4a), and **rack rotation** is a session format (§4b). (1) Approach's own programming and exercise catalog should be built the way a **top college strength program** builds them. (2) Lower-level athletes get **the same plan, with exercise switches**, not a different plan. (3) **Coaches who build their own workouts have full freedom**: rest, circuits, order, effort, anything. Rules apply only to what Approach generates. (4) **Every workout gets a warm-up built for that day's session.**
+**Next (11/20):** program length planning, the setup-time style choice, rack-aware generated sessions, and the coaching layer are in `content/programs/program-planner-v3.md`.
 Companion docs: `content/exercise-catalog-v3.md` (catalog additions), `content/programs/warmups.md` (warm-up system). Coach-freedom changes to older docs: §11.
 
 ---

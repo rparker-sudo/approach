@@ -1,6 +1,6 @@
 # Approach Strength — build snapshot
 
-*As of November 19, 2026: **v2.4.1 (generator v3 on, week setup) deployed November 19, 2026**, on 2.4.0 (deployed the same day with `/terms` v2.6). Flags: `generatorV3` on, `catalogV3` on, `rackRotation` on.*
+*As of November 20, 2026: **v2.4.2 (program planner v3, Parts A–D) approved for deploy November 20, 2026** (merged into local `main`; live once Ryan pushes `main`), on 2.4.1. Flags: `plannerV3` on (new), `generatorV3` on, `catalogV3` on, `rackRotation` on.*
 
 **What it is:** a weight-training, nutrition and planning app for volleyball athletes and coaches, and (from 2.3.0) for personal trainers with adult clients ("general" teams). Product name **Approach Strength** (since 2.2.1, D-035). Home-screen short name: "Approach". App: https://app.approachstrength.com. Website: https://approachstrength.com.
 
@@ -298,6 +298,13 @@ $0 now. Future: Apple Developer Program $99/year; Supabase Pro about $25/month i
 ---
 
 ## 8. Known gaps, judgment calls and checks
+
+**2.4.2 (program planner v3, Parts A–D; `docs/specs/v2.4.2.md` v1.1; report `reports/v2.4.2-acceptance.md`):** branch `v2.4.2` from `1a9a437` (hand-off `4abf080`). A commit per part: A `a887741`, B `876c257`, C `dc29b7c`, D `aa5b9d6`; then `faabf45` (browser suite, fixes, earlier suites' test edits) and `8530501` (report). **Approved by Ryan on November 20, 2026** with A-7 partial (testing suggestions can only check another team's matches where the device has them; the server's `can_load_test` still blocks load tests within 48 h of any match). Fast-forwarded into local `main` at `8530501`; GitHub Actions deploys `app.approachstrength.com` when Ryan pushes `main`. **Part E (day-of racks) not built:** Legal hasn't confirmed it in compliance.
+- **What was deployed:** Part A program length planner (start + end date or weeks, end type, plan timeline, ended prompt); Part B "Your weight room" step and style suggestion (auto-creates balanced-mix rack groups on Build when Rack rotation is chosen and the team has none); Part C rack-aware generation (§2b compiler, the §2c tables as compiled templates, fit by rounds); Part D coaching layer (intent cues, week notes, summary lines, block headers) and the §3d cooldown.
+- **Flags:** `plannerV3` **new, on** (`src/lib/flags.ts`; false restores the 2.4.1 builder and generator). `generatorV3`, `catalogV3`, `rackRotation` unchanged (on).
+- **Data: three new program JSON keys** (approved by Product D-066 and Legal § 2.4.2 check #1): `program.endDate` (ISO date), `program.endType` (`'season' | 'testing' | 'break' | 'none'`), `program.generatedFormat` (`'standard' | 'stations' | 'rack_rotation'`). Nothing else new on the server: **no migration, schema diff empty** (`supabase/` unchanged since `v2.4.1`), athletes per session in no request body. Device-only (AppData): `endedSnooze` ("Not now" on the ended banner) and `cooldownDone`. Cues and week notes use `ProgramExercise.notes`; the cooldown uses `role: 'mobility'`, `group: 'CD'`; rotations use `Session.format` / `rotation` / `fitLog`.
+- **No website change; no domain, DNS, repo-variable, Pages or Supabase setting change.**
+- **Checks:** `scripts/checks/v242-check.ts` (80), `scripts/checks/browser-v242.js` (97); earlier logic, SQL (10 suites, fresh and upgrade) and browser suites all pass, with the test edits listed in the report.
 
 **2.4.1 (generator v3 on, week setup; `docs/specs/v2.4.1.md` v1.1; report `reports/v2.4.1-acceptance.md`):** branch `v2.4.1` from `a2aede1`. **Deployed November 19, 2026, about 6:45 PM PST:** Ryan fast-forwarded `main` to `1daffb7` and pushed from his Mac (a first push failed on a network error and was retried); GitHub Actions deployed `app.approachstrength.com` (run finished 02:45 UTC Nov 20; live bundle checked: version 2.4.1, Week setup card). Tag `v2.4.1` pushed by Ryan. **No migration, no website change, no Supabase or Pages setting change.** Flag change: `generatorV3` false → true.
 - **Flags:** `generatorV3` **false → true** (default on, kept as the off switch); `catalogV3`, `rackRotation` unchanged (on).

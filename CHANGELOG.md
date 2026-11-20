@@ -4,6 +4,14 @@ Version numbers: whole numbers (1.0, 2.0) for big changes, decimals (1.1, 1.2) f
 The number is in `app.json` (`expo.version`, written as 1.1.0 for 1.1) and shows in the app under Settings.
 Each version has a matching GitHub tag (`v1.0`, `v1.1`, …) and download (`approach-1.0.zip`).
 
+## 2.4.2 — Program planner v3 (approved for deploy November 20, 2026)
+Built from `docs/specs/v2.4.2.md` v1.1 on branch `v2.4.2`, Parts A–D (Part E, day-of racks, waits on Legal). **No migration.** Report: `reports/v2.4.2-acceptance.md`.
+- **Programs have a length.** The coach sets a start and an end date (or a number of weeks) and what happens at the end: Season starts, Testing day, Break or Nothing special. Approach Strength plans backward from the end: blocks by length, deloads, a taper into the season, phases from the team's own calendar, and breaks that re-flow the plan to the same end date. The plan shows one row per week with deloads, the taper and suggested testing days, and a one-line summary. When a program ends, the coach gets "Build the next one?"; programs saved earlier keep their rolling 4-week blocks.
+- **"Your weight room" step.** Racks, equipment, athletes per session (used for the suggestion only, never saved) and session length; Approach Strength suggests Standard, Stations or Rack rotation with its reason, and the coach can pick any style. Choosing Rack rotation with no rack groups makes balanced-mix groups on Build.
+- **Rack-aware sessions.** With Rack rotation, every generated weight-room day is organized for the room: Power, Strength and Secondary rotations with one rack and one bar per rotation, a spotter after squat or bench, rest that meets the floors, a build-up round, and fitting by rounds to the session length. Each slot uses what the room has.
+- **Coaching detail.** Every generated exercise has a short intent cue; main lifts get a week note ("Week 2: 70% (up from 65%)."); sessions show the block and week, the jump count and what changed since last week; block headers show sets, rest and time. Every generated weight-room session ends with a 2–3 min cooldown. None of it appears on boards.
+- Off switch: `plannerV3` in `src/lib/flags.ts`. Checks: `scripts/checks/v242-check.ts`, `scripts/checks/browser-v242.js`.
+
 ## 2.4.1 — Generator v3 on, week setup (deployed November 19, 2026)
 Built from `docs/specs/v2.4.1.md` v1.1 on branch `v2.4.1`. **No migration.** Report: `reports/v2.4.1-acceptance.md`.
 - **Approach Strength's new programming for everyone (D-059).** Generated programs use generator v3: blocks, the warm-up → A–E session, movement ladders, position emphasis and the §9 limits. What each athlete sees is always their own version, never above their level. Personal programs always adjust to level.

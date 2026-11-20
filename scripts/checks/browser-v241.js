@@ -42,7 +42,8 @@ const S = process.argv[2];
     await click('Build workout'); await p.waitForTimeout(1200);
     await click('Off-season'); await p.waitForTimeout(300);
     let t = await body();
-    check(/Week setup/.test(t) && (await p.getByRole('radiogroup').count()) === 7, 'F56: the card with 7 day rows');
+    // 2.4.2 test edit: the builder now has other radio groups (F58 Ends by / end type, F60 Style); count the 7 day rows.
+    check(/Week setup/.test(t) && (await p.getByRole('radiogroup', { name: /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),/ }).count()) === 7, 'F56: the card with 7 day rows');
     check(!/Weight room only|Weight room \+ home|Training days per week/.test(t), 'F56i: the old chips, Weight room days row and Training days stepper are gone');
     const labels = await row('Monday').getByRole('radio').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
     check(JSON.stringify(labels.map((l) => l.replace(', selected', ''))) === JSON.stringify(['Off', 'Weight room', 'Home workout', 'Mobility']), `F56c segmented choice with full screen-reader names (${labels.join(' · ')})`);
@@ -88,7 +89,8 @@ const S = process.argv[2];
     await pick('Wednesday', 'Home workout'); t = await body();
     check(/Changes apply from the next week that hasn.t started\./.test(t) && /Cancel changes/.test(t), 'F56f a change shows the next-week line and Cancel changes');
     await click('Rebuild program'); await p.waitForTimeout(500); t = await body();
-    check(/Rebuild the week from these days\?/.test(t) && /Sessions you.ve edited keep your edits\./.test(t), 'F56f Rebuild asks to confirm');
+    // 2.4.2 test edit: UX F57a replaces F56f's button and confirm title ("Rebuild from these settings?"), same D-068.5 body.
+    check(/Rebuild the week from these days\?|Rebuild from these settings\?/.test(t) && /Sessions you.ve edited keep your edits\./.test(t), 'F56f Rebuild asks to confirm');
     await click('Rebuild'); await p.waitForTimeout(1500);
     a = await app(); prog = a.programs.find((x) => x.teamId === team.id);
     check(prog.sessions.find((x) => x.id === prog.liftSchedule[2])?.name === 'Home Upper' && prog.sessions.find((x) => x.id === prog.liftSchedule[5])?.name === 'Home Lower', 'Part D: rebuild with a second home day → Wed Home Upper, Sat Home Lower');

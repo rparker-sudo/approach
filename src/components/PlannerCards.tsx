@@ -66,7 +66,11 @@ export function ProgramLengthCard(p: {
   const chips = /^\d{4}-\d{2}-\d{2}$/.test(v.start) ? endSuggestions(p.events.filter((e) => !e.teamName), v.start) : [];
   const set = (patch: Partial<LengthValue>) => p.onChange({ ...v, ...patch });
   const switchMode = (mode: 'end' | 'weeks') => {
-    if (mode === v.mode) return;
+    // A rolling program (no end date yet): either segment starts planning it.
+    if (mode === v.mode) {
+      if (p.rolling) set({});
+      return;
+    }
     // Switching keeps the same end: 8 weeks ↔ Sun Jan 24.
     if (mode === 'end') set({ mode, end });
     else set({ mode, weeks: Math.min(52, weeksBetween(v.start, v.end || end)) });

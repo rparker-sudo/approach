@@ -79,7 +79,7 @@ const fs = require('fs');
   await click('New team'); await click('Volleyball team'); await click('Next');
   await p.getByPlaceholder('Team name, e.g. Varsity').fill('Varsity'); await click('Create'); await p.waitForTimeout(1500);
   let d = await demo(); const team = d.teams[0]; const code = team.joinCode;
-  await click('Build workout'); await p.waitForTimeout(800); await p.getByText('Build program', { exact: true }).last().click(); await p.waitForTimeout(1200); // 2.4.1 F56: the Week setup card's button
+  await click('Build workout'); await p.waitForTimeout(800); { const std = p.getByRole('radio', { name: /^Standard/ }); if (await std.count()) { await std.first().click(); await p.waitForTimeout(200); } } /* 2.4.2 test edit: F60 preselects Stations for a team with 0 racks; these checks are about Standard sessions */ await p.getByText('Build program', { exact: true }).last().click(); await p.waitForTimeout(1200); // 2.4.1 F56: the Week setup card's button
   const joinAthlete = async (name, email) => {
     await erase();
     await p.goto(`http://localhost:8099/join?code=${code}`); await p.waitForTimeout(2200); await welcomeCreate();

@@ -104,6 +104,8 @@ export default function WeightRoomCard(p: {
                     key={s}
                     accessibilityRole="radio"
                     accessibilityState={{ checked: on, disabled }}
+                    aria-checked={on}
+                    aria-disabled={disabled}
                     accessibilityLabel={`${STYLE_TEXT[s].title}${suggested ? ', suggested' : ''}`}
                     disabled={disabled}
                     onPress={() => p.onStyle(s)}

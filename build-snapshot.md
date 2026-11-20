@@ -1,6 +1,6 @@
 # Approach Strength — build snapshot
 
-*As of November 19, 2026: **v2.4.0 (Training v3) deployed November 19, 2026** with the website's `/terms` v2.6 (Legal ruling #7); `generatorV3` off, `catalogV3` and `rackRotation` on.*
+*As of November 19, 2026: **v2.4.1 (generator v3 on, week setup) deployed November 19, 2026**, on 2.4.0 (deployed the same day with `/terms` v2.6). Flags: `generatorV3` on, `catalogV3` on, `rackRotation` on.*
 
 **What it is:** a weight-training, nutrition and planning app for volleyball athletes and coaches, and (from 2.3.0) for personal trainers with adult clients ("general" teams). Product name **Approach Strength** (since 2.2.1, D-035). Home-screen short name: "Approach". App: https://app.approachstrength.com. Website: https://approachstrength.com.
 
@@ -299,7 +299,7 @@ $0 now. Future: Apple Developer Program $99/year; Supabase Pro about $25/month i
 
 ## 8. Known gaps, judgment calls and checks
 
-**2.4.1 (generator v3 on, week setup; `docs/specs/v2.4.1.md` v1.1; report `reports/v2.4.1-acceptance.md`):** branch `v2.4.1` from `a2aede1`. **Not deployed yet.**
+**2.4.1 (generator v3 on, week setup; `docs/specs/v2.4.1.md` v1.1; report `reports/v2.4.1-acceptance.md`):** branch `v2.4.1` from `a2aede1`. **Deployed November 19, 2026, about 6:45 PM PST:** Ryan fast-forwarded `main` to `1daffb7` and pushed from his Mac (a first push failed on a network error and was retried); GitHub Actions deployed `app.approachstrength.com` (run finished 02:45 UTC Nov 20; live bundle checked: version 2.4.1, Week setup card). Tag `v2.4.1` pushed by Ryan. **No migration, no website change, no Supabase or Pages setting change.** Flag change: `generatorV3` false → true.
 - **Flags:** `generatorV3` **false → true** (default on, kept as the off switch); `catalogV3`, `rackRotation` unchanged (on).
 - **No migration. Schema diff empty since `a2aede1`. Program JSON gains no new key:** week-setup programs use `weightRoomDays`, `liftSchedule`, each session's `location` / `mobility` / `light`, `name`, `homeJumps`, `block`, `source`; the coach note is the existing row `notes` on the B-rest filler row (`filler`). Device-only: `AppData.generatorSeen` (R-5 message seen, G-3).
 - **How the kind of day is stored:** a home workout is a session with `location: 'home'` named "Home Upper / Home Lower / Home Total / Home Care"; a v3 mobility day is `mobility: true` with `location: 'home'` (2.3.0 extra-mobility sessions have no location); the H2 light day keeps `light: true` and is used only per athlete. The Week setup card restores itself from these.

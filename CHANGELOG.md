@@ -4,7 +4,7 @@ Version numbers: whole numbers (1.0, 2.0) for big changes, decimals (1.1, 1.2) f
 The number is in `app.json` (`expo.version`, written as 1.1.0 for 1.1) and shows in the app under Settings.
 Each version has a matching GitHub tag (`v1.0`, `v1.1`, …) and download (`approach-1.0.zip`).
 
-## 2.4.1 — Generator v3 on, week setup (not deployed yet)
+## 2.4.1 — Generator v3 on, week setup (deployed November 19, 2026)
 Built from `docs/specs/v2.4.1.md` v1.1 on branch `v2.4.1`. **No migration.** Report: `reports/v2.4.1-acceptance.md`.
 - **Approach Strength's new programming for everyone (D-059).** Generated programs use generator v3: blocks, the warm-up → A–E session, movement ladders, position emphasis and the §9 limits. What each athlete sees is always their own version, never above their level. Personal programs always adjust to level.
 - **Week setup (D-062).** In the team program builder, the coach sets each day as Off, Weight room, Home workout or Mobility (with the day's practice or match shown). Approach Strength designs the whole week around those days: weight-room days do the heavy and power work; home workouts (Home Upper, Lower, Total, Care) cover what the weight room doesn't; mobility days are short, easy mobility and care sessions (12 minutes after a match). **Recommend for me** fills Off days. A summary line says what each level gets (for example, a beginner's light day).

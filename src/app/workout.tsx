@@ -29,7 +29,11 @@ import { goBack } from '../lib/nav';
 import { INTENSITY_LABEL, LEGAL, TALK_TEST, weekIndex } from '../lib/general';
 import WarmupCard from '../components/WarmupCard';
 import { RotationNowCard, RotationToday, useRotation } from '../components/RotationAthlete';
-import { positionAt } from '../lib/rotation';
+import { blockMinutes, positionAt } from '../lib/rotation';
+import { CoachingNote, CooldownCard, SessionSummary } from '../components/Coaching';
+import { cooldownMinutes, rotationHeader, standardHeader } from '../lib/coaching';
+import { FLAGS } from '../lib/flags';
+import { blockOf } from '../lib/warmup';
 import { needsRampUp, RAMP_REST_SEC, rampSetsFor, SESSION_TYPE_LABEL, sessionType, WARMUP_PARTS, warmupMinutes, type RampSet, type WarmupPart } from '../lib/warmup';
 
 /** minutesDone: 2.3.0 cardio blocks (minutes only). rampDone: 2.4.0 ramp-up sets checked (by row). */
@@ -79,7 +83,9 @@ export default function Workout() {
   // Resolved once when the workout opens, so finishing a set doesn't change the plan mid-workout.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const day = useMemo(() => (program && session ? resolveFor(data, program, session, today()) : null), [program, session]);
-  const plan: ResolvedExercise[] = useMemo(() => day?.exercises ?? [], [day]);
+  // 2.4.2 F62d: cooldown rows (group 'CD') log no sets; they're shown only as the cooldown card at the end.
+  const plan: ResolvedExercise[] = useMemo(() => (day?.exercises ?? []).filter((e) => e.group !== 'CD'), [day]);
+  const cooldown = useMemo(() => (day?.exercises ?? []).filter((e) => e.group === 'CD'), [day]);
   const blocks = useMemo(() => blocksOf(plan), [plan]);
   const isHome = session?.location === 'home';
   const noSuggestions = isRecovery || !!day?.lightHome; // light home day: no weight suggestions (H2)
@@ -509,6 +515,9 @@ export default function Workout() {
   }
 
   const level = athleteLevel(data);
+  // 2.4.2 Part D: Approach-generated sessions with the coaching layer (F61c: no "Coach:" prefix on generated notes).
+  const coachingOn = FLAGS.plannerV3 && day.source === 'approach' && !!day.summary;
+  const cdKey = `${dateKey(today())}|${session.id}`;
   const cardProps = (i: number) => {
     const pe = plan[i];
     const block = pe.group ? blocks.get(pe.group) ?? [] : [];
@@ -518,7 +527,20 @@ export default function Workout() {
       isHome && !day.lightHome && !(pe.exerciseId in (data.harderPicks ?? {}))
         ? harderSuggestion(data.logs, pe.exerciseId, pe.reps, level, (e) => homeAllowed(e, false))
         : null;
+    // 2.4.2 F62b: the §3a block header above each block's first card (generated sessions with the coaching layer).
+    const letter = pe.group && /^[A-E]$/.test(pe.group) ? pe.group : blockOf(pe);
+    const firstOfBlock = !!letter && plan.findIndex((x) => (x.group && /^[A-E]$/.test(x.group) ? x.group : blockOf(x)) === letter) === i;
+    const rb = session!.format === 'rack_rotation' ? (session!.rotation ?? []).find((b) => b.group === pe.group) : null;
+    const rows = plan.filter((x) => (x.group && /^[A-E]$/.test(x.group) ? x.group : blockOf(x)) === letter);
+    const header =
+      coachingOn && firstOfBlock && letter
+        ? rb
+          ? rotationHeader(letter, rb.rotationSec, rb.rounds, blockMinutes(rb))
+          : standardHeader(letter, Math.max(...rows.map((x) => x.sets)), pe.restSecResolved, rows.reduce((n, x) => n + x.sets * ((Number(x.reps.match(/\d+/)?.[0] ?? 8) * 3 * (/each/.test(x.reps) ? 2 : 1)) + x.restSecResolved), 0) / 60)
+        : null;
     return {
+      header,
+      generatedNotes: coachingOn,
       label: labelOf(plan, i),
       blockLine: block.length >= 2 ? `${block.length === 2 ? 'Superset' : 'Circuit'} · Round ${round} of ${rounds}` : null,
       harder,
@@ -553,6 +575,7 @@ export default function Workout() {
         {day.easing.active ? <Pill text="Easing back in this week" /> : null}
       </Row>
       <DroppedLine count={day.dropped} />
+      <SessionSummary lines={day.summary} />
         <NotesLines notes={day.notes} />
       {stationsOn && rs && rs.phase !== 'done' ? (
         rackIndex == null ? (
@@ -648,6 +671,16 @@ export default function Workout() {
           ))
         )}
 
+        {cooldown.length && (mode === 'list' || idx === plan.length - 1) ? (
+          <CooldownCard
+            rows={cooldown}
+            minutes={cooldownMinutes(cooldown)}
+            together={session.format === 'rack_rotation' || session.format === 'stations'}
+            coachSet={day.source === 'coach'}
+            done={(data.cooldownDone ?? []).includes(cdKey)}
+            onDone={(v) => mutate((d) => ({ ...d, cooldownDone: [...(d.cooldownDone ?? []).filter((k) => k !== cdKey && k.slice(0, 10) >= dateKey(today()).slice(0, 10)), ...(v ? [cdKey] : [])] }))}
+          />
+        ) : null}
         {mode === 'list' || idx === plan.length - 1 || done === total ? (
           <>
             <Label>How did it feel?</Label>
@@ -716,6 +749,8 @@ function Stat({ label, value }: { label: string; value: string }) {
 function ExerciseCard({
   general,
   setMinutes,
+  header,
+  generatedNotes,
   label,
   blockLine,
   harder,
@@ -731,6 +766,8 @@ function ExerciseCard({
   ramp,
   toggleRamp,
 }: {
+  header?: string | null;
+  generatedNotes?: boolean;
   label?: string | null;
   blockLine?: string | null;
   harder?: { id: string; name: string } | null;
@@ -753,6 +790,7 @@ function ExerciseCard({
   if (pe.cardio) return <CardioCard pe={pe} entry={entry} ei={ei} setMinutes={setMinutes!} toggleDone={toggleDone} />;
   return (
     <Card style={label ? { borderLeftWidth: 4, borderLeftColor: colors.ink } : undefined}>
+      {header ? <Text style={[display(12), { color: colors.muted }]}>{header}</Text> : null}
       {blockLine ? <Text style={{ fontSize: 13, fontWeight: '700' }}>{blockLine}</Text> : null}
       {label ? <Text style={{ fontSize: 28, fontWeight: '800' }}>{label}</Text> : null}
       <Text style={[display(12), { color: colors.muted }]}>{CATEGORY_LABEL[info.category]}</Text>
@@ -779,7 +817,7 @@ function ExerciseCard({
           <Text style={{ fontSize: 13, color: colors.muted }}>Pick a weight you could lift 2–3 more times.</Text>
         )
       ) : null}
-      {pe.notes ? <Text style={{ fontSize: 13 }}>{general ? 'Trainer' : 'Coach'}: {pe.notes}</Text> : null}
+      {pe.notes ? <CoachingNote notes={pe.notes} variant="athlete" prefix={generatedNotes ? null : general ? 'Trainer' : 'Coach'} /> : null}
       {harder && onHarder ? (
         <View style={{ borderWidth: 1, borderColor: colors.line, borderRadius: 12, padding: 10, gap: 6 }}>
           <Text style={{ fontSize: 14, fontWeight: '600' }}>{`Ready for a harder version? ${harder.name}`}</Text>

@@ -3,11 +3,16 @@ import { showAlert } from '../lib/dialog';
 import { View } from 'react-native';
 import { blockInfo } from '../lib/progression';
 import { useStore } from '../lib/store';
-import type { Program } from '../lib/types';
 import { EXPERIENCE, PHASES } from '../lib/types';
 import { shareProgramCode } from '../lib/share';
 import { useTeams } from '../lib/team';
 import { formatDate } from '../lib/util';
+import { FLAGS } from '../lib/flags';
+import { planWeek } from '../lib/generatorV3';
+import { addDays, dateKey, mondayOf, today } from '../lib/calendar';
+import { BLOCK_NAME, planOf, rowFor } from '../lib/planner';
+import type { Program } from '../lib/types';
+
 import { Body, Button, Card, colors, Label, Pill, Row, Text } from './ui';
 import CapNotice from './CapNotice';
 import ProgramSettings from './ProgramSettings';
@@ -53,6 +58,7 @@ function VolleyballProgramDetail({ program, afterDelete }: { program: Program; a
 
       <View style={{ gap: 4 }}>
         <Label>This week</Label>
+        {coach && FLAGS.plannerV3 && program.block ? <Text style={{ fontSize: 14 }}>{weekHeader(program)}</Text> : null}
         <Text style={{ fontSize: 13, color: colors.muted }}>
           {readOnly ? 'Tap a lift to see it. Your coach updates this plan.' : 'Tap a lift to see or edit it.'}
         </Text>
@@ -132,4 +138,19 @@ function VolleyballProgramDetail({ program, afterDelete }: { program: Program; a
       </Card>
     </View>
   );
+}
+
+const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+/** 2.4.2 F61a: "Week of Dec 21 · Strength · week 1 of 3." + " · Deload" / " · Taper" / " · Testing day suggested Thu" (Legal). */
+function weekHeader(program: Program): string {
+  const mon = mondayOf(today());
+  const w = planWeek(program, mon);
+  const plan = planOf(program);
+  const row = plan ? rowFor(plan, mon) : null;
+  const of = mon.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const extra = [w.deload ? 'Deload' : '', w.taper ? 'Taper' : '', row?.testDate && row.testDate >= dateKey(mon) && row.testDate <= dateKey(addDays(mon, 6)) ? `Testing day suggested ${DOW[(new Date(row.testDate + 'T00:00').getDay() + 6) % 7]}` : '']
+    .filter(Boolean)
+    .map((x) => ` · ${x}`)
+    .join('');
+  return `Week of ${of} · ${BLOCK_NAME[w.block]} · week ${w.weekInBlock ?? w.week} of ${w.blockWeeks ?? 4}${extra}.`;
 }

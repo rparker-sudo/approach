@@ -4,8 +4,9 @@ import { GENERAL_EASIER } from './generalLibrary';
 import { BACK_AFTER_BREAK_RAMP, clampCardio, programWeeks, RPE_CEILING, shiftBeginner, weekIndex, withWeekRpe } from './general';
 import { BEGINNER_EFFORT, homeAllowed, pickExercise, restSecFor } from './generator';
 import { FLAGS } from './flags';
+import { cueFor, isGeneratedLine, noteLines, setWeekNote, weekNoteFor, WEEK_NOTE } from './coaching';
 import { LADDERS, ladderResolve } from './ladders';
-import { contactsOf, DEPTH_CONTACT_CAP, DEPTH_JUMPS, isVertical, PLYO_CAP, PLYO_CONTACTS, planWeek, prescribe, verticalFactor } from './generatorV3';
+import { ADVANCED_METHODS, BLOCK_LABEL, contactsOf, DEPTH_CONTACT_CAP, DEPTH_JUMPS, isVertical, PLYO_CAP, PLYO_CONTACTS, planWeek, prescribe, verticalFactor } from './generatorV3';
 import { blockRests, blocksOf } from './groups';
 import { BlockInfo, lighten, sessionForDate } from './progression';
 import { addBack, estimateSession, fitSession, targetFor, undoneTrims, type FitCtx, type Target } from './fit';
@@ -134,6 +135,8 @@ export type ResolvedSession = {
   target: Target;
   /** 2.4.0: generated sessions under ~25 min (§4a Express). */
   express: boolean;
+  /** 2.4.2 F61b/F62a (§3b): block and week, jump count, what changed since last week. Runtime only, never stored. */
+  summary?: string[];
 };
 
 export type Easing = { active: boolean; until?: string };
@@ -265,7 +268,7 @@ export function coachEstimate(program: Program, session: Session, date?: Date | 
 }
 
 /* ---------- resolveSession ---------- */
-export function resolveSession(program: Program, session: Session, athlete: AthleteContext, date: Date = todayDate()): ResolvedSession {
+export function resolveSession(program: Program, session: Session, athlete: AthleteContext, date: Date = todayDate(), opts: { summary?: boolean } = {}): ResolvedSession {
   // 2.3.1: the program's own exercises resolve like library ones (level, tier, equipment).
   registerCustomExercises(program.customExercises);
   if (program.general) return resolveGeneral(program, session, athlete, date);
@@ -361,6 +364,12 @@ export function resolveSession(program: Program, session: Session, athlete: Athl
       if (!rx) continue;
       next = { ...rx, effort: capEffort(rx.effort, 7) };
     }
+    // 2.4.2 F62a/F62b: the cue follows the athlete's resolved exercise (Training to confirm).
+    if (FLAGS.plannerV3 && approach && resolved.id !== original.id && noteLines(next.notes).some(isGeneratedLine)) {
+      const lines = noteLines(next.notes);
+      const old = cueFor(original.id, pe.role);
+      next = { ...next, notes: lines.map((l) => (l === old ? cueFor(resolved!.id, pe.role) : l)).join('\n') };
+    }
     out.push({
       ...next,
       ...(resolved.id !== original.id ? { teamExerciseId: original.id } : {}),
@@ -410,7 +419,48 @@ export function resolveSession(program: Program, session: Session, athlete: Athl
   const wctx = { ...fitCtx.warmup, compact: compactWarmup };
   const warmup = warmupFor(mine, wctx);
   const estMinutes = estimateSession(mine, { ...fitCtx, warmup: wctx }, { rests });
-  return { session: day.session, exercises: out, dropped, swaps, block: day.block, light: day.light, easing, estMinutes, home, lightHome, source, levelAdjust: adjust, warmup, target, express, notes };
+  // 2.4.2 Part D (§3b): summary lines for sessions generated with the coaching layer (weight-room days).
+  let summary: string[] | undefined;
+  if (FLAGS.plannerV3 && v3 && v3w && !homeType && !session.light && !session.mobility && opts.summary !== false && session.exercises.some((pe) => noteLines(pe.notes).some(isGeneratedLine))) {
+    summary = summaryFor(program, session, athlete, date, v3w, out);
+  }
+  return { session: day.session, exercises: out, dropped, swaps, block: day.block, light: day.light, easing, estMinutes, home, lightHome, source, levelAdjust: adjust, warmup, target, express, notes, ...(summary ? { summary } : {}) };
+}
+
+/**
+ * §3b / F61b: "Strength block · week 2 of 4." · "Jumps today: about 27 contacts." (after R-4 and the contact cap) · "Since last
+ * week: …" (one generated line; left out in week 1, after a block restart, or with nothing comparable). Moved work stays in the
+ * existing session notes.
+ */
+function summaryFor(program: Program, session: Session, athlete: AthleteContext, date: Date, w: ReturnType<typeof planWeek>, out: ResolvedExercise[]): string[] {
+  const lines: string[] = [];
+  const wib = w.weekInBlock ?? w.week;
+  const bw = w.blockWeeks ?? (w.block === 'maintain' ? 2 : 4);
+  lines.push(`${BLOCK_LABEL[w.block]} block · week ${wib} of ${bw}${w.deload ? ' · Deload' : ''}.`);
+  const jumps = out.filter((pe) => isPlyo(pe.exerciseId) && pe.group !== 'CD').reduce((n, pe) => n + contactsOf(pe.sets, pe.reps), 0);
+  if (jumps > 0) lines.push(`Jumps today: about ${jumps} contacts.`);
+  if (wib > 1 && !w.restart) {
+    const prev = resolveSession(program, session, athlete, addDays(date, -7), { summary: false }).exercises;
+    const changes: string[] = [];
+    for (const pe of out) {
+      if (pe.group === 'CD' || !['main', 'power'].includes(pe.role ?? '')) continue;
+      const p = prev.find((x) => x.exerciseId === pe.exerciseId);
+      if (!p) continue;
+      const name = getExercise(pe.exerciseId).name;
+      const top = (r: string) => Number(r.match(/(\d+)\s*(?:each)?\s*$/)?.[1] ?? r.match(/\d+/)?.[0] ?? 0);
+      if (pe.pct != null && p.pct != null && pe.pct !== p.pct) changes.push(`${name} ${pe.pct}% (${pe.pct > p.pct ? 'up' : 'down'} from ${p.pct}%)`);
+      else if (top(pe.reps) !== top(p.reps) && pe.effort === p.effort && top(pe.reps) && top(p.reps)) {
+        const d = top(pe.reps) - top(p.reps);
+        changes.push(`${name} ${Math.abs(d)} ${d > 0 ? 'more' : 'fewer'} rep${Math.abs(d) === 1 ? '' : 's'} per set at the same effort`);
+      } else if (pe.sets !== p.sets && pe.effort === p.effort) {
+        const d = pe.sets - p.sets;
+        changes.push(`${name} ${Math.abs(d)} ${d > 0 ? 'more' : 'fewer'} set${Math.abs(d) === 1 ? '' : 's'}`);
+      }
+      if (changes.length >= 2) break;
+    }
+    if (changes.length) lines.push(`Since last week: ${changes.join('. ')}.`);
+  }
+  return lines;
 }
 
 /** F51d / F51g athlete Today: "About 52 min" (+ " (planned for 45)" when a set target differs by 5+), "Express · " first. */
@@ -611,13 +661,31 @@ function applyV3(program: Program, session: Session, list: ProgramExercise[], w:
   // 2.4.2 Part A: the plan's phase for this date (a plan that crosses the first practice or match) sets the §9 limits.
   const phase = w.phase ?? program.phase;
   ctx.phase = phase;
+  // 2.4.2 Part D: the rack lifts whose rotation starts with a build-up round (their week note says so).
+  const buildUp = new Set((session.format === 'rack_rotation' ? session.rotation ?? [] : []).filter((b) => b.buildUpRound && b.positions[0]?.kind === 'exercise').map((b) => `${b.group}|${b.positions[0].exerciseId}`));
   const out = list.map((pe) => {
+    // §3d: cooldown rows are as written (no block prescription).
+    if (pe.group === 'CD') return pe;
     const rx0 = prescribe(pe, pe.exerciseId, w.block, w.week, ctx, maintainDay);
     // Planner taper week (§1b step 2, §1c in-season): volume about −30%, same intensity and rest.
     const rx = w.taper && pe.role !== 'care' ? { ...rx0, sets: Math.max(1, Math.round(rx0.sets * 0.7)) } : rx0;
     // §2a: an in-season third weight-room day is a second Day 2 Fast at 2 sets; §2d: care shrunk to 1 round (plan sets 1).
     const sets = /\(2 sets\)$/.test(session.name) ? Math.min(rx.sets, 2) : pe.role === 'care' && pe.sets === 1 ? 1 : rx.sets;
-    return { ...pe, sets, reps: rx.reps, effort: rx.effort, method: rx.method, restSec: rx.restSec, restSetByCoach: true, ...(rx.pct != null ? { pct: rx.pct } : { pct: undefined }) };
+    let notes = pe.notes;
+    // 2.4.2 Part D (§3c): sessions generated with the coaching layer get this athlete's week note on loaded main lifts (the
+    // stored note is week 1's). Sessions generated before 2.4.2 have no generated lines and are left as they were.
+    if (FLAGS.plannerV3 && noteLines(pe.notes).some(isGeneratedLine)) {
+      const extra = buildUp.has(`${pe.group}|${pe.exerciseId}`) ? [WEEK_NOTE.buildUp] : [];
+      let note: string | null = null;
+      if (pe.role === 'main') {
+        const planned = prescribe(pe, pe.exerciseId, w.block, w.week, { ...ctx, level: 3, gateLevel: 3, confirmed: true }, maintainDay);
+        const downgraded = ADVANCED_METHODS.has(planned.method) && rx.method === 'straight';
+        const prev = w.week > 1 && w.week < 4 && !w.deload ? prescribe(pe, pe.exerciseId, w.block, (w.week - 1) as 1 | 2 | 3, ctx, maintainDay).pct ?? null : null;
+        note = weekNoteFor(rx, { week: w.weekInBlock ?? w.week, deload: w.deload, downgraded, prevPct: prev });
+      }
+      notes = setWeekNote(pe.notes, cueFor(pe.exerciseId, pe.role), note, extra);
+    }
+    return { ...pe, sets, reps: rx.reps, effort: rx.effort, method: rx.method, restSec: rx.restSec, restSetByCoach: true, notes, ...(rx.pct != null ? { pct: rx.pct } : { pct: undefined }) };
   });
   // Plyo contact budget for the session (§5a top of range, deload −50%), never above the §9 phase cap.
   const jumps = out.map((pe, i) => (isPlyo(pe.exerciseId) ? i : -1)).filter((i) => i >= 0);

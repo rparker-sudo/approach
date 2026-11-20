@@ -1,3 +1,4 @@
+import { FLAGS } from '../lib/flags';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { breakOn, dateKey, eventsOn, fromKey, isHeavyLegs, mondayOf, today, weekPlan } from '../lib/calendar';
@@ -215,7 +216,7 @@ export function ProgramWeek({
                 <>
                   <Text style={{ fontWeight: '600', fontSize: 16 }}>{session.name}</Text>
                   <Text style={{ color: colors.muted, fontSize: 13 }}>
-                    {session.exercises.length} exercises · {vb === 'off' ? 'No volleyball' : `${vbLabel} day`}
+                    {session.exercises.filter((e) => e.group !== 'CD').length} exercises · {vb === 'off' ? 'No volleyball' : `${vbLabel} day`}
                   </Text>
                   {coach
                     ? (() => {
@@ -226,6 +227,9 @@ export function ProgramWeek({
                           <>
                             <Text style={{ color: colors.muted, fontSize: 13 }}>{`about ${est.minutes} / ${est.target.minutes} min${src}`}</Text>
                             <Row style={{ gap: 6, flexWrap: 'wrap' }}>
+                              {/* 2.4.2 F61a: the format tag (text) when not Standard. */}
+                              {FLAGS.plannerV3 && session.format === 'rack_rotation' ? <Text style={{ fontSize: 12, fontWeight: '600' }}>Rack rotation</Text> : null}
+                              {FLAGS.plannerV3 && session.format === 'stations' ? <Text style={{ fontSize: 12, fontWeight: '600' }}>Stations</Text> : null}
                               {est.express ? <Pill text="Express" /> : null}
                               {program.levelAdjust !== false && session.levelAdjust === false ? <Text style={{ fontSize: 12, color: colors.muted }}>Level adjust off</Text> : null}
                             </Row>

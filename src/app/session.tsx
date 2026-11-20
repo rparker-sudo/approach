@@ -4,6 +4,10 @@ import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { Body, Button, Card, colors, Field, H2, Label, Pill, Row, Screen, Stepper, Text, TextInput, Toggle, display, Icon } from '../components/ui';
 import WarmupCard from '../components/WarmupCard';
 import WarmupRow from '../components/WarmupEditor';
+import { CoachingNote, CooldownCard, prescriptionText, SessionSummary } from '../components/Coaching';
+import { cooldownMinutes, cooldownTypeOf, isGeneratedLine, noteLines, rotationHeader, standardHeader } from '../lib/coaching';
+import { blockMinutes } from '../lib/rotation';
+import { FLAGS } from '../lib/flags';
 import { FitBanner, FitSheet } from '../components/FitToTime';
 import CustomExerciseSheet from '../components/CustomExerciseSheet';
 import { CustomInput, inputOf, roleOf } from '../lib/customExercise';
@@ -14,10 +18,12 @@ import { formatRest, homeAllowed, restSecFor } from '../lib/generator';
 import { useStore } from '../lib/store';
 import { resolveFor } from '../lib/athlete';
 import { restFor, tierOf } from '../lib/rest';
-import { clampCardioFree, coachEdit, levelAdjustFor, sourceOf, warmupCtxFor } from '../lib/resolve';
+import { clampCardioFree, coachEdit, levelAdjustFor, resolveSession, sourceOf, warmupCtxFor } from '../lib/resolve';
+import { today } from '../lib/calendar';
+import { showAlert } from '../lib/dialog';
 import { blockRests, blocksOf, groupRows, labelOf, straightRests, ungroup } from '../lib/groups';
 import { estimateSession, fitSession, targetFor, type FitCtx } from '../lib/fit';
-import { SESSION_TYPE_LABEL, sessionType, warmupMinutes } from '../lib/warmup';
+import { SESSION_TYPE_LABEL, sessionType, warmupMinutes, blockOf } from '../lib/warmup';
 import StationsEditor from '../components/StationsEditor';
 import VersionLine, { DroppedLine, NotesLines } from '../components/VersionLine';
 import type { Exercise, ExerciseCategory, ProgramExercise, Session, SlotRole } from '../lib/types';
@@ -37,6 +43,7 @@ export default function SessionScreen() {
   const [selected, setSelected] = useState<number[]>([]);
   const [fitOpen, setFitOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [cdShow, setCdShow] = useState(false);
 
   if (!program || !session) return <Screen><Body muted>Session not found.</Body></Screen>;
   const coach = data.profile?.role === 'coach';
@@ -70,7 +77,8 @@ export default function SessionScreen() {
             coachWord={general ? 'trainer' : 'coach'}
           />
         ) : null}
-        {resolved.exercises.map((e, i) => {
+        <SessionSummary lines={resolved.summary} />
+        {resolved.exercises.filter((e) => e.group !== 'CD').map((e, i) => {
           const info = getExercise(e.exerciseId);
           if (e.cardio) {
             return (
@@ -92,11 +100,14 @@ export default function SessionScreen() {
               <Text style={{ fontSize: 16, fontWeight: '600' }}>
                 {e.sets} × {e.reps} <Text style={{ fontSize: 13, color: colors.muted }}>· {e.effort} · Rest {formatRest(e.restSecResolved)}</Text>
               </Text>
-              {e.notes ? <Text style={{ fontSize: 13 }}>{general ? 'Trainer' : 'Coach'}: {e.notes}</Text> : null}
+              {e.notes ? <CoachingNote notes={e.notes} variant="athlete" prefix={FLAGS.plannerV3 && resolved.summary ? null : general ? 'Trainer' : 'Coach'} /> : null}
               <Body muted style={{ fontSize: 13 }}>{info.cue}</Body>
             </Card>
           );
         })}
+        {resolved.exercises.some((e) => e.group === 'CD') ? (
+          <CooldownCard rows={resolved.exercises.filter((e) => e.group === 'CD')} minutes={cooldownMinutes(resolved.exercises.filter((e) => e.group === 'CD'))} together={session.format === 'rack_rotation' || session.format === 'stations'} coachSet={resolved.source === 'coach'} done={false} />
+        ) : null}
         <DroppedLine count={resolved.dropped} />
         <NotesLines notes={resolved.notes} />
       </Screen>
@@ -115,8 +126,27 @@ export default function SessionScreen() {
   const target = targetFor(program, session);
   const minutes = estimateSession(session, fitCtx, { rests });
   // Generated sessions show what fitting does (F51f); coach-built sessions show the estimate and offer Fit to time (F51e).
-  const fitted = approach && !session.light && !session.mobility ? fitSession(session, target.minutes, fitCtx, { skip: (session.fitLog ?? []).filter((l) => l.startsWith('undo:')).map((l) => l.slice(5)) }) : null;
+  // 2.4.2 D-068.4: generated rotation sessions were fitted by rounds when built (their fitLog lines show instead).
+  const rotationFitted = FLAGS.plannerV3 && approach && session.format === 'rack_rotation';
+  const fitted = approach && !session.light && !session.mobility && !rotationFitted ? fitSession(session, target.minutes, fitCtx, { skip: (session.fitLog ?? []).filter((l) => l.startsWith('undo:')).map((l) => l.slice(5)) }) : null;
   const shownMinutes = fitted ? fitted.after : minutes;
+  // 2.4.2 Part D (F61b–F61e): coaching layer on Approach's sessions generated with it.
+  const coaching = FLAGS.plannerV3 && approach && session.exercises.some((e) => noteLines(e.notes).some(isGeneratedLine));
+  const preview = coaching && program.block ? resolveSession(program, session, { level: program.experience === 'beginner' ? 1 : program.experience === 'intermediate' ? 2 : 3, logs: [], minor: true }, today()) : null;
+  const cd = session.exercises.map((e, i) => ({ e, i })).filter((x) => x.e.group === 'CD');
+  const letterOf = (e: ProgramExercise) => (e.group && /^[A-E]$/.test(e.group) ? e.group : blockOf(e));
+  const headerFor = (i: number): string | null => {
+    if (!coaching) return null;
+    const e = session.exercises[i];
+    const L = letterOf(e);
+    if (!L || session.exercises.findIndex((x) => x.group !== 'CD' && letterOf(x) === L) !== i) return null;
+    const rb = session.format === 'rack_rotation' ? (session.rotation ?? []).find((b) => b.group === e.group) : null;
+    if (rb) return rotationHeader(L, rb.rotationSec, rb.rounds, blockMinutes(rb));
+    const rows = session.exercises.map((x, k) => ({ x, k })).filter(({ x }) => x.group !== 'CD' && letterOf(x) === L);
+    const min = rows.reduce((n, { x, k }) => n + x.sets * (Number(x.reps.match(/\d+/)?.[0] ?? 8) * 3 * (/each/.test(x.reps) ? 2 : 1) + rests[k]), 0) / 60;
+    return standardHeader(L, Math.max(...rows.map(({ x }) => x.sets)), rests[i], min);
+  };
+  const [cdOpen, setCdOpen] = [cdShow, setCdShow];
   const swapping = picker?.replaceIndex != null ? getExercise(session.exercises[picker.replaceIndex].exerciseId) : null;
   // 2.3.0: general teams pick from the whole library + the general library, limited to the gym equipment profile (F39c).
   // 2.4.0 (§1.1 item 7): home sessions open on the H6 filter (no barbell/cable at home) with "Show all exercises".
@@ -283,12 +313,21 @@ export default function SessionScreen() {
       </Card>
       ) : null}
       {!session.light && !session.mobility ? <WarmupRow session={session} ctx={wctx} teamId={program.teamId} general={general} onChange={update} /> : null}
+      {preview?.summary ? <SessionSummary lines={preview.summary} /> : null}
       {fitted ? <FitBanner session={session} target={target.minutes} ctx={fitCtx} onChange={update} /> : null}
+      {rotationFitted && (session.fitLog ?? []).filter((l) => !l.startsWith('undo:')).length ? (
+        <Card style={{ gap: 4 }}>
+          <Text style={{ fontSize: 14, fontWeight: '600' }}>{`Fit to ${target.minutes} min`}</Text>
+          {(session.fitLog ?? []).filter((l) => !l.startsWith('undo:')).map((l) => <Text key={l} style={{ fontSize: 13, color: colors.muted }}>{l}</Text>)}
+        </Card>
+      ) : null}
       {program.teamId ? <StationsEditor program={program} session={session} onChange={edit} /> : null}
 
       {session.exercises.map((e, i) => {
+        if (e.group === 'CD' && FLAGS.plannerV3) return null;
         const info = getExercise(e.exerciseId);
         const rest = rests[i];
+        const head = headerFor(i);
         const label = labelOf(session.exercises, i);
         const block = e.group ? blocksOf(session.exercises).get(e.group) ?? [] : [];
         const firstInBlock = block.length >= 2 && block[0] === i;
@@ -333,6 +372,7 @@ export default function SessionScreen() {
         const prevHeavy = i > 0 && ['A', 'P'].includes(tierOf(getExercise(session.exercises[i - 1].exerciseId), program.equipment));
         return (
           <View key={`${e.exerciseId}-${i}`} style={{ gap: 6 }}>
+          {head ? <Text style={[display(12), { color: colors.muted }]}>{head}</Text> : null}
           {firstInBlock ? (
             <Row style={{ justifyContent: 'space-between' }}>
               <Text style={{ fontSize: 14, fontWeight: '700' }}>
@@ -418,8 +458,11 @@ export default function SessionScreen() {
                 {e.filler ? 'Do as its own exercise' : 'Do during the rest of the lift above'}
               </Text>
             ) : null}
+            {coaching && e.notes ? <CoachingNote notes={e.notes} variant="coach" /> : null}
             <TextInput
-              style={{ fontSize: 14 }}
+              style={{ fontSize: 14, ...(coaching ? { minHeight: 66, textAlignVertical: 'top' as const } : {}) }}
+              multiline={coaching}
+              accessibilityLabel="Notes"
               placeholder="Notes (optional)"
               placeholderTextColor={colors.faint}
               value={e.notes ?? ''}
@@ -444,6 +487,38 @@ export default function SessionScreen() {
         );
       })}
 
+      {FLAGS.plannerV3 && cd.length ? (
+        <Card style={{ gap: 8 }}>
+          {session.format === 'rack_rotation' ? <Text style={{ fontSize: 13, color: colors.muted }}>Together</Text> : null}
+          <Row style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+            <Text style={{ fontSize: 15, fontWeight: '600', flex: 1 }}>{`Cooldown · ${cooldownTypeOf(session) ?? 'Total'} · about ${cooldownMinutes(cd.map((x) => x.e))} min`}</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.muted }}>{approach ? 'Approach Strength' : 'Edited'}</Text>
+          </Row>
+          <Row style={{ gap: 8 }}>
+            <Button small kind="secondary" title={cdOpen ? 'Hide' : 'Show'} onPress={() => setCdOpen(!cdOpen)} />
+            <Button
+              small
+              kind="ghost"
+              title="Remove cooldown"
+              onPress={() =>
+                showAlert('Remove the cooldown from this session?', undefined, [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Remove', style: 'destructive', onPress: () => edit({ ...session, exercises: session.exercises.filter((x) => x.group !== 'CD') }) },
+                ])
+              }
+            />
+          </Row>
+          {cdOpen
+            ? cd.map(({ e, i }) => (
+                <Row key={`${e.exerciseId}-${i}`} style={{ justifyContent: 'space-between', minHeight: 44 }}>
+                  <Text style={{ fontSize: 14, flex: 1 }}>{`${getExercise(e.exerciseId).name} · ${prescriptionText(e)}`}</Text>
+                  <Button small kind="ghost" title="Swap" onPress={() => setPicker({ replaceIndex: i })} />
+                  <Button small kind="ghost" title="Remove" onPress={() => remove(i)} />
+                </Row>
+              ))
+            : null}
+        </Card>
+      ) : null}
       {selected.length >= 2 ? (
         <Card>
           <Button title={selected.length === 2 ? 'Pair as superset' : 'Group as circuit'} onPress={groupSelected} />

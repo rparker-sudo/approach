@@ -9,9 +9,10 @@ import { ALL_EQUIPMENT } from './exercises';
 import { compileDay } from './rackCompile';
 import { defaultStations } from './stations';
 import { PHASE_RANGE } from './fit';
-import { rowOf } from './generatorV3';
+import { prescribe, rowOf } from './generatorV3';
 import { buildWarmup, warmupMinutes } from './warmup';
 import { layoutSize } from './room';
+import { cooldownMinutes, cooldownRows, cooldownType, cueFor, setWeekNote, WEEK_NOTE, weekNoteFor, withCue } from './coaching';
 
 /**
  * 2.4.2 program planner v3 pass over a freshly generated v3 program (spec Parts A–D; FLAGS.plannerV3). Approach-generated
@@ -26,6 +27,8 @@ export function applyPlanner(program: Program, input: GeneratorInput): Program {
   // Part C (spec C1–C4): the style shapes every generated weight-room session; home and mobility days are always Standard.
   if (FLAGS.rackRotation && p.generatedFormat === 'rack_rotation') p = withRotations(p, input);
   if (p.generatedFormat === 'stations') p = withStations(p, input);
+  // Part D (spec D1–D4): cues and week notes on every generated row; the §3d cooldown on every weight-room session.
+  p = withCoaching(p);
   return p;
 }
 
@@ -48,9 +51,6 @@ function withPlan(p: Program, input: GeneratorInput): Program {
 /** A generated weight-room session (not home, mobility, light or a coach's session). */
 export const isRoomSession = (s: Session) => !s.mobility && !s.light && s.location !== 'home' && s.source !== 'coach';
 
-/** Minutes the cooldown adds (§3d: 2–3 min); counted with the warm-up when fitting rotations by rounds. */
-export const COOLDOWN_MIN = 2;
-
 /** Part C: compile each weight-room day into rack rotations (§2b), sized for the rack group (§2d). */
 function withRotations(p: Program, input: GeneratorInput): Program {
   const equipment = p.equipment?.length ? p.equipment : ALL_EQUIPMENT;
@@ -65,7 +65,7 @@ function withRotations(p: Program, input: GeneratorInput): Program {
       equipment,
       groupSize,
       targetMinutes: target,
-      otherMinutes: warm + COOLDOWN_MIN,
+      otherMinutes: warm + cooldownMinutes(cooldownRows(cooldownType(s, p.phase === 'in'))),
       rowFor: (id, role, reps) => withWeek1([{ ...rowOf({ id, role: role ?? 'care' }), ...(reps ? { reps } : {}) }], p.block ?? 'accumulation', p.phase, p.position, level)[0],
     });
     const rest = s.exercises.filter((r) => r.group === 'CD');
@@ -81,6 +81,34 @@ function withStations(p: Program, input: GeneratorInput): Program {
     if (!isRoomSession(s)) return s;
     const st = defaultStations(s, count, p.equipment);
     return { ...s, format: 'stations' as const, exercises: st.exercises, stations: st.stations };
+  });
+  return { ...p, sessions };
+}
+
+/**
+ * Part D: one intent cue per generated row (§3c, by exercise else by role; stored in `ProgramExercise.notes`), the week-1 week
+ * note on loaded main lifts (resolveSession writes each athlete's week), the build-up note on a rotation's rack lift, and the
+ * §3d cooldown rows (`role: 'mobility'`, `group: 'CD'`) at the end of every generated weight-room session.
+ */
+function withCoaching(p: Program): Program {
+  if (!p.block) return p;
+  const level = (p.experience === 'beginner' ? 1 : p.experience === 'intermediate' ? 2 : 3) as 1 | 2 | 3;
+  const sessions = p.sessions.map((s) => {
+    if (s.source === 'coach') return s;
+    const room = isRoomSession(s);
+    const lead = new Set((s.rotation ?? []).filter((b) => b.buildUpRound && b.positions[0]?.kind === 'exercise').map((b) => `${b.group}|${b.positions[0].exerciseId}`));
+    const exercises = s.exercises.map((r) => {
+      if (r.group === 'CD') return r;
+      const c = withCue(r);
+      if (!room) return c;
+      const extra = lead.has(`${r.group}|${r.exerciseId}`) ? [WEEK_NOTE.buildUp] : [];
+      if (r.role !== 'main') return extra.length ? { ...c, notes: setWeekNote(c.notes, cueFor(r.exerciseId, r.role), null, extra) } : c;
+      const rx = prescribe(r, r.exerciseId, p.block!, 1, { level, confirmed: false, minor: true, phase: p.phase, position: p.position, dayIndex: 0 });
+      const note = weekNoteFor(rx, { week: 1, deload: false, downgraded: false, prevPct: null });
+      return { ...c, notes: setWeekNote(c.notes, cueFor(r.exerciseId, r.role), note, extra) };
+    });
+    const cd = room && !s.exercises.some((r) => r.group === 'CD') ? cooldownRows(cooldownType(s, p.phase === 'in')) : [];
+    return { ...s, exercises: [...exercises, ...cd] };
   });
   return { ...p, sessions };
 }

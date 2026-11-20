@@ -46,6 +46,7 @@ import { DAY_TYPES, WEEKDAYS } from '../../lib/types';
 import { weekdayIndex } from '../../lib/util';
 import { FLAGS } from '../../lib/flags';
 import { athleteEndedLine, programEnded } from '../../lib/planner';
+import { SessionSummary } from '../../components/Coaching';
 
 export default function Home() {
   const { data } = useStore();
@@ -233,6 +234,8 @@ function Today() {
               <>
                 <H2>{session.name}</H2>
                 <Body muted>{session.focus}</Body>
+                {/* 2.4.2 F62a: block and week, jump count, what changed (the athlete's own resolved session). */}
+                <SessionSummary lines={todaySession!.summary} />
               </>
             )}
             {activeProgram.teamId && session.format === 'stations' ? <StationsCard teamId={activeProgram.teamId} session={session} exercises={todaySession!.exercises} /> : null}
@@ -247,7 +250,7 @@ function Today() {
             {todaySession!.light ? <Note>Coach lightened today&apos;s lift. Same exercises, fewer sets, easy effort.</Note> : null}
             {!todaySession!.light && todaySession!.block.deload ? <Note>Deload week: fewer sets, easy effort. Let your body catch up.</Note> : null}
             <View style={{ gap: 4 }}>
-              {todaySession!.exercises.slice(0, 4).map((e, k) => (
+              {todaySession!.exercises.filter((e) => e.group !== 'CD').slice(0, 4).map((e, k) => (
                 <View key={k}>
                   <Text style={{ fontSize: 13 }}>
                     {getExercise(e.exerciseId).name} <Text style={{ color: colors.muted, fontSize: 13 }}>{e.sets} × {e.reps}</Text>
@@ -255,9 +258,10 @@ function Today() {
                   <VersionLine exerciseId={e.exerciseId} teamExerciseId={e.teamExerciseId} teamId={activeProgram.teamId} />
                 </View>
               ))}
-              {todaySession!.exercises.length > 4 ? (
-                <Text style={{ fontSize: 13, color: colors.muted }}>+ {todaySession!.exercises.length - 4} more</Text>
+              {todaySession!.exercises.filter((e) => e.group !== 'CD').length > 4 ? (
+                <Text style={{ fontSize: 13, color: colors.muted }}>+ {todaySession!.exercises.filter((e) => e.group !== 'CD').length - 4} more</Text>
               ) : null}
+              {todaySession!.exercises.some((e) => e.group === 'CD') ? <Text style={{ fontSize: 13, color: colors.muted }}>Cooldown at the end.</Text> : null}
               <DroppedLine count={todaySession!.dropped} />
         <NotesLines notes={todaySession!.notes} />
             </View>

@@ -460,6 +460,8 @@ export type AppData = {
   generatorSeen?: Record<string, 'v2' | 'v3'>;
   /** 2.4.2 F59g coaches (device only, no server field): "Not now" on the program-ended banner, per team → hide until date. */
   endedSnooze?: Record<string, string>;
+  /** 2.4.2 F62d athletes (device only, no server field): "Cooldown done" per day and session (`YYYY-MM-DD|sessionId`). */
+  cooldownDone?: string[];
 };
 
 export type LocalTeamCalendar = {

@@ -1,3 +1,5 @@
+// 2.4.2 test edit: notes are read line by line (planner §3c puts the intent cue on the first line; the 2.4.1 note is kept as
+// its own line, F61c).
 // 2.4.1 acceptance (docs/specs/v2.4.1.md v1.1): Part A (generator v3 on, R-1–R-6), Part D (week setup; home-and-mobility-v3
 // §8 and Examples 1–3), Part B (build answers 1, 3, 5, 6; D-054; D-056), Part C (waves, bye-week Day 3, 4-day Day 1 pair).
 // Logic and source checks; the Week setup card UI is checked in the browser (browser-v241.js).
@@ -157,7 +159,7 @@ const thu = ex1.sessions.find((s) => s.name === 'Day 2 Total: hinge')!;
 const sat = ex1.sessions.find((s) => homeTypeOf(s) === 'H-Upper')!;
 const monS = ex1.sessions.find((s) => isV3Mobility(s))!;
 ok([tue, thu].every((s) => s.exercises.some((e) => e.role === 'power') && s.exercises.some((e) => e.role === 'main')), 'Ex1 Tue/Thu keep the A-block and B-block (§7c Day 1 / Day 2)');
-ok(tue.exercises.some((e) => e.filler && e.exerciseId === 'spanish-squat' && e.notes === "Care work is on Saturday's home workout.") && thu.exercises.some((e) => e.filler && e.exerciseId === 'er-90-90-iso'), 'Ex1 §2d: one care item stays as the B-rest filler (Spanish Squat Tue, 90/90 ER Thu) with the coach note (Legal: "Care work is on…")');
+ok(tue.exercises.some((e) => e.filler && e.exerciseId === 'spanish-squat' && (e.notes ?? '').split('\n').includes("Care work is on Saturday's home workout.")) && thu.exercises.some((e) => e.filler && e.exerciseId === 'er-90-90-iso'), 'Ex1 §2d: one care item stays as the B-rest filler (Spanish Squat Tue, 90/90 ER Thu) with the coach note (Legal: "Care work is on…")');
 ok(thu.exercises.some((e) => e.exerciseId === 'face-pull'), 'Ex1 Face Pull stays on Thu (upper accessories move home only with ≥ 2 home days)');
 ok(!sat.exercises.some((e) => e.role === 'power') && sat.exercises.every((e) => !H6(e.exerciseId) || e.role === 'care'), 'Ex1 Sat is H-Upper with no A-block and no H6 equipment');
 const satR = resolveSession(ex1, sat, ath(2), addDays(mon, 5 + 7));
@@ -192,7 +194,7 @@ const baseMon = resolveSession(ex2free, ex2free.sessions.find((s) => s.name === 
 const baseWed = resolveSession(ex2free, ex2free.sessions.find((s) => s.name === 'Day 2 Fast')!, ath(2), addDays(mon, 2));
 const firstPlyo = (r: ReturnType<typeof resolveSession>) => r.exercises.find((e) => getExercise(e.exerciseId).pattern === 'jump' && !getExercise(e.exerciseId).weighted);
 ok(plyoC(ex2mon) <= Math.floor(plyoC(baseMon) * 0.7) && plyoC(ex2wed) <= Math.floor(plyoC(baseWed) * 0.7) && (firstPlyo(ex2mon)?.sets ?? 0) >= 1 && (firstPlyo(ex2wed)?.sets ?? 0) >= 1, `Ex2 Mon/Wed plyo contacts show the practice-day cut (Mon ${plyoC(baseMon)} → ${plyoC(ex2mon)}, Wed ${plyoC(baseWed)} → ${plyoC(ex2wed)}; lowest-priority plyo first, main plyo ≥ 1 set)`);
-ok(ex2.sessions.find((s) => s.name === 'Day 1 Heavy')!.exercises.some((e) => e.notes === "Care work is on Thursday's home workout."), 'Ex2 weight-room note "Care work is on Thursday\'s home workout." (Legal copy fix)');
+ok(ex2.sessions.find((s) => s.name === 'Day 1 Heavy')!.exercises.some((e) => (e.notes ?? '').split('\n').includes("Care work is on Thursday's home workout.")), 'Ex2 weight-room note "Care work is on Thursday\'s home workout." (Legal copy fix)');
 const ex2fri = team(generateProgram({ position: 'Middle Blocker', phase: 'in', experience: 'intermediate', volleyballWeek: wkEx2, liftDaysPerWeek: 3, kinds: kindsOf('W O W O H O M') }));
 ok(homeTypeOf(ex2fri.sessions.find((s) => s.id === ex2fri.liftSchedule[4])) === 'H-Upper', 'Ex2 variation: home workout on Fri (day before the tournament) is H-Upper');
 const ex2sat = team(generateProgram({ position: 'Middle Blocker', phase: 'in', experience: 'intermediate', volleyballWeek: wkEx2, liftDaysPerWeek: 3, kinds: kindsOf('W O W H O M O') }));

@@ -8,6 +8,8 @@ import { FLAGS } from '../lib/flags';
 import type { ResolvedExercise } from '../lib/resolve';
 import { positionAt, positionName, SPOT_LABEL, startPosition } from '../lib/rotation';
 import { rotationState, type RotationNow } from '../lib/rotationRun';
+import { CoachingNote } from './Coaching';
+import { isGeneratedLine, noteLines } from '../lib/coaching';
 import type { StationRun } from '../lib/stations';
 import type { RotationBlock, Session } from '../lib/types';
 import { Card, colors, Text } from './ui';
@@ -80,6 +82,12 @@ export function RotationNowCard({ rack, state, exercises }: { rack: MyRack | nul
       <Text style={{ fontSize: 13, color: colors.muted }}>{`${rack.rackName} · ${b.group} · Round ${state.round + 1} of ${b.rounds}${b.buildUpRound && state.round === 0 ? ' · Build-up' : ''}`}</Text>
       <Text style={{ fontSize: 20, fontWeight: '700' }}>{`Position ${pos + 1} · ${myPositionName(b, pos, exercises)}${b.positions[pos]?.reps ? ` × ${b.positions[pos].reps}` : ''}`}</Text>
       {spot ? <Text style={{ fontSize: 14 }}>Spot the next lifter. Nothing to log.</Text> : null}
+      {/* 2.4.2 F62c: the cue (16 pt ink) and week note (13 pt muted) for this position. Spot positions have none. */}
+      {!spot && FLAGS.plannerV3 ? (() => {
+        const p = b.positions[pos];
+        const pe = exercises.find((e) => e.group === b.group && (e.teamExerciseId ?? e.exerciseId) === p?.exerciseId);
+        return pe?.notes && noteLines(pe.notes).some(isGeneratedLine) ? <CoachingNote notes={pe.notes} variant="athlete" /> : null;
+      })() : null}
       <Text
         accessibilityLiveRegion="polite"
         accessibilityLabel={`Rotate in ${state.secondsLeft} seconds${lastTick ? '' : `, next Position ${next + 1}, ${myPositionName(b, next, exercises)}`}`}

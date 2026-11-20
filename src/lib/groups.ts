@@ -92,7 +92,8 @@ export function blockReason(exs: Exercise[], gym?: Equipment[]): string | null {
 export function blocksOf(list: ProgramExercise[]): Map<string, number[]> {
   const m = new Map<string, number[]>();
   list.forEach((pe, i) => {
-    if (!pe.group) return;
+    // 2.4.2 F61e/F62d: cooldown rows (group 'CD') are never a superset or circuit.
+    if (!pe.group || pe.group === 'CD') return;
     m.set(pe.group, [...(m.get(pe.group) ?? []), i]);
   });
   return m;

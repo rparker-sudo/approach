@@ -6,6 +6,7 @@ import { topReps, type RestContext } from './rest';
 import { rotationMinutes } from './rotation';
 import { blockOf, compactOf, isSessionWarmup, needsRampUp, warmupFor, warmupMinutes, type WarmupCtx } from './warmup';
 import type { Phase, Program, ProgramExercise, Session } from './types';
+import { cooldownMinutes } from './coaching';
 
 /**
  * 2.4.0 session length and Fit to time (`content/program-design.md` §4a, spec §1.4). Pure functions; no React.
@@ -79,12 +80,15 @@ export function estimateSession(session: Session, ctx: FitCtx, opts: { compactWa
   const rot = session.format === 'rack_rotation' ? session.rotation ?? [] : [];
   const inRotation = new Set(rot.map((b) => b.group));
   if (rot.length) sec += rotationMinutes(rot) * 60;
+  // 2.4.2 §3d: the cooldown (group 'CD') counts as its 2–3 min, together, with no rest between items.
+  const cd = list.filter((pe) => pe.group === 'CD');
+  if (cd.length) sec += cooldownMinutes(cd) * 60;
   for (const [i, pe] of list.entries()) {
-    if (pe.filler || (pe.group && inRotation.has(pe.group))) continue;
+    if (pe.filler || pe.group === 'CD' || (pe.group && inRotation.has(pe.group))) continue;
     sec += (pe.cardio ? 1 : pe.sets) * (workSec(pe) + (rests[i] ?? 0));
   }
   // Transitions between non-rotation blocks (rotation blocks already add 1 min between them).
-  const blocks = new Set(list.filter((pe) => !(pe.group && inRotation.has(pe.group))).map((pe, i) => pe.group ?? `#${i}`)).size;
+  const blocks = new Set(list.filter((pe) => pe.group !== 'CD' && !(pe.group && inRotation.has(pe.group))).map((pe, i) => pe.group ?? `#${i}`)).size;
   sec += Math.max(0, blocks - (rot.length ? 0 : 1)) * 30;
   const w = warmupFor(session, { ...ctx.warmup, compact: opts.compactWarmup || ctx.warmup.compact });
   // A rotation's build-up round is its ramp-up (rule 6), so those lifts add no separate ramp-up time.
@@ -231,7 +235,7 @@ function operations(): Op[] {
  * B-block and the warm-up are never removed. `skip` = trims the coach undid (generated sessions, F51f).
  * `all` = list every applicable trim (Fit to time suggestions for coach-built sessions, F51e).
  */
-export function fitSession(session: Session, target: number, ctx: FitCtx, opts: { skip?: string[]; all?: boolean } = {}): FitResult {
+function fitSessionCore(session: Session, target: number, ctx: FitCtx, opts: { skip?: string[]; all?: boolean } = {}): FitResult {
   const before = estimateSession(session, ctx);
   let cur: Session = session;
   let compact = false;
@@ -266,7 +270,7 @@ export function fitSession(session: Session, target: number, ctx: FitCtx, opts: 
  * Express session (§4a): compact warm-up + A at 3 sets + B at 3 sets + one C superset at 2 rounds.
  * Built from the session's own exercises (A = first power, B = first main lift, C = first two secondary).
  */
-export function expressSession(session: Session): Session {
+function expressSessionCore(session: Session): Session {
   const list = session.exercises;
   const a = list.find((pe) => blockOf(pe) === 'A');
   const b = list.find((pe) => blockOf(pe) === 'B');
@@ -283,7 +287,7 @@ export function expressSession(session: Session): Session {
  * Under the target by 8+ min (generated sessions): add back in reverse order — a second care round, then accessory sets
  * (up to 3). Never adds A or B volume.
  */
-export function addBack(session: Session, target: number, ctx: FitCtx): { session: Session; lines: string[] } {
+function addBackCore(session: Session, target: number, ctx: FitCtx): { session: Session; lines: string[] } {
   let cur = session;
   const lines: string[] = [];
   if (target - estimateSession(cur, ctx) < 8) return { session: cur, lines };
@@ -306,7 +310,7 @@ export function addBack(session: Session, target: number, ctx: FitCtx): { sessio
  * Fit to time for a coach-built session (F51e): apply the chosen trims, in Training's order, to the session as it was when
  * the sheet opened. The compact warm-up is saved on the session's warm-up.
  */
-export function applyTrims(session: Session, keys: string[], ctx: FitCtx): Session {
+function applyTrimsCore(session: Session, keys: string[], ctx: FitCtx): Session {
   let cur = session;
   for (const op of operations()) {
     if (!keys.includes(op.key)) continue;
@@ -336,3 +340,28 @@ export function stationMinutesFrom(length: number, warmup: number, part1: number
 }
 
 export { blocksOf };
+
+/* 2.4.2 F61e: the cooldown rows (group 'CD') are never trimmed, paired or moved by Fit to time; they stay at the end. */
+const splitCD = (session: Session) => ({ core: { ...session, exercises: session.exercises.filter((pe) => pe.group !== 'CD') }, cd: session.exercises.filter((pe) => pe.group === 'CD') });
+const withCD = (s: Session, cd: ProgramExercise[]): Session => (cd.length ? { ...s, exercises: [...s.exercises.filter((pe) => pe.group !== 'CD'), ...cd] } : s);
+export function fitSession(session: Session, target: number, ctx: FitCtx, opts: { skip?: string[]; all?: boolean } = {}): FitResult {
+  const { core, cd } = splitCD(session);
+  if (!cd.length) return fitSessionCore(session, target, ctx, opts);
+  const m = cooldownMinutes(cd);
+  const r = fitSessionCore(core, target - m, ctx, opts);
+  return { ...r, session: withCD(r.session, cd), before: r.before + m, after: r.after + m };
+}
+export function addBack(session: Session, target: number, ctx: FitCtx): { session: Session; lines: string[] } {
+  const { core, cd } = splitCD(session);
+  if (!cd.length) return addBackCore(session, target, ctx);
+  const r = addBackCore(core, target - cooldownMinutes(cd), ctx);
+  return { ...r, session: withCD(r.session, cd) };
+}
+export function applyTrims(session: Session, keys: string[], ctx: FitCtx): Session {
+  const { core, cd } = splitCD(session);
+  return withCD(applyTrimsCore(core, keys, ctx), cd);
+}
+export function expressSession(session: Session): Session {
+  const { core, cd } = splitCD(session);
+  return withCD(expressSessionCore(core), cd);
+}

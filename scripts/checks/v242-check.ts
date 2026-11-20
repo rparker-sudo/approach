@@ -20,6 +20,7 @@ import { REST_FLOOR, tierOf } from '../../src/lib/rest';
 import { sameMuscles, startPosition } from '../../src/lib/rotation';
 import { coachEstimate, practiceCut } from '../../src/lib/resolve';
 import { POSITIONS, type Phase, type Session, type RotationBlock } from '../../src/lib/types';
+import { ALL_COACHING_STRINGS, cooldownMinutes, INTENT_CUES, isGeneratedLine, noteLines, ROLE_CUES, rotationHeader, standardHeader } from '../../src/lib/coaching';
 import { makeRackGroups, STYLE_REASON, suggestStyle } from '../../src/lib/room';
 
 let f = 0;
@@ -393,8 +394,126 @@ const ruleBad = (s: Session, opts: { table?: boolean } = {}) => {
     `C-9 when no rotation has the rack free, the item switches within its own ladder (same pattern): ${swapped.join(', ') || 'no switch needed'}`);
 }
 
+/* =================== PART D =================== */
+{
+  const plannerDoc = read('docs/content/programs/program-planner-v3.md');
+  const docCues = [...plannerDoc.matchAll(/^\s+'?([a-z0-9-]+)'?: '([^']+)',$/gm)].map((m) => [m[1], m[2]]);
+  const intentOk = docCues.filter(([k]) => !['power', 'main', 'secondary', 'accessory', 'core', 'care', 'mobility'].includes(k)).every(([k, v]) => INTENT_CUES[k] === v) && Object.keys(INTENT_CUES).length === 42;
+  const roleLine = plannerDoc.match(/export const ROLE_CUES = \{([\s\S]*?)\};/)![1];
+  const roleOk = Object.entries(ROLE_CUES).every(([k, v]) => roleLine.includes(`${k}: '${v}'`));
+  ok(intentOk && roleOk, `D-1 INTENT_CUES (42) and ROLE_CUES match planner §3c exactly`);
+  const p = rot('M W O W O H O', { generatedFormat: 'standard' });
+  const rr = rot('O W O W O O O');
+  const all = [...p.sessions, ...rr.sessions];
+  const missing = all.flatMap((x) => x.exercises.filter((e) => !noteLines(e.notes).some(isGeneratedLine)).map((e) => `${x.name}: ${e.exerciseId}`));
+  ok(!missing.length, `D-1 every generated row has an intent cue (weight room, home, mobility; ${all.reduce((n, x) => n + x.exercises.length, 0)} rows)${missing.length ? ` · ${missing.slice(0, 3).join('; ')}` : ''}`);
+  const s1 = p.sessions.find((x) => x.name.startsWith('Day 1'))!;
+  const main = (ses: Session, d: string) => resolveSession(p, ses, ath(2), fromKey(d)).exercises.find((e) => e.role === 'main')!;
+  const w1 = main(s1, '2026-12-01');
+  const w2 = main(s1, '2026-12-08');
+  const w3 = main(s1, '2026-12-15');
+  ok(noteLines(w1.notes)[1] === 'Week 1: 65%.' && noteLines(w2.notes)[1] === 'Week 2: 70% (up from 65%).' && noteLines(w3.notes)[1] === 'Deload: 60–65%. Easy and fast.',
+    `D-1 main lifts have a week note that follows the athlete's week: ${[w1, w2, w3].map((x) => noteLines(x.notes)[1]).join(' · ')}`);
+  // R-2 downgrade note: Strength-Power contrast for an athlete who doesn't qualify.
+  const sp = team(build('O W O W O O O', { start: '2026-11-30', endDate: '2027-03-21', endType: 'none' }));
+  const spDay = sp.sessions.find((x) => x.name.startsWith('Day 1'))!;
+  const spDate = sp.endDate && planOf(sp)!.rows.find((r) => r.block === 'strength_power')!.start;
+  const dn = resolveSession(sp, spDay, ath(2), addDays(fromKey(spDate!), 1)).exercises.find((e) => e.role === 'main')!;
+  const up = resolveSession(sp, spDay, ath(3, { levelConfirmed: true }), addDays(fromKey(spDate!), 1)).exercises.find((e) => e.role === 'main')!;
+  ok(noteLines(dn.notes).includes('Straight sets today (your version).') && !noteLines(up.notes).includes('Straight sets today (your version).'), `D-1 R-2 downgrade week note "Straight sets today (your version)." (intermediate: ${dn.method}; confirmed advanced: ${up.method})`);
+  // Cue follows the athlete's resolved exercise.
+  const beg = resolveSession(p, s1, ath(1), fromKey('2026-12-01')).exercises.find((e) => e.teamExerciseId === 'back-squat');
+  ok(!!beg && noteLines(beg.notes)[0] === 'Stop with about 2 reps left.' && noteLines(w1.notes)[0] === INTENT_CUES['back-squat'], `D-1 the cue follows the resolved exercise (beginner ${beg?.exerciseId}: "${noteLines(beg?.notes)[0]}")`);
+  // Summary lines.
+  const sum1 = resolveSession(p, s1, ath(2), fromKey('2026-12-01')).summary ?? [];
+  const sum2 = resolveSession(p, s1, ath(2), fromKey('2026-12-08')).summary ?? [];
+  ok(sum1[0] === 'Accumulation block · week 1 of 3.' && /^Jumps today: about \d+ contacts\.$/.test(sum1[1] ?? '') && !sum1.some((l) => l.startsWith('Since last week')) && sum2.some((l) => l.startsWith('Since last week: Back Squat 70% (up from 65%)')),
+    `D-1 summary lines: ${sum1.join(' | ')} || week 2: ${sum2.join(' | ')}`);
+  ok(standardHeader('B', 5, 180, 18) === 'B · Strength · 5 sets · rest 3:00 · about 18 min' && rotationHeader('B', 75, 4, 20) === 'B · Strength · 75 s rotations · 4 rounds · about 20 min' && rotationHeader('C', 135, 3, 14) === 'C · Secondary · 2:15 rotations · 3 rounds · about 14 min',
+    'D-1 block headers in the §3a formats (rotation time m:ss from 2:00)');
+  const wsrc = read('src/app/workout.tsx');
+  const ssrc = read('src/app/session.tsx');
+  ok(/rotationHeader\(letter/.test(wsrc) && /standardHeader\(letter/.test(wsrc) && /headerFor\(i\)/.test(ssrc) && /<SessionSummary lines=\{day\.summary\}/.test(wsrc) && /<SessionSummary lines=\{todaySession!\.summary\}/.test(read('src/app/(tabs)/index.tsx')),
+    'D-1 headers and summary lines render for the athlete (workout, Today) and the coach (session editor)');
+  // D-2: every generated weight-room session ends with the cooldown (2–3 min) as group 'CD' rows; home and mobility don't.
+  const cdBad: string[] = [];
+  for (const prog of [p, rr, rot('W O W O W O O', { phase: 'in' }), rot('W W O W W O O', { phase: 'pre' }), rot('W O W O W O H', { phase: 'post', generatedFormat: 'stations', racks: 3 })]) {
+    for (const x of prog.sessions) {
+      const cd = x.exercises.filter((e) => e.group === 'CD');
+      const room = !x.mobility && !x.light && x.location !== 'home';
+      const tailOk = cd.length === 3 && x.exercises.slice(-3).every((e) => e.group === 'CD' && e.role === 'mobility') && cd[2].exerciseId === 'crocodile-breathing' && cooldownMinutes(cd) >= 2 && cooldownMinutes(cd) <= 3;
+      if (room && !tailOk) cdBad.push(`${x.name}: ${cd.map((e) => e.exerciseId).join(',')}`);
+      if (!room && cd.length) cdBad.push(`${x.name} (home/mobility) has a cooldown`);
+    }
+  }
+  ok(!cdBad.length, `D-2 cooldown at the end of every generated weight-room session (Standard, Rack rotation, Stations; every phase), 2–3 min, role mobility, group CD; none on home or mobility${cdBad.length ? ` · ${cdBad.slice(0, 3).join('; ')}` : ''}`);
+  const { estimateSession } = require('../../src/lib/fit') as typeof import('../../src/lib/fit');
+  const { warmupCtxFor } = require('../../src/lib/resolve') as typeof import('../../src/lib/resolve');
+  const fctx = { rest: { phase: p.phase, equipment: p.equipment }, warmup: warmupCtxFor(p, s1, p.equipment ?? []), kind: 'school' as const };
+  const est = { minutes: estimateSession(s1, fctx) };
+  const noCd = { minutes: estimateSession({ ...s1, exercises: s1.exercises.filter((e) => e.group !== 'CD') }, fctx) };
+  ok(est.minutes - noCd.minutes >= 2 && est.minutes - noCd.minutes <= 3, `D-2 the cooldown is counted in the session estimate (+${est.minutes - noCd.minutes} min)`);
+  ok(/group === 'CD'\) return/.test(read('src/lib/groups.ts')) && /filter\(\(e\) => e\.group !== 'CD'\)/.test(wsrc), 'D-2 / F62d CD rows are never a superset or circuit, log no sets, and Finish is never gated on the cooldown');
+  // D-3: claim-word search on cues and notes (and every new 2.4.2 string, below).
+  const claim = /durabilit|injur|prevent|rehab|treat|cure|guarantee|bulletproof|heal|therap|recover fully|pain[- ]free|reduces soreness|helps you recover/i;
+  const hits = ALL_COACHING_STRINGS.filter((x) => claim.test(x));
+  ok(!hits.length, `D-3 claim-word search (with "durability") clean on every cue and week note (${ALL_COACHING_STRINGS.length} strings)${hits.length ? ` · ${hits.join(' | ')}` : ''}`);
+  // D-4: G-4 boards: no new notes, summary, cue, %, load or level on any board.
+  const boardFiles = ['src/app/board/[teamId].tsx', 'src/components/EffortBoard.tsx', 'src/components/RotationRing.tsx'];
+  const boardSrc = boardFiles.map(read).join('\n');
+  ok(!/SessionSummary|CoachingNote|Coaching'|coaching'|\.summary\b|\.notes\b/.test(boardSrc), `D-4 / F62e no SessionSummary, CoachingNote, summary or notes on the boards (${boardFiles.join(', ')})`);
+  // Jump count = plyo contacts after practice-load and contact-cap cuts.
+  const pr = { ...p, events: [{ date: '2026-12-01', type: 'practice' as const }] };
+  const r = resolveSession(pr, s1, ath(2), fromKey('2026-12-01'));
+  const contacts = r.exercises.filter((e) => getExercise(e.exerciseId).pattern === 'jump' && !getExercise(e.exerciseId).weighted).reduce((n, e) => n + e.sets * Number(e.reps.match(/\d+/)?.[0] ?? 0) * (/each/.test(e.reps) ? 2 : 1), 0);
+  ok((r.summary ?? []).includes(`Jumps today: about ${contacts} contacts.`), `D-4 jump count = the session's plyo contacts after R-4 (practice day) and the cap (${contacts})`);
+}
+
+/* =================== COPY (claim words on every new 2.4.2 string) =================== */
+{
+  const files = ['src/lib/planner.ts', 'src/lib/room.ts', 'src/lib/coaching.ts', 'src/lib/rackCompile.ts', 'src/lib/plannerBuild.ts', 'src/components/PlannerCards.tsx', 'src/components/WeightRoomCard.tsx', 'src/components/Coaching.tsx', 'src/app/builder.tsx'];
+  const code = files.map(read).join('\n').split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*|\{\/\*)/.test(l)).join('\n');
+  const strings = [...code.matchAll(/'([^'\n]{12,})'|"([^"\n]{12,})"|`([^`\n]{12,})`/g)].map((m) => m[1] ?? m[2] ?? m[3]).filter((x) => !/^[a-z-./]+$/.test(x) && !/import|from /.test(x));
+  const claim = /durabilit|injur|prevent|rehab|treat|cure|guarantee|bulletproof|heal|therap|recover fully|pain[- ]free|ends fresh|max test|1RM|max out|check-in/i;
+  const hits = strings.filter((x) => claim.test(x));
+  ok(!hits.length, `copy: claim-word search on every new 2.4.2 string, including "durability", "Ends fresh", "max test", "1RM", "max out" and "check-in" (${strings.length} strings)${hits.length ? ` · ${hits.slice(0, 4).join(' | ')}` : ''}`);
+  ok(/Testing day suggested · \$\{dmd\(r\.testDate\)\}/.test(read('src/components/PlannerCards.tsx')) && !/Test suggested/.test(code), 'copy: Legal\'s testing label "Testing day suggested · Thu Dec 3" (never "Test suggested")');
+}
+
+/* =================== KILL SWITCH =================== */
+{
+  FLAGS.plannerV3 = false;
+  const off2 = team(build('M W O W O H O', { generatedFormat: 'rack_rotation', groupSize: 4, start: '2026-11-30', endDate: '2027-01-24', endType: 'season', planEvents: [] }));
+  const r = resolveSession(off2, off2.sessions[0], ath(2), fromKey('2026-12-01'));
+  const w = weekPlan({ ...off2, endDate: '2026-11-01' }, mondayOf(fromKey('2026-12-07')));
+  FLAGS.plannerV3 = true;
+  ok(!off2.endDate && !off2.endType && !off2.generatedFormat && off2.sessions.every((x) => !x.format && !x.exercises.some((e) => e.group === 'CD' || noteLines(e.notes).some(isGeneratedLine))) && !r.summary && w.some((d) => d.sessionId),
+    'Kill switch: plannerV3 = false builds the 2.4.1 program (no new keys, rotations, cues or cooldown), no summary lines, no end-date cut-off');
+  const bsrc = read('src/app/builder.tsx');
+  ok(/const planner = FLAGS\.plannerV3 && FLAGS\.generatorV3/.test(bsrc) && /const roomCard = planner && weekSetup/.test(bsrc) && /if \(!FLAGS\.plannerV3 \|\| !tp\?\.endDate/.test(read('src/app/team/[id].tsx')),
+    'Kill switch: F57–F62 render only with plannerV3 on (builder cards, plan, ended banner, coaching components gated)');
+}
+
 /* =================== DATA =================== */
-// (Completed after Parts B–D.)
+{
+  const p = rot('M W O W O H O');
+  const keys = new Set(Object.keys(p));
+  const before = new Set(Object.keys(team(build('M W O W O H O', { position: 'All positions', experience: 'advanced' }))));
+  const added = [...keys].filter((k) => !before.has(k));
+  ok(added.sort().join(',') === 'endDate,endType,generatedFormat', `Data: the only new program JSON keys are ${added.sort().join(', ')}`);
+  const sKeys = new Set(p.sessions.flatMap((x) => Object.keys(x)));
+  const known = ['id', 'name', 'focus', 'exercises', 'mobility', 'location', 'light', 'format', 'rotation', 'stations', 'stationTransitionSec', 'warmup', 'source', 'levelAdjust', 'targetMinutes', 'fitLog'];
+  const rKeys = new Set(p.sessions.flatMap((x) => x.exercises.flatMap((e) => Object.keys(e))));
+  const rowKnown = ['exerciseId', 'sets', 'reps', 'effort', 'notes', 'role', 'restSec', 'restSetByCoach', 'group', 'filler', 'autoGroup', 'cardio', 'customName', 'method', 'pct'];
+  ok([...sKeys].every((k) => known.includes(k)) && [...rKeys].every((k) => rowKnown.includes(k)), `Data: sessions and rows use existing keys only (${[...sKeys].filter((k) => !known.includes(k)).join(',') || 'session ok'}; ${[...rKeys].filter((k) => !rowKnown.includes(k)).join(',') || 'rows ok'})`);
+  const t = read('src/lib/types.ts');
+  ok(/endType\?: EndType/.test(t) && /export type EndType = 'season' \| 'testing' \| 'break' \| 'none'/.test(t) && /export type GeneratedFormat = 'standard' \| 'stations' \| 'rack_rotation'/.test(t), 'Data: fixed values only (no free text) for endType and generatedFormat');
+  const migrations = fs.readdirSync(path.join(__dirname, '../../supabase/migrations'));
+  ok(migrations.length === 12 && migrations[migrations.length - 1] === '013_training_v3_p3.sql', `Data: no migration (latest is ${migrations[migrations.length - 1]})`);
+  const backendSrc = read('src/lib/backend/supabase.ts') + read('src/lib/backend/local.ts');
+  ok(!/athletesPerSession|athletes_per_session|perRack|groupSize/.test(backendSrc), 'Data: athletes per session is in no request body (no backend code sends it)');
+  ok(read('src/lib/general.ts').includes('export function endDate') && !/function endDate/.test(read('src/lib/planner.ts')), 'Data: names kept distinct from the general.ts endDate() helper (trainer programs keep startDate/weeks)');
+}
 
 console.log(f ? `${f} FAIL` : 'all pass');
 if (f) process.exitCode = 1;

@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Body, Button, Card, Chip, ChipRow, Field, H2, Label, Screen , Row, Stepper, Text, Toggle, colors } from '../components/ui';
 import { LiftDayPicker, WeekEditor } from '../components/week';
 import EquipmentPicker from '../components/EquipmentPicker';
@@ -9,9 +9,12 @@ import { LEVEL_NAME } from '../lib/athlete';
 import { WEEKDAYS , EXPERIENCE, PHASES, POSITIONS } from '../lib/types';
 import { useStore } from '../lib/store';
 import { ALL, teamProgramId, useTeams } from '../lib/team';
-import type { DayType, Equipment, Experience, Phase, ProgramPosition } from '../lib/types';
+import type { DayType, Equipment, Experience, GeneratedFormat, Phase, ProgramPosition } from '../lib/types';
 import { goBack } from '../lib/nav';
 import WeekSetupCard from '../components/WeekSetupCard';
+import WeightRoomCard from '../components/WeightRoomCard';
+import { layoutSize, makeRackGroups, suggestStyle } from '../lib/room';
+import { backend } from '../lib/backend';
 import { FLAGS } from '../lib/flags';
 import { setupFromProgram, type DayKind } from '../lib/homeV3';
 import { sourceOf } from '../lib/source';
@@ -120,6 +123,34 @@ function BuilderForm() {
   const builtPlan = existing?.endDate ? planOf(existing) : null;
   const ended = planner && !!existing && programEnded(existing, todayKey);
   const busy = false;
+  // 2.4.2 Part B (UX F60): card 3 "Your weight room" for team programs. Athletes per session is never stored (spec B2).
+  const roomCard = planner && weekSetup;
+  const [groupsCount, setGroupsCount] = useState<number | null>(roomCard ? null : 0);
+  const [racks, setRacksState] = useState<number>(0);
+  const [racksTouched, setRacksTouched] = useState(false);
+  useEffect(() => {
+    if (!roomCard || !setupTeamId) return;
+    let alive = true;
+    backend
+      .listRacks(setupTeamId)
+      .then((r) => {
+        if (!alive) return;
+        setGroupsCount(r.length);
+        setRacksState((n) => (racksTouched ? n : r.length));
+      })
+      .catch(() => alive && setGroupsCount(-1));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomCard, setupTeamId]);
+  const rosterAll = setupTeamId ? (members[setupTeamId] ?? []).filter((m) => !(coachExtras[setupTeamId]?.followingOther ?? []).includes(m.userId)) : [];
+  const [athletes, setAthletes] = useState<number | null>(null);
+  const athletesN = athletes ?? Math.max(1, rosterAll.length);
+  const [style, setStyle] = useState<GeneratedFormat | null>(existing?.generatedFormat ?? (existing ? 'standard' : null));
+  const phaseMinutes = phase === 'off' ? 60 : phase === 'pre' ? 50 : phase === 'in' ? 40 : 45;
+  const suggestion = suggestStyle(racks, athletesN, sessionMinutes ?? phaseMinutes);
+  const chosenStyle: GeneratedFormat = style ?? suggestion.style;
   const [showFewer, setShowFewer] = useState(false);
   const jumpsAllowed = phase === 'off' || phase === 'pre';
   const supersetsOn = supersets ?? phase === 'in';
@@ -136,6 +167,7 @@ function BuilderForm() {
     equipment,
     ...(supersets != null ? { supersets } : {}),
     ...(planInput ? { phase: builtPhase, start: planInput.start, endDate: planInput.end, endType: planInput.endType, planEvents: ownEvents } : {}),
+    ...(roomCard ? { generatedFormat: chosenStyle, groupSize: layoutSize(suggestion.perRack), racks } : {}),
   });
   const preview = team && homeMode && !weekSetup ? weekSummary(generateProgram(input())) : null;
   const fewer = team && preview?.beginners ? (members[team.id] ?? []).filter((m) => (m.level ?? 2) === 1) : [];
@@ -152,13 +184,17 @@ function BuilderForm() {
       setLength({ start, mode: 'weeks', end: endFromWeeks(start, 8), weeks: 8, endType: defaultEndType(ownEvents, start), endTypePicked: false });
     }
   };
-  const changedAny = !!existing && (lengthTouched || (asBuilt ? asBuilt.some((k, i) => k !== kinds[i]) : false) || (sessionMinutes ?? null) !== (existing.sessionMinutes ?? null));
+  const styleChanged = !!existing && chosenStyle !== (existing.generatedFormat ?? 'standard');
+  const eqChanged = !!existing && JSON.stringify([...equipment].sort()) !== JSON.stringify([...(existing.equipment ?? ALL_EQUIPMENT)].sort());
+  const changedAny = !!existing && (lengthTouched || styleChanged || eqChanged || (asBuilt ? asBuilt.some((k, i) => k !== kinds[i]) : false) || (sessionMinutes ?? null) !== (existing.sessionMinutes ?? null));
   const buildReason = weekSetup && kinds.every((k) => k === 'off') ? 'Pick at least one day.' : planner && !rolling ? lengthError(length, !existing || next, todayKey) : null;
   const cancelChanges = () => {
     setLengthState(initialLength());
     setLengthTouched(false);
     if (asBuilt) setKinds(asBuilt);
     setSessionMinutes(existing?.sessionMinutes ?? null);
+    setStyle(existing?.generatedFormat ?? 'standard');
+    setEquipment(existing?.equipment ?? ALL_EQUIPMENT);
   };
 
   function build() {
@@ -237,6 +273,25 @@ function BuilderForm() {
       // The team list hasn't loaded yet: keep the program's own team fields.
       program = { ...program, id: existing.id, teamId: existing.teamId, teamName: existing.teamName, groupKey: existing.groupKey, groupName: existing.groupName, postedAt: existing.postedAt, unposted: true, events: existing.events };
     }
+    // Spec B3 / F60d: Rack rotation with no rack groups makes balanced-mix groups on Build (roster, level, position only).
+    let made = 0;
+    if (roomCard && setupTeamId && chosenStyle === 'rack_rotation' && groupsCount === 0 && racks > 0) {
+      const lv = coachExtras[setupTeamId]?.levels ?? {};
+      const groupsNew = makeRackGroups(
+        rosterAll.map((m) => {
+          // D-031 (compliance § 2.4.2 #3): an athlete whose level resolves lower because of another team counts one lower;
+          // the other team is never named or shown.
+          const lower = Object.keys(lv[m.userId]?.adjusted ?? {}).length > 0;
+          const level = m.level ?? null;
+          return { userId: m.userId, level: level != null && lower ? Math.max(1, level - 1) : level, position: m.position ?? null, groupId: m.groupId ?? null };
+        }),
+        racks,
+      );
+      if (groupsNew.length) {
+        made = groupsNew.length;
+        backend.saveRacks(setupTeamId, groupsNew).catch(() => showAlert("Couldn't make rack groups", 'Set them up in Team → Racks.'));
+      }
+    }
     saveProgram(program, !coach);
     if (coach) setProfile({ ...profile, equipment });
     if (!coach) {
@@ -247,7 +302,7 @@ function BuilderForm() {
     if (planner && plan) {
       // F57a success line (no toast component in the app; shown as a short alert).
       const perWeek = program.liftSchedule.filter(Boolean).length;
-      showAlert(`Program built: ${plan.weeks} week${plan.weeks === 1 ? '' : 's'}, ${perWeek} session${perWeek === 1 ? '' : 's'} a week.`);
+      showAlert(`Program built: ${plan.weeks} week${plan.weeks === 1 ? '' : 's'}, ${perWeek} session${perWeek === 1 ? '' : 's'} a week.`, made ? `${made} rack groups made. Edit them in Team → Racks.` : undefined);
     }
   }
 
@@ -307,10 +362,12 @@ function BuilderForm() {
         <WeekEditor value={week} onChange={setWeek} />
       </Card>
 
-      <Card>
-        <H2>What&apos;s in your gym?</H2>
-        <EquipmentPicker value={equipment} onChange={setEquipment} />
-      </Card>
+      {roomCard ? null : (
+        <Card>
+          <H2>What&apos;s in your gym?</H2>
+          <EquipmentPicker value={equipment} onChange={setEquipment} />
+        </Card>
+      )}
 
       {ended && existing?.endDate && !snoozed ? (
         <EndedBanner
@@ -350,6 +407,24 @@ function BuilderForm() {
           input={input()}
           otherTeamAthletes={coachExtras[setupTeamId!]?.followingOther?.length ?? 0}
           onBuild={build}
+        />
+      ) : null}
+      {roomCard ? (
+        <WeightRoomCard
+          racks={racks}
+          onRacks={(n) => (setRacksTouched(true), setRacksState(n))}
+          groups={groupsCount}
+          equipment={equipment}
+          onEquipment={setEquipment}
+          athletes={athletesN}
+          onAthletes={setAthletes}
+          minutes={sessionMinutes ?? phaseMinutes}
+          onMinutes={setSessionMinutes}
+          phaseDefault={phaseMinutes}
+          style={style}
+          onStyle={setStyle}
+          tag={next ? 'From your last program' : existing && !styleChanged ? 'As built' : null}
+          onEditRacks={setupTeamId ? () => router.push({ pathname: '/racks', params: { teamId: setupTeamId } }) : undefined}
         />
       ) : null}
       {planner && weekSetup ? (

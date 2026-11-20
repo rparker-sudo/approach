@@ -14,6 +14,7 @@ import { addDays, dateKey, fromKey, weekPlan, mondayOf } from '../../src/lib/cal
 import { blockRuns, endSuggestions, offSeasonBlocks, planOf, planTimeline, summaryLine, defaultEndType, lengthLine, dateError, type PlanInput } from '../../src/lib/planner';
 import { setupFromProgram, type DayKind } from '../../src/lib/homeV3';
 import type { CalendarEvent, EndType, Program } from '../../src/lib/types';
+import { makeRackGroups, STYLE_REASON, suggestStyle } from '../../src/lib/room';
 
 let f = 0;
 const ok = (c: boolean, m: string) => {
@@ -219,6 +220,42 @@ ok(!long.length, `A-6 17–52 weeks: Accumulation → Strength, then Strength / 
   const sug = endSuggestions(ev, '2026-11-30');
   ok(sug.map((x) => x.label).join(' | ') === 'Sun Jan 3 · before first practice Jan 4 | Sun Jan 24 · before first match Jan 26', `F58d chips: ${sug.map((x) => x.label).join(' | ')}`);
   ok(defaultEndType(ev, '2026-11-30') === 'season' && defaultEndType([{ date: '2027-01-26', type: 'game', teamName: 'Club' }], '2026-11-30') === 'none', 'F58c default: Season starts only with this team\'s first match after the start');
+}
+
+/* =================== PART B =================== */
+{
+  const rows: [number, number, number, string, string][] = [
+    [0, 14, 60, 'stations', 'No racks, so groups rotate through equipment stations.'],
+    [4, 8, 60, 'standard', 'Two or fewer per rack, so everyone works through their own sets.'],
+    [4, 16, 60, 'rack_rotation', '3–5 per rack, so each group rotates at its rack and nobody waits.'],
+    [4, 20, 60, 'rack_rotation', '3–5 per rack, so each group rotates at its rack and nobody waits.'],
+    [3, 16, 60, 'stations', 'More than 5 per rack, so groups move between racks and other stations.'],
+  ];
+  const bad = rows.filter(([r, a, m, st, why]) => {
+    const x = suggestStyle(r, a, m);
+    return x.style !== st || x.reason !== why;
+  });
+  ok(!bad.length, `B-1 suggestion table and exact reasons (spec B2): 0 racks, ≤ 2, 3–5, 6+ per rack${bad.length ? ` · ${JSON.stringify(bad)}` : ''}`);
+  ok(suggestStyle(4, 14, 60).math === '14 athletes ÷ 4 racks = 4 per rack (3.5, rounded up).' && suggestStyle(4, 9, 60).style === 'rack_rotation' && suggestStyle(4, 16, 60).math === '16 athletes ÷ 4 racks = 4 per rack.',
+    'B-1 athletes per rack rounds up (D-065): 14 ÷ 4 → 4; 9 ÷ 4 → 3 (Rack rotation)');
+  ok(suggestStyle(4, 16, 25).express && !suggestStyle(4, 16, 30).express && STYLE_REASON.short === 'Short sessions: the essentials only.', 'B-1 under 30 min adds Express ("Short sessions: the essentials only.")');
+  const card = read('src/components/WeightRoomCard.tsx');
+  const bsrc = read('src/app/builder.tsx');
+  ok(/Racks or platforms/.test(card) && /Equipment/.test(card) && /Athletes per session/.test(card) && /Session length/.test(card) && /const chosen = p\.style \?\? sug\.style/.test(card) && /onPress=\{\(\) => p\.onStyle\(s\)\}/.test(card),
+    'B-1 the card asks racks, equipment, athletes per session and length; the coach can pick any style and a pick is never replaced by the suggestion');
+  // B-2: balanced-mix groups of 3–5 from roster, level and position only; existing groups left as they are.
+  const roster = Array.from({ length: 16 }, (_, i) => ({ userId: `u${i}`, level: (i % 3) + 1, position: ['Outside Hitter', 'Setter', 'Middle Blocker', 'Libero / DS'][i % 4], groupId: null }));
+  const g = makeRackGroups(roster, 4);
+  const gsrc = read('src/lib/room.ts');
+  ok(g.length === 4 && g.every((r) => r.userIds.length >= 3 && r.userIds.length <= 5) && g.every((r, i) => r.name === `Rack ${i + 1}`) && g.every((r) => r.userIds.some((u) => (roster.find((x) => x.userId === u)!.level) >= 2)),
+    `B-2 auto-created rack groups: 4 balanced-mix racks of ${g.map((r) => r.userIds.length).join('/')}, neutral names, an intermediate+ athlete in each`);
+  ok(makeRackGroups(roster.slice(0, 7), 4).every((r) => r.userIds.length >= 3) && !/test_results|e1rm|readiness|bodyWeight|birth|\bage\b/.test(gsrc.split('\n').filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join('\n')),
+    'B-2 never under 3 per rack; inputs are roster, level and position only (no test results, loads, check-ins, bodyweight or age)');
+  ok(/chosenStyle === 'rack_rotation' && groupsCount === 0 && racks > 0/.test(bsrc), 'B-2 groups are created on Build only when the team has none (existing groups are left as they are, F60d)');
+  // B-3: generatedFormat restores on edit; athletes per session isn't stored.
+  const rr = build('O W O W O O O', { generatedFormat: 'rack_rotation', start: '2026-11-30', endDate: '2027-01-24', endType: 'season' });
+  ok(rr.generatedFormat === 'rack_rotation' && /existing\?\.generatedFormat \?\? \(existing \? 'standard' : null\)/.test(bsrc), 'B-3 generatedFormat stored per program and restored when the program is edited (no key = Standard)');
+  ok(!/athlete|perSession|groupSize/i.test(Object.keys(rr).join(' ')) && !/groupSize|athletesN/.test(JSON.stringify(rr)), 'B-3 athletes per session (and the layout size) are not in the program JSON');
 }
 
 /* =================== DATA =================== */

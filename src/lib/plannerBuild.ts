@@ -13,6 +13,8 @@ import { withWeek1 } from './weekV3';
 export function applyPlanner(program: Program, input: GeneratorInput): Program {
   let p = program;
   if (input.start && input.endDate) p = withPlan(p, input);
+  // Part B (spec B3): the style is stored per program (team programs; personal programs are always Standard, no key).
+  if (input.generatedFormat && p.weightRoomDays) p = { ...p, generatedFormat: input.generatedFormat };
   return p;
 }
 

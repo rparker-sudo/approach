@@ -299,6 +299,13 @@ $0 now. Future: Apple Developer Program $99/year; Supabase Pro about $25/month i
 
 ## 8. Known gaps, judgment calls and checks
 
+**2.4.1 (generator v3 on, week setup; `docs/specs/v2.4.1.md` v1.1; report `reports/v2.4.1-acceptance.md`):** branch `v2.4.1` from `a2aede1`. **Not deployed yet.**
+- **Flags:** `generatorV3` **false → true** (default on, kept as the off switch); `catalogV3`, `rackRotation` unchanged (on).
+- **No migration. Schema diff empty since `a2aede1`. Program JSON gains no new key:** week-setup programs use `weightRoomDays`, `liftSchedule`, each session's `location` / `mobility` / `light`, `name`, `homeJumps`, `block`, `source`; the coach note is the existing row `notes` on the B-rest filler row (`filler`). Device-only: `AppData.generatorSeen` (R-5 message seen, G-3).
+- **How the kind of day is stored:** a home workout is a session with `location: 'home'` named "Home Upper / Home Lower / Home Total / Home Care"; a v3 mobility day is `mobility: true` with `location: 'home'` (2.3.0 extra-mobility sessions have no location); the H2 light day keeps `light: true` and is used only per athlete. The Week setup card restores itself from these.
+- **Judgment calls:** Rebuild keeps coach-edited sessions whose day keeps its kind and starts with the next week (per-date choices hold the current week; Product to confirm); plyo reps per set capped (Box Jump 3, Pogo 10) before the §8b position factor; moved care work joins the first H-Upper/H-Care/H-Lower E-block; mobility parts are rows by role (no per-part Done); "Care work is on <Day>'s home workout." for every §2d move; one weight-room day alternates weekly; the R-4 cut runs after Fit to time; Example 2's Day 1 at the 40-min in-season default loses its plyo pair to Fit to time (Training to look at).
+- **Superseded checks (spec §0):** G1 → R-1 and G8 → R-2 for v3 (the 2.3.0 generator keeps both); Olympic beginner pick → med-ball throw (B2); ramp-up scope (B4); warm-up estimates (B3); 4-day Day 1 (Part C).
+
 **2.4.0 judgment calls, gaps and questions (Training v3; also in `reports/training-v3-acceptance.md`):**
 - **`session.source` (Legal ruling #1, 11/19):** approved and added to V4 as program metadata. #1a any coach or trainer edit sets `'coach'` (`coachEdit`); #1c never on boards.
 - **Spec inconsistency (§1.2 vs the Part 1 criterion):** §1.2 says turning "Adjust to level" off on a generated session makes it `'coach'`; the Part 1 criterion says the level toggle doesn't change the source. Built: no flip; "off" is honored on generated sessions too (athletes get the written exercises; Approach Strength's limits still apply). Product to confirm.

@@ -59,7 +59,7 @@ export default function WarmupRow({
   const w = session.warmup;
   const removed = session.warmup === null || (isSessionWarmup(w) && w.edited && !w.raise.length && !w.activate.length && !w.potentiate.length);
   const type = SESSION_TYPE_LABEL[sessionType(session)];
-  const minutes = warmupMinutes(shown, ctx);
+  const minutes = Math.round(warmupMinutes(shown, ctx));
   const tag = removed ? 'None' : shown?.source === 'template' ? `Template: ${isSessionWarmup(w) ? w.template : ''}` : shown?.source === 'edited' ? 'Edited' : 'Approach Strength';
   const limitedSpace = isSessionWarmup(w) && typeof w.limitedSpace === 'boolean' ? w.limitedSpace : !!ctx.limitedSpace;
 
@@ -210,7 +210,7 @@ function WarmupEditorSheet({
   const [limited, setLimited] = useState(limitedSpace);
   const [picker, setPicker] = useState<{ part: WarmupPart; index: number | null } | null>(null);
   const [customDraft, setCustomDraft] = useState<{ part: WarmupPart; name: string; reps: string } | null>(null);
-  const minutes = warmupMinutes({ ...items }, ctx);
+  const minutes = Math.round(warmupMinutes({ ...items }, ctx));
 
   const setPart = (part: WarmupPart, list: ProgramExercise[]) => setItems((cur) => ({ ...cur, [part]: list }));
   function move(part: WarmupPart, i: number, dir: -1 | 1) {

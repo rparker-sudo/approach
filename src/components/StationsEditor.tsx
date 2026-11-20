@@ -128,7 +128,7 @@ export default function StationsEditor({ program, session, onChange }: { program
   const checks = stationChecks(list, stations, racks ?? 0, ctx);
   // §1.4: station time = (session length − warm-up − Part 1 − finish) ÷ stations − 1 min transition.
   const target = targetFor(program, session);
-  const warmMin = warmupMinutes(warmupFor(session, warmupCtxFor(program, session, program.equipment?.length ? program.equipment : ALL_EQUIPMENT)), { phase: program.phase });
+  const warmMin = Math.round(warmupMinutes(warmupFor(session, warmupCtxFor(program, session, program.equipment?.length ? program.equipment : ALL_EQUIPMENT)), { phase: program.phase }));
   const part1Only = stationsEstimate(list, stations, ctx).part1 - 8;
   const fromLength = stations.length ? stationMinutesFrom(target.minutes, warmMin, Math.max(0, part1Only), 0, stations.length) : null;
   const est = stationsEstimate(list, stations, ctx, fromLength);

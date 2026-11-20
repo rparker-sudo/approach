@@ -78,7 +78,7 @@ const fs = require('fs');
   await click('New team'); await click('Volleyball team'); await click('Next');
   await p.getByPlaceholder('Team name, e.g. Varsity').fill('Varsity'); await click('Create'); await p.waitForTimeout(1500);
   let d = await demo(); const team = d.teams[0]; const code = team.joinCode;
-  await click('Build workout'); await p.waitForTimeout(800); await p.getByText('Build team workout', { exact: true }).last().click(); await p.waitForTimeout(1200);
+  await click('Build workout'); await p.waitForTimeout(800); await p.getByText('Build program', { exact: true }).last().click(); await p.waitForTimeout(1200); // 2.4.1 F56: the Week setup card's button
   let a = await app(); let prog = a.programs.find(x => x.teamId === team.id);
   check(prog.sessions.every(s => s.source === 'approach'), "generated team workout: source = 'approach'");
   const ses = prog.sessions.find(s => s.exercises.some(e => e.role === 'main')) || prog.sessions[0];
@@ -93,7 +93,9 @@ const fs = require('fs');
   const mainIdx = ses.exercises.findIndex(e => e.role === 'main');
   const rowsBefore = (await app()).programs.find(x => x.id === prog.id).sessions.find(s => s.id === ses.id).exercises;
   // reps/effort inputs come in pairs after the name field; find the effort input by its current value
-  const eff = p.locator(`input[value="${rowsBefore[mainIdx].effort}"]`).first();
+  // Several rows can share an effort value (v3 week-1 prescriptions): take the main row's own occurrence.
+  const sameBefore = rowsBefore.slice(0, mainIdx).filter((r) => r.effort === rowsBefore[mainIdx].effort).length;
+  const eff = p.locator(`input[value="${rowsBefore[mainIdx].effort}"]`).nth(sameBefore);
   await eff.fill('RPE 10'); await p.waitForTimeout(400);
   t = await body(); await shot('editor-rpe10');
   check(!BLOCKS.test(t), `effort "RPE 10" on a minors team: no block, warning or note${(t.match(BLOCKS) || [''])[0]}`);

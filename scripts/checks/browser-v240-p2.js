@@ -79,7 +79,7 @@ const fs = require('fs');
   await click('New team'); await click('Volleyball team'); await click('Next');
   await p.getByPlaceholder('Team name, e.g. Varsity').fill('Varsity'); await click('Create'); await p.waitForTimeout(1500);
   let d = await demo(); const team = d.teams[0]; const code = team.joinCode;
-  await click('Build workout'); await p.waitForTimeout(800); await p.getByText('Build team workout', { exact: true }).last().click(); await p.waitForTimeout(1200);
+  await click('Build workout'); await p.waitForTimeout(800); await p.getByText('Build program', { exact: true }).last().click(); await p.waitForTimeout(1200); // 2.4.1 F56: the Week setup card's button
   const joinAthlete = async (name, email) => {
     await erase();
     await p.goto(`http://localhost:8099/join?code=${code}`); await p.waitForTimeout(2200); await welcomeCreate();
@@ -129,7 +129,7 @@ const fs = require('fs');
   t = await body(); await shot('p2-team-start'); await tapAudit('team rotation controls');
   check(/Rack rotation/.test(t) && /Start rotation/.test(t), 'team screen: "Start rotation"');
   await click('Start rotation'); await p.waitForTimeout(1200);
-  t = await body(); check(/Rack rotation · \w · Round 1 of \d+ · Rotate in \d:\d\d/.test(t) && /Rotate now/.test(t) && /\+15 s/.test(t) && /End block/.test(t), 'control bar: "Rack rotation · A · Round 1 of N · Rotate in m:ss" with Rotate now, +15 s, End block');
+  t = await body(); check(/Rack rotation · \w · Round 1 of \d+( · Build-up)? · Rotate in \d+:\d\d/.test(t) && /Rotate now/.test(t) && /\+15 s/.test(t) && /End block/.test(t), `control bar: "Rack rotation · A · Round 1 of N (· Build-up, 2.2c) · Rotate in m:ss" with Rotate now, +15 s, End block (${(t.match(/Rack rotation · [^\n]*/) || [''])[0]})`);
 
   step('F55b board ring');
   await p.goto(`http://localhost:8099/board/${team.id}`); await p.waitForTimeout(2800);

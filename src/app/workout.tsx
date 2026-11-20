@@ -617,7 +617,7 @@ export default function Workout() {
         {day.warmup ? (
           <WarmupCard
             warmup={day.warmup}
-            minutes={warmupMinutes(day.warmup, { phase: program.phase, home: day.home })}
+            minutes={Math.round(warmupMinutes(day.warmup, { phase: program.phase, home: day.home }))}
             typeLabel={SESSION_TYPE_LABEL[sessionType({ ...session, exercises: plan })]}
             done={draft.warmupDone ?? []}
             onToggle={toggleWarmup}

@@ -64,7 +64,7 @@ export default function SessionScreen() {
         {resolved.warmup ? (
           <WarmupCard
             warmup={resolved.warmup}
-            minutes={warmupMinutes(resolved.warmup, { phase: program.phase, home: resolved.home })}
+            minutes={Math.round(warmupMinutes(resolved.warmup, { phase: program.phase, home: resolved.home }))}
             typeLabel={SESSION_TYPE_LABEL[sessionType({ ...session, exercises: resolved.exercises })]}
             done={[]}
             coachWord={general ? 'trainer' : 'coach'}

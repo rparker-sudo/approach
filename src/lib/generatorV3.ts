@@ -251,7 +251,15 @@ export function generateProgramV3(input: GeneratorInput & { clubInSeason?: boole
   const r6 = Math.min(input.experience === 'beginner' ? 3 : input.experience === 'intermediate' ? 4 : 5, input.phase === 'in' || club ? 3 : 5);
   const days = Math.max(1, Math.min(r6, input.liftDays?.length ?? input.liftDaysPerWeek));
   const tpl = templateFor(input.phase, days, input.experience, club).map((d, i) => emphasize(d, input.position, i));
-  const sessions: Session[] = tpl.map((d) => ({ id: uid(), name: d.name, focus: d.focus, source: 'approach', exercises: d.slots.map(rowOf) }));
+  // Rows store the block's week-1 prescription for the program's level so the coach sees real numbers (2.4.1).
+  const level = (input.experience === 'beginner' ? 1 : input.experience === 'intermediate' ? 2 : 3) as 1 | 2 | 3;
+  const b0 = blockFor(input.phase, 0, club);
+  const week1 = (s: Slot) => {
+    const row = rowOf(s);
+    const rx = prescribe(row, row.exerciseId, b0, 1, { level, confirmed: false, minor: true, phase: input.phase, position: input.position, dayIndex: 0 });
+    return { ...row, sets: rx.sets, reps: rx.reps, effort: rx.effort };
+  };
+  const sessions: Session[] = tpl.map((d) => ({ id: uid(), name: d.name, focus: d.focus, source: 'approach', exercises: d.slots.map(week1) }));
   const placed = input.liftDays?.length
     ? placeDays(input.volleyballWeek, tpl, input.phase, club, input.liftDays)
     : placeDays(input.volleyballWeek, tpl, input.phase, club);

@@ -4,6 +4,16 @@ Version numbers: whole numbers (1.0, 2.0) for big changes, decimals (1.1, 1.2) f
 The number is in `app.json` (`expo.version`, written as 1.1.0 for 1.1) and shows in the app under Settings.
 Each version has a matching GitHub tag (`v1.0`, `v1.1`, …) and download (`approach-1.0.zip`).
 
+## 2.4.1 — Generator v3 on, week setup (not deployed yet)
+Built from `docs/specs/v2.4.1.md` v1.1 on branch `v2.4.1`. **No migration.** Report: `reports/v2.4.1-acceptance.md`.
+- **Approach Strength's new programming for everyone (D-059).** Generated programs use generator v3: blocks, the warm-up → A–E session, movement ladders, position emphasis and the §9 limits. What each athlete sees is always their own version, never above their level. Personal programs always adjust to level.
+- **Week setup (D-062).** In the team program builder, the coach sets each day as Off, Weight room, Home workout or Mobility (with the day's practice or match shown). Approach Strength designs the whole week around those days: weight-room days do the heavy and power work; home workouts (Home Upper, Lower, Total, Care) cover what the weight room doesn't; mobility days are short, easy mobility and care sessions (12 minutes after a match). **Recommend for me** fills Off days. A summary line says what each level gets (for example, a beginner's light day).
+- **Jump volume follows practice:** plyo contacts drop 30% on practice days and 50% the day after a match or tournament, from each athlete's own calendar. If an athlete's version of a jump puts them over the day's jump limit, a set is dropped with a note.
+- **Programs already running** finish their current 4-week block; the next block uses the new programming, with a one-time note.
+- **Smaller changes:** beginners get a med-ball throw for Olympic lifts when a med ball is there (else a jump); Copenhagens on a bench or a box; warm-up time estimates match Training's table; ramp-up sets only before heavy barbell lifts and Olympic lifts; turning level adjustment off on an Approach Strength session still keeps the advanced-method limits; in a "Back after a break" program, effort a trainer types reaches the client as typed.
+- **Also:** wave loading for coach-confirmed advanced athletes (Strength-Power weeks 2–3); a Day 3 in in-season weeks with no match; the 4-day Day 1 opens Depth Drop → Box Jump.
+- Checks: `scripts/checks/v241-check.ts`, `scripts/checks/browser-v241.js`; earlier rows superseded by spec §0 are marked.
+
 ## 2.4.0 — Training v3 (deployed November 19, 2026)
 Built from `docs/specs/training-v3.md` v1.0 on branch `v2.4.0`, Part 1 → Part 2 → Part 3. Migrations `011`–`013` (run in order after 010; each safe to re-run). Acceptance report: `reports/training-v3-acceptance.md`.
 

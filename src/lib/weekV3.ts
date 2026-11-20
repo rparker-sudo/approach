@@ -1,6 +1,6 @@
 import { ALL_EQUIPMENT, getExercise } from './exercises';
 import type { GeneratorInput } from './generator';
-import { BLOCK_LABEL, blockFor, emphasize, IN2, POSITION_CARE, POST, PRE3, rowOf, T2, T3, T4, T5_DAY5, type Day, type Slot } from './generatorV3';
+import { BLOCK_LABEL, blockFor, emphasize, prescribe, IN2, POSITION_CARE, POST, PRE3, rowOf, T2, T3, T4, T5_DAY5, type Day, type Slot } from './generatorV3';
 import { HOME_NAME, LIGHT_NAME, MOBILITY_NAME, WEEKDAY_FULL, type DayKind, type HomeType } from './homeV3';
 import { WEEKDAYS, type DayType, type Experience, type Phase, type Program, type ProgramExercise, type ProgramPosition, type Session } from './types';
 import { dateKey, weekPlan } from './calendar';
@@ -368,6 +368,14 @@ export function generateWeekV3(input: SetupInput): Program {
 
   const now = new Date();
   const block = blockFor(input.phase, 0, club);
+  // The coach sees (and edits from) real numbers: each row stores the block's week-1 prescription for the program's level.
+  // Athletes' sessions are still prescribed per block and week by resolveSession (applyV3 / homeRxV3).
+  const level = (input.experience === 'beginner' ? 1 : input.experience === 'intermediate' ? 2 : 3) as 1 | 2 | 3;
+  for (const s of [...roomSessions, ...(bye ? [bye] : [])]) s.exercises = withWeek1(s.exercises, block, phase, input.position, level);
+  for (const s of homeSessions.values()) {
+    const t = homeTypeOf(s);
+    if (t) s.exercises = s.exercises.map((r) => homeRxV3(r, r.exerciseId, t, block, 1, level) ?? r);
+  }
   return {
     id: uid(),
     name: input.name?.trim() || `${BLOCK_LABEL[block]} – ${input.position}`,
@@ -590,3 +598,11 @@ export function summaryLines(kinds: DayKind[], program: Program, monday: Date, p
   return { week, levels, exceptions };
 }
 
+
+/** Week-1 prescription for stored weight-room rows (sets, reps, effort only; no new keys). */
+export function withWeek1(rows: ProgramExercise[], block: ReturnType<typeof blockFor>, phase: Phase, position: ProgramPosition, level: 1 | 2 | 3): ProgramExercise[] {
+  return rows.map((r) => {
+    const rx = prescribe(r, r.exerciseId, block, 1, { level, confirmed: false, minor: true, phase, position, dayIndex: 0 });
+    return { ...r, sets: r.role === 'care' && r.sets === 1 ? 1 : rx.sets, reps: rx.reps, effort: rx.effort };
+  });
+}

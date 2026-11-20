@@ -90,7 +90,8 @@ export function estimateSession(session: Session, ctx: FitCtx, opts: { compactWa
   // A rotation's build-up round is its ramp-up (rule 6), so those lifts add no separate ramp-up time.
   const buildUp = new Set(rot.filter((b) => b.buildUpRound).map((b) => b.group));
   const ramps = rampCount(list.filter((pe) => !(pe.group && buildUp.has(pe.group))), ctx.rest);
-  return Math.round(sec / 60) + warmupMinutes(w, { phase: ctx.warmup.phase, home: ctx.warmup.home }) + ramps;
+  // warmups v1.1 §1a minutes are one decimal; the session estimate is whole minutes.
+  return Math.round(sec / 60 + warmupMinutes(w, { phase: ctx.warmup.phase, home: ctx.warmup.home }) + ramps);
 }
 
 /* ---------- fitSession (§4a trim order) ---------- */

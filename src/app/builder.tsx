@@ -73,7 +73,9 @@ function BuilderForm() {
   const [total, setTotal] = useState(() => (existing?.weightRoomDays ? existing.liftSchedule.filter((sid) => sid && !existing.sessions.find((x) => x.id === sid)?.light && !existing.sessions.find((x) => x.id === sid)?.mobility).length : 4));
   const [homeJumps, setHomeJumps] = useState(!!existing?.homeJumps);
   // 2.4.1 Part D (UX F56): team programs set each weekday's kind before the build.
-  const weekSetup = !!team && FLAGS.generatorV3;
+  // Keyed on the team id (route or program) so the card restores "As built" even before the team list has loaded.
+  const setupTeamId = team?.id ?? teamId ?? existing?.teamId;
+  const weekSetup = !!setupTeamId && FLAGS.generatorV3 && !existing?.general;
   const asBuilt = existing && weekSetup ? setupFromProgram(existing) : null;
   const [kinds, setKinds] = useState<DayKind[]>(() => asBuilt ?? WEEKDAYS.map((_, i) => (liftDays.includes(i) ? 'room' : 'off')));
   const [sessionMinutes, setSessionMinutes] = useState<number | null>(existing?.sessionMinutes ?? null);
@@ -161,6 +163,10 @@ function BuilderForm() {
         lightDates: existing?.lightDates,
       };
     }
+    if (!team && existing?.teamId) {
+      // The team list hasn't loaded yet: keep the program's own team fields.
+      program = { ...program, id: existing.id, teamId: existing.teamId, teamName: existing.teamName, groupKey: existing.groupKey, groupName: existing.groupName, postedAt: existing.postedAt, unposted: true, events: existing.events };
+    }
     saveProgram(program, !coach);
     if (coach) setProfile({ ...profile, equipment });
     if (!coach) {
@@ -231,7 +237,7 @@ function BuilderForm() {
           onChange={setKinds}
           asBuilt={asBuilt}
           week={week}
-          events={data.teamCalendars?.[team!.id]?.events ?? existing?.events ?? []}
+          events={data.teamCalendars?.[setupTeamId!]?.events ?? existing?.events ?? []}
           phase={phase}
           homeJumps={homeJumps}
           onHomeJumps={setHomeJumps}
@@ -239,7 +245,7 @@ function BuilderForm() {
           onSessionMinutes={setSessionMinutes}
           minutesByWeekday={existing?.minutesByWeekday}
           input={input()}
-          otherTeamAthletes={coachExtras[team!.id]?.followingOther?.length ?? 0}
+          otherTeamAthletes={coachExtras[setupTeamId!]?.followingOther?.length ?? 0}
           onBuild={build}
         />
       ) : null}

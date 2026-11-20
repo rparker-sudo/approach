@@ -257,7 +257,7 @@ export function coachEstimate(program: Program, session: Session, date?: Date | 
     kind: home ? 'home' : 'school',
   };
   const target = targetFor(program, session, date, weekday);
-  if (approach && !session.light && !session.mobility) {
+  if (approach && !session.light && !session.mobility && !(FLAGS.plannerV3 && session.format === 'rack_rotation')) {
     const fit = fitSession(session, target.minutes, ctx, { skip: undoneTrims(session) });
     return { minutes: fit.after, target, express: fit.express };
   }
@@ -301,7 +301,10 @@ export function resolveSession(program: Program, session: Session, athlete: Athl
   if (v3 && v3w && !session.light && !homeType) ({ list: written, cap: plyoCap } = applyV3(program, session, written, v3w, athlete, adjust, date));
   let compactWarmup = false;
   let express = false;
-  if (approach && !lightHome && !session.mobility) {
+  // 2.4.2 D-068.4: generated rack rotation sessions are fitted by rounds when they're built (§2b step 8, fitLog); the §4a trim
+  // order stays for Standard sessions.
+  const rotationFit = approach && session.format === 'rack_rotation' && FLAGS.plannerV3;
+  if (approach && !lightHome && !session.mobility && !rotationFit) {
     const fit = fitSession({ ...session, exercises: written }, target.minutes, fitCtx, { skip: undoneTrims(session) });
     const more = fit.trims.length || fit.express ? { session: fit.session } : addBack(fit.session, target.minutes, fitCtx);
     written = more.session.exercises;

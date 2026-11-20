@@ -127,7 +127,9 @@ export function suggestSessionRotation(session: Session, ctx: { equipment?: Equi
 export function startPosition(k: number, block: Pick<RotationBlock, 'positions'>): number {
   const n = block.positions.length;
   if (k < n) return k;
-  const shared = [...block.positions.keys()].reverse().find((i) => !block.positions[i].usesRack && block.positions[i].kind !== 'spot');
+  // 2.4.2 §2d: with 5 athletes, position 3 holds 2 (when it's a non-rack, non-spot position); otherwise the last such position.
+  const ok3 = (i: number) => !!block.positions[i] && !block.positions[i].usesRack && block.positions[i].kind !== 'spot';
+  const shared = ok3(2) ? 2 : [...block.positions.keys()].reverse().find(ok3);
   return shared ?? n - 1;
 }
 

@@ -14,6 +14,12 @@ import { addDays, dateKey, fromKey, weekPlan, mondayOf } from '../../src/lib/cal
 import { blockRuns, endSuggestions, offSeasonBlocks, planOf, planTimeline, summaryLine, defaultEndType, lengthLine, dateError, type PlanInput } from '../../src/lib/planner';
 import { setupFromProgram, type DayKind } from '../../src/lib/homeV3';
 import type { CalendarEvent, EndType, Program } from '../../src/lib/types';
+import { barOf, rackOf, needsSpot, rackRest, COMPILED } from '../../src/lib/rackCompile';
+import { getExercise } from '../../src/lib/exercises';
+import { REST_FLOOR, tierOf } from '../../src/lib/rest';
+import { sameMuscles, startPosition } from '../../src/lib/rotation';
+import { coachEstimate, practiceCut } from '../../src/lib/resolve';
+import { POSITIONS, type Phase, type Session, type RotationBlock } from '../../src/lib/types';
 import { makeRackGroups, STYLE_REASON, suggestStyle } from '../../src/lib/room';
 
 let f = 0;
@@ -256,6 +262,135 @@ ok(!long.length, `A-6 17–52 weeks: Accumulation → Strength, then Strength / 
   const rr = build('O W O W O O O', { generatedFormat: 'rack_rotation', start: '2026-11-30', endDate: '2027-01-24', endType: 'season' });
   ok(rr.generatedFormat === 'rack_rotation' && /existing\?\.generatedFormat \?\? \(existing \? 'standard' : null\)/.test(bsrc), 'B-3 generatedFormat stored per program and restored when the program is edited (no key = Standard)');
   ok(!/athlete|perSession|groupSize/i.test(Object.keys(rr).join(' ')) && !/groupSize|athletesN/.test(JSON.stringify(rr)), 'B-3 athletes per session (and the layout size) are not in the program JSON');
+}
+
+/* =================== PART C =================== */
+const ROOM_1118 = ['barbell', 'pullup-bar', 'dumbbells', 'kettlebells', 'box'] as Program['equipment'];
+const rot = (kinds: string, o: Partial<GeneratorInput> = {}) =>
+  team(build(kinds, { position: 'All positions', experience: 'advanced', generatedFormat: 'rack_rotation', groupSize: 4, sessionMinutes: 60, start: '2026-11-30', endDate: '2027-01-24', endType: 'season', ...o }));
+const rooms = (p: Program) => p.sessions.filter((x) => !x.mobility && !x.light && x.location !== 'home');
+const names = (b: RotationBlock) => b.positions.map((q) => (q.kind === 'spot' ? 'Spot' : getExercise(q.exerciseId!).name));
+const ruleBad = (s: Session, opts: { table?: boolean } = {}) => {
+  const out: string[] = [];
+  for (const b of s.rotation ?? []) {
+    const ex = b.positions.filter((q) => q.kind === 'exercise').map((q) => getExercise(q.exerciseId!));
+    if (ex.filter(rackOf).length > 1) out.push(`${s.name} ${b.group}: 2 rack`);
+    if (ex.filter(barOf).length > 1) out.push(`${s.name} ${b.group}: 2 bar`);
+    const lead = b.positions[0].kind === 'exercise' ? getExercise(b.positions[0].exerciseId!) : null;
+    if (lead && needsSpot(lead) && b.positions[1]?.kind !== 'spot') out.push(`${s.name} ${b.group}: no spot`);
+    const last = b.positions[b.positions.length - 1];
+    if (!opts.table && lead && last.kind === 'exercise' && b.positions.length > 2 && sameMuscles(lead, getExercise(last.exerciseId!))) out.push(`${s.name} ${b.group}: same-muscle before rack lift`);
+    if (lead && rackRest(b) < (REST_FLOOR[tierOf(lead)] ?? 0)) out.push(`${s.name} ${b.group}: rest ${rackRest(b)}`);
+    if (lead && (tierOf(lead) === 'A' || lead.pattern === 'olympic') && !b.buildUpRound) out.push(`${s.name} ${b.group}: no build-up`);
+  }
+  return out;
+};
+{
+  // C-1: with Rack rotation chosen, every generated weight-room session is Rack rotation: R1 Power, R2 Strength, R3 Secondary.
+  const p = rot('M W O W O H O');
+  const r = rooms(p);
+  ok(r.length === 2 && r.every((x) => x.format === 'rack_rotation' && (x.rotation ?? []).map((b) => b.group).join('') === 'ABC' && x.exercises.filter((e) => e.group !== 'CD').every((e) => ['A', 'B', 'C'].includes(e.group ?? ''))),
+    `C-1 every weight-room session is Rack rotation, A (R1 Power) · B (R2 Strength) · C (R3 Secondary): ${r.map((x) => `${x.name} ${x.format}`).join('; ')}`);
+  ok(p.sessions.filter((x) => x.location === 'home' || x.mobility).every((x) => !x.format || x.format === 'standard'), 'C-1 / C4 home workout and mobility days stay Standard');
+  // C-3 (+ D-068.2): the founder's 2-day off-season setup in a full weight room generates the §2c tables, within 45–60 min.
+  const full = rot('O W O W O O O');
+  const d1 = full.sessions.find((x) => x.name === 'Day 1 Total: squat')!;
+  const d2 = full.sessions.find((x) => x.name === 'Day 2 Total: hinge')!;
+  const want: Record<string, string[][]> = {
+    'Day 1 Total: squat': [['Hang Power Clean', 'Box Jump', 'Prone Y-T-W Raises', 'Copenhagen Plank'], ['Back Squat', 'Spot', 'One-Arm Dumbbell Row', 'Pallof Press'], ['Bench Press', 'Spot', 'Single-Leg RDL', 'Spanish Squat Hold']],
+    'Day 2 Total: hinge': [['Push Press', 'Med Ball Rotational Throw', 'Bent-Knee Calf Raise', 'Wall Slide'], ['Trap Bar Deadlift', 'Weighted Pull-Up', 'Face Pull', 'Slider Hamstring Curl'], ['Rear-Foot Elevated Split Squat', 'Copenhagen Plank', 'Tibialis Raise', 'Dead Bug']],
+  };
+  const table = (s: Session, rounds: number[], secs: number[]) =>
+    (s.rotation ?? []).every((b, k) => JSON.stringify(names(b)) === JSON.stringify(want[s.name][k]) && b.rotationSec === secs[k] && b.rounds <= rounds[k] && (b.rounds === rounds[k] || (s.fitLog ?? []).some((l) => l.startsWith(`${b.group}: ${rounds[k]} → ${b.rounds} rounds`))));
+  const m1 = coachEstimate(full, d1).minutes;
+  const m2 = coachEstimate(full, d2).minutes;
+  ok(table(d1, [3, 4, 3], [75, 75, 75]) && table(d2, [3, 4, 3], [75, 90, 75]) && m1 >= 45 && m1 <= 60 && m2 >= 45 && m2 <= 60,
+    `C-3 founder setup, full weight room, 60 min: Day 1 and Day 2 = the §2c tables (same exercises, rotations, positions, rotation times; rounds lower only by fitting) · Day 1 ${m1} min [${(d1.fitLog ?? []).join(' ')}] · Day 2 ${m2} min [${(d2.fitLog ?? []).join(' ')}]`);
+  const m45 = rot('O W O W O O O', { sessionMinutes: 45 });
+  const e45 = rooms(m45).map((x) => `${x.name} ${coachEstimate(m45, x).minutes} min [${(x.fitLog ?? []).join(' ')}]`);
+  ok(rooms(m45).every((x) => coachEstimate(m45, x).minutes <= 50 && (x.rotation ?? []).find((b) => b.group === 'B')!.rounds >= 3), `C-3 at 45 min: fitted by rounds (B never under 3) · ${e45.join(' · ')}`);
+  // C-6 (D-068.2): the 11/18 room: same rotations, each slot on its ladder's room-fitting rung; one rack/one bar holds.
+  const room = rot('O W O W O O O', { equipment: ROOM_1118 });
+  const r1 = room.sessions.find((x) => x.name === 'Day 1 Total: squat')!;
+  const r2 = room.sessions.find((x) => x.name === 'Day 2 Total: hinge')!;
+  const n1 = (r1.rotation ?? []).map(names);
+  const n2 = (r2.rotation ?? []).map(names);
+  ok(n1[1].join() === 'Back Squat,Spot,One-Arm Dumbbell Row,Dead Bug' && n1[2][0] === 'Dumbbell Floor Press' && n1[2].includes('Isometric Split Squat') && n2[1][0] === 'Romanian Deadlift' && n2[1].includes('Weighted Pull-Up') && n2[0][1] === 'Squat Jump' && !ruleBad(r1, { table: true }).length && !ruleBad(r2, { table: true }).length,
+    `C-6 the 11/18 room (no bench, bands, med balls, trap bar): Pallof → Dead Bug, Bench → DB Floor Press, Spanish squat → Isometric Split Squat, Trap Bar Deadlift → RDL (bar) with the pull-up on the rack, MB throw → a jump · ${n1.map((x) => x.join(' / ')).join(' | ')} || ${n2.map((x) => x.join(' / ')).join(' | ')}`);
+  // C-2: rules on the compiled founder days (the two §2c positions Training flagged are built as written: known conflict 7).
+  const tbl = [...ruleBad(d1, { table: true }), ...ruleBad(d2, { table: true })];
+  const flagged = [d1, d2].flatMap((s) => (s.rotation ?? []).filter((b) => b.positions.length > 2 && b.positions[0].kind === 'exercise' && sameMuscles(getExercise(b.positions[0].exerciseId!), getExercise(b.positions[b.positions.length - 1].exerciseId!))).map((b) => `${s.name} ${b.group}: ${names(b)[b.positions.length - 1]} before ${names(b)[0]}`));
+  ok(!tbl.length, `C-2 compiled founder days: ≤ 1 rack and ≤ 1 bar per rotation, spotter after barbell squat/bench, rack-lift rest ≥ floors, round 1 build-up for tier A/Olympic${tbl.length ? ` · ${tbl.join('; ')}` : ''} · as written per §2c (Training D4): ${flagged.join('; ') || 'none'}`);
+  // C-7: in-season Day 1 Heavy = the §2c in-season line (about 46 min).
+  const ins = team(build('O W O W O O O', { phase: 'in', position: 'All positions', experience: 'advanced', generatedFormat: 'rack_rotation', groupSize: 4, start: '2026-11-30', endDate: '2027-01-24', endType: 'none' }));
+  const h = ins.sessions.find((x) => x.name === 'Day 1 Heavy')!;
+  const hn = (h.rotation ?? []).map(names);
+  const hm = coachEstimate(ins, h).minutes;
+  ok(hn[0].join() === 'Hang Power Clean,Box Jump,Chin-Up,Wall Slide' && hn[1].join() === 'Back Squat,Spot,Spanish Squat Hold,Dead Bug' && hn[2].join() === '90/90 External Rotation Hold,Bent-Knee Calf Raise'.replace(/^/, 'Bench Press,Spot,') && (h.rotation ?? []).map((b) => `${b.rotationSec}x${b.rounds}`).join() === '75x2,75x3,75x2' && hm >= 44 && hm <= 48,
+    `C-7 in-season Day 1 Heavy at the in-season default (50 min): the §2c line, ${(h.rotation ?? []).map((b) => `${b.rotationSec} s × ${b.rounds}`).join(' → ')}, about ${hm} min (planner: 46)`);
+  // C-4: groups of 3 and 5 follow §2d.
+  const g3 = rot('O W O W O O O', { groupSize: 3 });
+  const g5 = rot('O W O W O O O', { groupSize: 5 });
+  const s3 = g3.sessions.find((x) => x.name === 'Day 1 Total: squat')!;
+  const s5 = g5.sessions.find((x) => x.name === 'Day 1 Total: squat')!;
+  const B3 = s3.rotation!.find((b) => b.group === 'B')!;
+  const B5 = s5.rotation!.find((b) => b.group === 'B')!;
+  const five = [0, 1, 2, 3, 4].map((k) => startPosition(k, B5));
+  ok(s3.rotation!.every((b) => b.positions.length === 3) && B3.positions[1].kind === 'spot' && s3.rotation!.every((b) => rackRest(b) === 2 * b.rotationSec && rackRest(b) >= (REST_FLOOR[tierOf(getExercise(b.positions[0].exerciseId!))] ?? 0)),
+    `C-4 groups of 3: position 4 dropped, spotter kept, rack-lift rest = 2 × rotation time and ≥ floors (B: ${names(B3).join(' / ')}, rest ${rackRest(B3)} s)`);
+  ok(s5.rotation!.every((b) => b.positions.length === 4) && five.filter((x) => x === 2).length === 2 && new Set(five).size === 4, `C-4 groups of 5: position 3 holds 2 athletes (starts ${five.join(',')})`);
+  // C-5: Standard and Stations generate those formats; home and mobility stay Standard.
+  const st = team(build('M W O W O H O', { generatedFormat: 'standard', start: '2026-11-30', endDate: '2027-01-24', endType: 'season' }));
+  const sn = team(build('M W O W O H O', { generatedFormat: 'stations', racks: 4, start: '2026-11-30', endDate: '2027-01-24', endType: 'season' }));
+  ok(rooms(st).every((x) => !x.format || x.format === 'standard') && rooms(sn).every((x) => x.format === 'stations' && (x.stations ?? []).length >= 2) && sn.sessions.filter((x) => x.location === 'home' || x.mobility).every((x) => !x.format),
+    `C-5 Standard → Standard sessions; Stations → the stations format (${rooms(sn).map((x) => (x.stations ?? []).length).join('/')} stations, Part 1 together); home and mobility always Standard`);
+  // C-8: every §7 template (2–5 days, every phase) compiles with ≤ 1 rack and ≤ 1 bar per rotation at all three levels after
+  // resolution; R-1, R-2 and R-4 run on rotation sessions.
+  const bad8: string[] = [];
+  let n8b = 0;
+  const kindsBy: Record<number, string> = { 2: 'O W O W O O O', 3: 'W O W O W O O', 4: 'W W O W W O O', 5: 'W W W W W O O' };
+  for (const phase of ['off', 'pre', 'in', 'post'] as Phase[]) for (const days of [2, 3, 4, 5]) for (const position of [...POSITIONS, 'All positions'] as Program['position'][]) for (const gs of [3, 4, 5]) {
+    const p = rot(kindsBy[days], { phase, position, groupSize: gs, sessionMinutes: null });
+    for (const s of rooms(p)) {
+      if (s.format !== 'rack_rotation') { bad8.push(`${phase}${days} ${s.name}: ${s.format}`); continue; }
+      const isTable = COMPILED.some((l) => l.name === s.name);
+      bad8.push(...ruleBad(s, { table: isTable }).map((x) => `${phase}${days} ${position} g${gs}: ${x}`));
+      for (const level of [1, 2, 3] as const) {
+        const res = resolveSession(p, s, ath(level, { levelConfirmed: level === 3 }), fromKey('2026-12-01'));
+        n8b++;
+        for (const e of res.exercises) if (getExercise(e.exerciseId).level > level) bad8.push(`${s.name} L${level}: ${e.exerciseId} above level`);
+        for (const b of s.rotation ?? []) {
+          const ids = b.positions.filter((q) => q.kind === 'exercise').map((q) => res.exercises.find((e) => (e.teamExerciseId ?? e.exerciseId) === q.exerciseId)?.exerciseId).filter(Boolean) as string[];
+          if (ids.map(getExercise).filter(rackOf).length > 1 || ids.map(getExercise).filter(barOf).length > 1) bad8.push(`${phase}${days} ${s.name} ${b.group} L${level}: rack/bar after resolution`);
+        }
+      }
+    }
+  }
+  ok(!bad8.length, `C-8 every §7 template (off/pre/in/post × 2–5 days × 6 positions × groups of 3/4/5) compiles as Rack rotation with ≤ 1 rack and ≤ 1 bar per rotation, spotter, floors, build-up; R-1 holds at levels 1–3 after resolution (${n8b} resolutions)${bad8.length ? ` · ${[...new Set(bad8)].slice(0, 6).join('; ')}` : ''}`);
+  // R-4 and R-2 on a rotation session: a practice day cuts plyo contacts 30%; the contact cap holds after the switch.
+  const pr = { ...full, events: [{ date: '2026-12-01', type: 'practice' as const }] };
+  const s1 = pr.sessions.find((x) => x.name === 'Day 1 Total: squat')!;
+  const jump = (date: string, prog: Program) => resolveSession(prog, s1, ath(2), fromKey(date)).exercises.filter((e) => getExercise(e.exerciseId).pattern === 'jump' && !getExercise(e.exerciseId).weighted).reduce((n, e) => n + e.sets * Number(e.reps.match(/\d+/)?.[0] ?? 0), 0);
+  ok(practiceCut(pr, fromKey('2026-12-01')) === 0.3 && jump('2026-12-01', pr) < jump('2026-12-01', full), `C-8 R-4 on a rotation session: practice day jumps ${jump('2026-12-01', pr)} vs ${jump('2026-12-01', full)} contacts`);
+}
+// C-9: a two-rack-item conflict moves the lower-priority item to another rotation first; a ladder switch never changes pattern.
+{
+  const day: Session = { id: 'x', name: 'Test day', focus: 'x', source: 'approach', exercises: [
+    { exerciseId: 'hang-clean', sets: 3, reps: '3', effort: 'RPE 7', role: 'power' }, { exerciseId: 'box-jump', sets: 3, reps: '3', effort: 'Max effort', role: 'power' },
+    { exerciseId: 'back-squat', sets: 4, reps: '5', effort: 'RPE 7', role: 'main' },
+    { exerciseId: 'bench', sets: 3, reps: '6', effort: 'RPE 7', role: 'secondary' }, { exerciseId: 'weighted-pullup', sets: 3, reps: '5', effort: 'RPE 7', role: 'secondary' },
+    { exerciseId: 'dead-bug', sets: 2, reps: '6 each', effort: 'Controlled', role: 'core' }, { exerciseId: 'wall-slide', sets: 2, reps: '8', effort: 'Light', role: 'care' },
+  ] };
+  const { compileDay } = require('../../src/lib/rackCompile') as typeof import('../../src/lib/rackCompile');
+  const c = compileDay(day, { equipment: ['barbell', 'pullup-bar', 'dumbbells', 'bench', 'box'] as never, groupSize: 4, targetMinutes: 90, otherMinutes: 10, rowFor: (id, role) => ({ exerciseId: id, sets: 2, reps: '8', effort: 'Light', role }) });
+  const where = (id: string) => c.rotation.find((b) => b.positions.some((q) => q.exerciseId === id))?.group;
+  ok(where('bench') !== where('weighted-pullup') && !!where('bench') && !!where('weighted-pullup') && c.rotation.every((b) => b.positions.filter((q) => q.kind === 'exercise' && rackOf(getExercise(q.exerciseId!))).length <= 1),
+    `C-9 bench and weighted pull-up (both rack) in one C-block: the lower-priority one moves to another rotation (bench ${where('bench')}, pull-up ${where('weighted-pullup')})`);
+  const tight = compileDay({ ...day, exercises: day.exercises.filter((e) => e.role !== 'power') }, { equipment: ['barbell', 'pullup-bar', 'dumbbells', 'bench', 'box'] as never, groupSize: 3, targetMinutes: 90, otherMinutes: 10, rowFor: (id, role) => ({ exerciseId: id, sets: 2, reps: '8', effort: 'Light', role }) });
+  const allIds = tight.rotation.flatMap((b) => b.positions.filter((q) => q.kind === 'exercise').map((q) => q.exerciseId!));
+  const swapped = allIds.filter((id) => !day.exercises.some((e) => e.exerciseId === id));
+  ok(tight.rotation.every((b) => b.positions.filter((q) => q.kind === 'exercise' && rackOf(getExercise(q.exerciseId!))).length <= 1) && swapped.every((id) => ['dead-bug', 'wall-slide', 'ytw', 'soleus-calf-raise', 'tib-raise', 'side-plank'].includes(id) || ['h-push', 'v-pull'].includes(getExercise(id).pattern)),
+    `C-9 when no rotation has the rack free, the item switches within its own ladder (same pattern): ${swapped.join(', ') || 'no switch needed'}`);
 }
 
 /* =================== DATA =================== */

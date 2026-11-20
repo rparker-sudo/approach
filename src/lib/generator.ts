@@ -59,6 +59,9 @@ export type GeneratorInput = {
   groupSize?: number;
   /** 2.4.2 Part B: racks (stations count when the style is Stations). Input only. */
   racks?: number;
+  /** 2.4.2 Part C: session length (program default and per weekday) for fitting rotations by rounds. Stored as today. */
+  sessionMinutes?: number | null;
+  minutesByWeekday?: (number | null)[];
   /** 2.4.2 Part A: this team's calendar for the plan (phases by date, breaks, testing suggestions). Input only. */
   planEvents?: CalendarEvent[];
 };

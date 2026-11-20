@@ -167,7 +167,7 @@ function BuilderForm() {
     equipment,
     ...(supersets != null ? { supersets } : {}),
     ...(planInput ? { phase: builtPhase, start: planInput.start, endDate: planInput.end, endType: planInput.endType, planEvents: ownEvents } : {}),
-    ...(roomCard ? { generatedFormat: chosenStyle, groupSize: layoutSize(suggestion.perRack), racks } : {}),
+    ...(roomCard ? { generatedFormat: chosenStyle, groupSize: layoutSize(suggestion.perRack), racks, sessionMinutes, minutesByWeekday: existing?.minutesByWeekday } : {}),
   });
   const preview = team && homeMode && !weekSetup ? weekSummary(generateProgram(input())) : null;
   const fewer = team && preview?.beginners ? (members[team.id] ?? []).filter((m) => (m.level ?? 2) === 1) : [];

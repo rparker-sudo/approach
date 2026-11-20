@@ -71,7 +71,7 @@ const S = process.argv[2];
     check(/No racks or platforms\./.test(t) && /Suggested: Stations\. No racks, so groups rotate through equipment stations\./.test(t), 'F60c 0 racks: "No racks or platforms." and the Stations suggestion (exact reason)');
     check(/Used for the suggestion only\. Not saved\./.test(t) && /Home workout and mobility days are always Standard\./.test(t), 'F60b/F60c lines: athletes per session not saved; home and mobility always Standard');
     const rr = p.getByRole('radio', { name: /^Rack rotation/ });
-    check((await rr.getAttribute('aria-disabled')) === 'true' && /Needs at least 1 rack\. Add racks above\./.test(t) === false || true, 'F60d Rack rotation disabled with 0 racks');
+    check((await rr.getAttribute('aria-disabled')) === 'true', 'F60d Rack rotation disabled with 0 racks (an input dependency, not a training rule)');
     await plus('3 Your weight room', 4, 0);
     await plus('3 Your weight room', 15, 1);
     t = await body();

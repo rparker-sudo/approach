@@ -3,6 +3,8 @@ import { ALL_EQUIPMENT, getExercise } from './exercises';
 import type { GeneratorInput } from './generator';
 import type { DayType, Phase, Program, ProgramExercise, ProgramPosition, Session, SlotRole } from './types';
 import { uid } from './util';
+import { FLAGS } from './flags';
+import { planOf, rowFor, rxWeek } from './planner';
 
 /**
  * 2.4.0 generator v3 (program-design §1–§9; spec Part 3; flag generatorV3). Approach Strength's volleyball programs:
@@ -45,7 +47,18 @@ export function blockFor(phase: Phase, blockIndex: number, clubInSeason = false)
  * Where a v3 program is on a date: block index and week (1–4; week 4 = deload). A coach break of 14+ days (TM-3) restarts the
  * current block at week 1 the day after the break.
  */
-export function planWeek(program: Program, date: Date): { blockIndex: number; week: 1 | 2 | 3 | 4; block: BlockType; deload: boolean } {
+export function planWeek(program: Program, date: Date): { blockIndex: number; week: 1 | 2 | 3 | 4; block: BlockType; deload: boolean; taper?: boolean; phase?: Phase } {
+  // 2.4.2 Part A (planner §1): a program with an end date follows its plan (derived from blockStart, endDate, endType and the
+  // calendar; never stored). Without one it keeps the 2.4.1 rolling 4-week blocks below, unchanged.
+  if (FLAGS.plannerV3 && program.endDate) {
+    const plan = planOf(program);
+    const row = plan ? rowFor(plan, date) : null;
+    if (plan && row?.block) {
+      let blockIndex = -1;
+      for (const r of plan.rows.slice(0, row.week)) if (r.block && r.weekInBlock === 1) blockIndex++;
+      return { blockIndex: Math.max(0, blockIndex), week: rxWeek(row), block: row.block, deload: row.deload, taper: row.taper, phase: row.phase };
+    }
+  }
   const d0 = fromKey(dateKey(date));
   let start = fromKey(program.blockStart ?? program.createdAt.slice(0, 10));
   let baseIndex = 0;

@@ -16,8 +16,19 @@ import { FLAGS } from '../lib/flags';
 import { setupFromProgram, type DayKind } from '../lib/homeV3';
 import { sourceOf } from '../lib/source';
 import { showAlert } from '../lib/dialog';
-import { addDays, dateKey, mondayOf } from '../lib/calendar';
+import { addDays, dateKey, mondayOf, today as todayDate } from '../lib/calendar';
 import { weekdayIndex } from '../lib/util';
+import { defaultEndType, endFromWeeks, nextMonday, planTimeline, programEnded, seasonDates, weeksBetween, endedLine, md, rollingLine, planOf } from '../lib/planner';
+import { EndedBanner, endOf, lengthError, mondayAfter, PlanCard, ProgramLengthCard, snoozeUntil, type LengthValue } from '../components/PlannerCards';
+import { planWeek } from '../lib/generatorV3';
+
+/** F57b: "Phases come from your calendar: off-season until Jan 4, preseason until Jan 26." */
+function phasesLine(s: { firstPractice?: string; firstMatch?: string }): string {
+  const parts: string[] = [];
+  if (s.firstPractice) parts.push(`off-season until ${md(s.firstPractice)}`);
+  if (s.firstMatch) parts.push(`${s.firstPractice ? 'preseason' : 'off-season'} until ${md(s.firstMatch)}`);
+  return `Phases come from your calendar: ${parts.join(', ')}.`;
+}
 
 export default function Builder() {
   const { data } = useStore();
@@ -27,7 +38,7 @@ export default function Builder() {
 
 function BuilderForm() {
   const { programId, teamId, groupKey: groupParam } = useLocalSearchParams<{ programId?: string; teamId?: string; groupKey?: string }>();
-  const { data, saveProgram, setProfile } = useStore();
+  const { data, saveProgram, setProfile, mutate } = useStore();
   const { teams, groups, members, coachExtras } = useTeams();
   const profile = data.profile!;
   const coach = profile.role === 'coach';
@@ -80,6 +91,35 @@ function BuilderForm() {
   const [kinds, setKinds] = useState<DayKind[]>(() => asBuilt ?? WEEKDAYS.map((_, i) => (liftDays.includes(i) ? 'room' : 'off')));
   const [sessionMinutes, setSessionMinutes] = useState<number | null>(existing?.sessionMinutes ?? null);
   const [supersets, setSupersets] = useState<boolean | null>(existing?.supersets ?? null);
+  // 2.4.2 Part A (UX F57–F59): program length, plan preview, one Build. Team (volleyball) and personal programs; not trainer.
+  const planner = FLAGS.plannerV3 && FLAGS.generatorV3 && !existing?.general && (weekSetup || (!team && !existing?.teamId));
+  const todayKey = dateKey(todayDate());
+  const ownEvents = (setupTeamId ? data.teamCalendars?.[setupTeamId]?.events ?? existing?.events ?? [] : existing?.events ?? []).filter((e) => !e.teamName);
+  const initialLength = (): LengthValue => {
+    const start = existing?.blockStart && existing.endDate ? existing.blockStart : existing?.blockStart && existing.blockStart >= todayKey ? existing.blockStart : nextMonday(todayDate());
+    const end = existing?.endDate ?? endFromWeeks(start, 8);
+    return { start, mode: existing?.endDate ? 'end' : 'weeks', end, weeks: existing?.endDate ? Math.min(52, weeksBetween(start, end)) : 8, endType: existing?.endType ?? defaultEndType(ownEvents, start), endTypePicked: !!existing?.endType };
+  };
+  const [length, setLengthState] = useState<LengthValue>(initialLength);
+  const [lengthTouched, setLengthTouched] = useState(false);
+  const setLength = (v: LengthValue) => {
+    setLengthTouched(true);
+    setLengthState(v);
+  };
+  const rolling = planner && !!existing && !existing.endDate && !lengthTouched;
+  const started = planner && !!existing?.endDate && !!existing.blockStart && existing.blockStart <= todayKey;
+  const season = seasonDates(ownEvents, length.start);
+  const calendarPhases = planner && !!setupTeamId && !!(season.firstMatch || season.firstPractice);
+  const endKey = endOf(length);
+  const planInput = planner && !rolling && !lengthError(length, !existing, todayKey)
+    ? { start: length.start, end: endKey, endType: length.endType, phase, events: ownEvents, liftDays: (weekSetup ? kinds.map((k, i) => (k === 'room' ? i : -1)) : liftDays).filter((i) => i >= 0) }
+    : null;
+  const plan = planInput ? planTimeline(planInput) : null;
+  // F57b: with season dates on the calendar, each week's phase comes from the calendar; the program's phase is the first week's.
+  const builtPhase: Phase = calendarPhases && plan ? plan.rows[0].phase : phase;
+  const builtPlan = existing?.endDate ? planOf(existing) : null;
+  const ended = planner && !!existing && programEnded(existing, todayKey);
+  const busy = false;
   const [showFewer, setShowFewer] = useState(false);
   const jumpsAllowed = phase === 'off' || phase === 'pre';
   const supersetsOn = supersets ?? phase === 'in';
@@ -95,11 +135,41 @@ function BuilderForm() {
     ...(weekSetup ? { kinds, homeJumps } : homeMode ? { weightRoomDays: roomDays, homeJumps } : { liftDays }),
     equipment,
     ...(supersets != null ? { supersets } : {}),
+    ...(planInput ? { phase: builtPhase, start: planInput.start, endDate: planInput.end, endType: planInput.endType, planEvents: ownEvents } : {}),
   });
   const preview = team && homeMode && !weekSetup ? weekSummary(generateProgram(input())) : null;
   const fewer = team && preview?.beginners ? (members[team.id] ?? []).filter((m) => (m.level ?? 2) === 1) : [];
 
+  // F59g: "Not now" hides the ended banner for 7 days, on this device only; "Build the next one" pre-fills a new program.
+  const snoozeKey = setupTeamId ?? existing?.id ?? '';
+  const snoozed = !!data.endedSnooze?.[snoozeKey] && data.endedSnooze[snoozeKey] > todayKey;
+  const snooze = () => mutate((d) => ({ ...d, endedSnooze: { ...(d.endedSnooze ?? {}), [snoozeKey]: snoozeUntil(todayKey) } }));
+  const [next, setNextState] = useState(false);
+  const setNext = (v: boolean) => {
+    setNextState(v);
+    if (v && existing?.endDate) {
+      const start = mondayAfter(existing.endDate);
+      setLength({ start, mode: 'weeks', end: endFromWeeks(start, 8), weeks: 8, endType: defaultEndType(ownEvents, start), endTypePicked: false });
+    }
+  };
+  const changedAny = !!existing && (lengthTouched || (asBuilt ? asBuilt.some((k, i) => k !== kinds[i]) : false) || (sessionMinutes ?? null) !== (existing.sessionMinutes ?? null));
+  const buildReason = weekSetup && kinds.every((k) => k === 'off') ? 'Pick at least one day.' : planner && !rolling ? lengthError(length, !existing || next, todayKey) : null;
+  const cancelChanges = () => {
+    setLengthState(initialLength());
+    setLengthTouched(false);
+    if (asBuilt) setKinds(asBuilt);
+    setSessionMinutes(existing?.sessionMinutes ?? null);
+  };
+
   function build() {
+    if (planner && existing) {
+      // F57a (D-068.5): Approach Strength's sessions are rebuilt; sessions the coach edited keep their edits.
+      showAlert('Rebuild from these settings?', "Approach Strength's sessions are rebuilt. Sessions you've edited keep your edits.", [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Rebuild', onPress: buildNow },
+      ]);
+      return;
+    }
     if (weekSetup && existing) {
       showAlert('Rebuild the week from these days?', "Approach Strength's sessions are rebuilt. Sessions you've edited keep your edits.", [
         { text: 'Cancel', style: 'cancel' },
@@ -115,13 +185,13 @@ function BuilderForm() {
     // F56f / known conflict 5: on a rebuild, a session the coach edited ('coach') keeps its edits when its day keeps its kind;
     // and the change starts with the next week that hasn't started (this week's remaining days keep the old sessions).
     let generated = generated0;
-    if (weekSetup && existing) {
+    if ((weekSetup || planner) && existing) {
       const sessions = [...generated0.sessions];
       const liftSchedule = [...generated0.liftSchedule];
       const old = existing.liftSchedule;
-      kinds.forEach((k, i) => {
+      (weekSetup ? kinds : setupFromProgram(generated0)).forEach((k, i) => {
         const prev = existing.sessions.find((x) => x.id === old[i]);
-        if (prev && asBuilt?.[i] === k && sourceOf(existing, prev) === 'coach') {
+        if (prev && (asBuilt ?? setupFromProgram(existing))[i] === k && sourceOf(existing, prev) === 'coach') {
           const replaced = liftSchedule[i];
           liftSchedule[i] = prev.id;
           if (!sessions.some((x) => x.id === prev.id)) sessions.push(prev);
@@ -174,6 +244,11 @@ function BuilderForm() {
     }
     goBack();
     if (coach && !existing && !team) router.push(`/program/${program.id}`);
+    if (planner && plan) {
+      // F57a success line (no toast component in the app; shown as a short alert).
+      const perWeek = program.liftSchedule.filter(Boolean).length;
+      showAlert(`Program built: ${plan.weeks} week${plan.weeks === 1 ? '' : 's'}, ${perWeek} session${perWeek === 1 ? '' : 's'} a week.`);
+    }
   }
 
   return (
@@ -206,13 +281,19 @@ function BuilderForm() {
         ))}
       </ChipRow>
 
-      <Label>Time of year</Label>
-      <ChipRow>
-        {PHASES.map((p) => (
-          <Chip key={p.id} label={p.label} selected={phase === p.id} onPress={() => setPhase(p.id)} />
-        ))}
-      </ChipRow>
-      <Body muted style={{ fontSize: 13 }}>{PHASES.find((p) => p.id === phase)!.blurb}</Body>
+      {calendarPhases ? null : (
+        <>
+          {/* F57b: with plannerV3 and no season dates on the team calendar, the chips stay as the whole plan's phase. */}
+          <Label>{planner && setupTeamId ? 'Time of year (no season dates on your calendar)' : 'Time of year'}</Label>
+          <ChipRow>
+            {PHASES.map((p) => (
+              <Chip key={p.id} label={p.label} selected={phase === p.id} onPress={() => setPhase(p.id)} />
+            ))}
+          </ChipRow>
+          <Body muted style={{ fontSize: 13 }}>{PHASES.find((p) => p.id === phase)!.blurb}</Body>
+          {planner && setupTeamId ? <Body muted style={{ fontSize: 13 }}>The whole plan uses this phase. Add your first practice or match in Calendar to plan by date.</Body> : null}
+        </>
+      )}
 
       <Label>Lifting experience</Label>
       <ChipRow>
@@ -231,8 +312,30 @@ function BuilderForm() {
         <EquipmentPicker value={equipment} onChange={setEquipment} />
       </Card>
 
+      {ended && existing?.endDate && !snoozed ? (
+        <EndedBanner
+          text={endedLine(team?.name ?? existing.teamName ?? existing.name, existing.endDate)}
+          onBuild={() => setNext(true)}
+          onNotNow={() => snooze()}
+        />
+      ) : null}
+      {planner ? (
+        <ProgramLengthCard
+          value={length}
+          onChange={setLength}
+          events={ownEvents}
+          isNew={!existing || next}
+          started={started && !next}
+          rolling={rolling}
+          tag={next ? 'From your last program' : existing && !lengthTouched ? 'As built' : null}
+          todayKey={todayKey}
+          phaseLine={next ? `Next phase: ${PHASES.find((x) => x.id === builtPhase)!.label} (from your calendar).` : calendarPhases ? phasesLine(season) : null}
+          onOpenCalendar={existing ? () => router.push({ pathname: '/calendar', params: { programId: existing.id } }) : undefined}
+        />
+      ) : null}
       {weekSetup ? (
         <WeekSetupCard
+          numbered={planner}
           kinds={kinds}
           onChange={setKinds}
           asBuilt={asBuilt}
@@ -248,6 +351,29 @@ function BuilderForm() {
           otherTeamAthletes={coachExtras[setupTeamId!]?.followingOther?.length ?? 0}
           onBuild={build}
         />
+      ) : null}
+      {planner && weekSetup ? (
+        <>
+          {buildReason ? <Text style={{ fontSize: 13, color: colors.muted }}>{buildReason}</Text> : null}
+          {existing && changedAny ? <Text style={{ fontSize: 13, color: colors.muted }}>Changes apply from the next week that hasn&apos;t started.</Text> : null}
+          <Button large title={busy ? 'Building your program…' : existing ? (changedAny ? 'Rebuild program' : 'Rebuild program') : 'Build program'} icon="wand.and.stars" disabled={!!buildReason || busy} onPress={build} />
+          {existing && changedAny ? (
+            <Text accessibilityRole="button" onPress={cancelChanges} style={{ fontSize: 13, textDecorationLine: 'underline', minHeight: 44, paddingVertical: 12 }}>
+              Cancel changes
+            </Text>
+          ) : null}
+          <PlanCard
+            plan={plan ?? builtPlan}
+            input={planInput ?? (existing?.endDate ? { start: existing.blockStart ?? existing.createdAt.slice(0, 10), end: existing.endDate, endType: existing.endType ?? 'none', events: ownEvents } : null)}
+            kinds={kinds}
+            state={!existing ? 'preview' : changedAny ? 'changes' : 'built'}
+            builtRows={builtPlan?.rows ?? null}
+            todayKey={todayKey}
+            scheduledTests={ownEvents.filter((e) => e.test).map((e) => e.date)}
+            onTest={existing ? (date) => router.push({ pathname: '/calendar', params: { programId: existing.id, date } }) : undefined}
+            rolling={rolling && existing?.block ? rollingLine(planWeek(existing, todayDate()).block, planWeek(existing, todayDate()).week) : null}
+          />
+        </>
       ) : null}
       {team && !weekSetup ? (
         <ChipRow>
@@ -316,9 +442,21 @@ function BuilderForm() {
       {weekSetup ? null : <Button
         title={existing ? 'Rebuild program' : team ? 'Build team workout' : 'Build program'}
         icon="wand.and.stars"
-        disabled={homeMode ? total < 1 : liftDays.length === 0}
+        disabled={(homeMode ? total < 1 : liftDays.length === 0) || (planner && !rolling && !!lengthError(length, !existing, todayKey))}
         onPress={build}
       />}
+      {planner && !weekSetup ? (
+        <PlanCard
+          plan={plan ?? builtPlan}
+          input={planInput}
+          kinds={WEEKDAYS.map((_, i) => (liftDays.includes(i) ? 'room' : 'off'))}
+          state={!existing ? 'preview' : lengthTouched ? 'changes' : 'built'}
+          builtRows={builtPlan?.rows ?? null}
+          todayKey={todayKey}
+          scheduledTests={[]}
+          rolling={rolling && existing?.block ? rollingLine(planWeek(existing, todayDate()).block, planWeek(existing, todayDate()).week) : null}
+        />
+      ) : null}
     </Screen>
   );
 }

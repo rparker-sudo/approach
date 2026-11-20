@@ -31,6 +31,8 @@ type Props = {
   input: Omit<GeneratorInput, 'kinds'>;
   otherTeamAthletes?: number;
   onBuild: () => void;
+  /** 2.4.2 F57 (plannerV3): card 2 of the numbered setup; Build moves out of the card. */
+  numbered?: boolean;
 };
 
 export default function WeekSetupCard(p: Props) {
@@ -100,7 +102,7 @@ export default function WeekSetupCard(p: Props) {
   return (
     <Card style={{ gap: 10 }}>
       <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ fontSize: 17, fontWeight: '700' }}>Week setup</Text>
+        <Text accessibilityRole="header" style={p.numbered ? { fontSize: 20, fontWeight: '600' } : { fontSize: 17, fontWeight: '700' }}>{p.numbered ? '2 Week setup' : 'Week setup'}</Text>
         <Button small kind="secondary" title={wide ? 'Recommend for me' : 'Recommend'} onPress={recommend} />
       </Row>
       <Text style={{ fontSize: 13, color: colors.muted }}>{`Week of ${weekOf} · ${phaseLabel}${p.asBuilt && !changed ? ' · As built' : ''}`}</Text>
@@ -203,10 +205,10 @@ export default function WeekSetupCard(p: Props) {
         ) : null}
       </View>
 
-      {changed ? <Text style={{ fontSize: 13, color: colors.muted }}>Changes apply from the next week that hasn&apos;t started.</Text> : null}
-      {allOff ? <Text style={{ fontSize: 13, color: colors.muted }}>Pick at least one day.</Text> : null}
-      <Button title={p.asBuilt ? 'Rebuild program' : 'Build program'} icon="wand.and.stars" disabled={allOff} onPress={p.onBuild} />
-      {changed && p.asBuilt ? (
+      {changed && !p.numbered ? <Text style={{ fontSize: 13, color: colors.muted }}>Changes apply from the next week that hasn&apos;t started.</Text> : null}
+      {allOff && !p.numbered ? <Text style={{ fontSize: 13, color: colors.muted }}>Pick at least one day.</Text> : null}
+      {p.numbered ? null : <Button title={p.asBuilt ? 'Rebuild program' : 'Build program'} icon="wand.and.stars" disabled={allOff} onPress={p.onBuild} />}
+      {changed && p.asBuilt && !p.numbered ? (
         <Text accessibilityRole="button" onPress={() => p.onChange(p.asBuilt!)} style={{ fontSize: 13, textDecorationLine: 'underline', minHeight: 44, paddingVertical: 12 }}>
           Cancel changes
         </Text>

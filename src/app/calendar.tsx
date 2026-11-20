@@ -45,15 +45,16 @@ const TYPE_CHOICES: { id: DayType; label: string }[] = [
 ];
 
 export default function CalendarScreen() {
-  const { programId } = useLocalSearchParams<{ programId: string }>();
+  const { programId, date: dateParam } = useLocalSearchParams<{ programId: string; date?: string }>();
   const { data, saveProgram } = useStore();
   const { postTeam, setTeamEvents, hasUnposted } = useTeams();
   const program = data.programs.find((p) => p.id === programId);
   const [month, setMonth] = useState(() => {
-    const t = today();
+    // 2.4.2 F59c: a "Testing day suggested" chip opens the day with that date filled.
+    const t = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? fromKey(dateParam) : today();
     return new Date(t.getFullYear(), t.getMonth(), 1);
   });
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : null);
   const [breakEdit, setBreakEdit] = useState<{ start: string; original?: CalendarEvent } | null>(null);
   const [posting, setPosting] = useState(false);
 

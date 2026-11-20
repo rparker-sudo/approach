@@ -605,16 +605,21 @@ function applyV3(program: Program, session: Session, list: ProgramExercise[], w:
   // B5 (D-054): the §9 athlete gates always use the athlete's own level, even with level adjust off.
   const ctx = { level, gateLevel: athlete.level, confirmed: !!athlete.levelConfirmed, minor: athlete.minor !== false, phase: program.phase, position: program.position, dayIndex: 0 };
   const maintainDay = Math.max(0, program.sessions.filter((s) => !s.mobility).findIndex((s) => s.id === session.id)) % 2;
+  // 2.4.2 Part A: the plan's phase for this date (a plan that crosses the first practice or match) sets the §9 limits.
+  const phase = w.phase ?? program.phase;
+  ctx.phase = phase;
   const out = list.map((pe) => {
-    const rx = prescribe(pe, pe.exerciseId, w.block, w.week, ctx, maintainDay);
+    const rx0 = prescribe(pe, pe.exerciseId, w.block, w.week, ctx, maintainDay);
+    // Planner taper week (§1b step 2, §1c in-season): volume about −30%, same intensity and rest.
+    const rx = w.taper && pe.role !== 'care' ? { ...rx0, sets: Math.max(1, Math.round(rx0.sets * 0.7)) } : rx0;
     // §2a: an in-season third weight-room day is a second Day 2 Fast at 2 sets; §2d: care shrunk to 1 round (plan sets 1).
     const sets = /\(2 sets\)$/.test(session.name) ? Math.min(rx.sets, 2) : pe.role === 'care' && pe.sets === 1 ? 1 : rx.sets;
     return { ...pe, sets, reps: rx.reps, effort: rx.effort, method: rx.method, restSec: rx.restSec, restSetByCoach: true, ...(rx.pct != null ? { pct: rx.pct } : { pct: undefined }) };
   });
   // Plyo contact budget for the session (§5a top of range, deload −50%), never above the §9 phase cap.
   const jumps = out.map((pe, i) => (isPlyo(pe.exerciseId) ? i : -1)).filter((i) => i >= 0);
-  const base = Math.min(PLYO_CAP[program.phase], PLYO_CONTACTS[w.block]);
-  const cap = base * (w.deload ? 0.5 : 1);
+  const base = Math.min(PLYO_CAP[phase], PLYO_CONTACTS[w.block]);
+  const cap = base * (w.deload ? 0.5 : 1) * (w.taper ? 0.7 : 1);
   if (jumps.length) {
     const per = Math.max(3, Math.floor(base / jumps.length));
     for (const i of jumps) {
@@ -624,6 +629,7 @@ function applyV3(program: Program, session: Session, list: ProgramExercise[], w:
       let budget = per;
       if (DEPTH_JUMPS.has(id) || id === 'depth-drop') budget = Math.min(budget, DEPTH_CONTACT_CAP);
       if (w.deload) budget = Math.floor(budget * 0.5);
+      if (w.taper) budget = Math.floor(budget * 0.7);
       const sets = out[i].sets >= 2 ? Math.min(out[i].sets, 4) : 3;
       // Reps per set stay in the plyo range (program-design §5a examples: Box Jump 3 × 3, Pogo Hops × 10); position emphasis
       // (§8b: setter −20%, libero/DS −30% vertical) then scales the contacts.

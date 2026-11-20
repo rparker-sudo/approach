@@ -322,7 +322,19 @@ export type Program = {
   minutesByWeekday?: (number | null)[];
   /** 2.3.0 trainer device only: a duplicate's intended client (`client:<uid>`), preselected at Post. Never posted. */
   draftTarget?: string;
+  /** 2.4.2 (planner §1, D-066, compliance § 2.4.2 check #1): the last day of the program (YYYY-MM-DD). Missing = rolling
+   *  4-week blocks (2.4.1). Date only: never an event id, opponent or location. The start date is `blockStart`. */
+  endDate?: string;
+  /** 2.4.2: what happens at the end. Fixed values, no free text. */
+  endType?: EndType;
+  /** 2.4.2 (planner §2a): the style for generated weight-room days. Per program, never per athlete. Missing = 'standard'. */
+  generatedFormat?: GeneratedFormat;
 };
+
+/** 2.4.2 program end type (planner §1a). */
+export type EndType = 'season' | 'testing' | 'break' | 'none';
+/** 2.4.2 generated session style (planner §2a). */
+export type GeneratedFormat = 'standard' | 'stations' | 'rack_rotation';
 
 /** A dated volleyball event. date is local 'YYYY-MM-DD'. */
 /** Testing-day battery (P6): full = jumps + strength checks; jump = jumps only; mid = jumps + trap bar. */
@@ -446,6 +458,8 @@ export type AppData = {
   customSeen?: Record<string, Exercise>;
   /** 2.4.1 R-5 (device only, G-3): which generator this device last saw for each program ('v2' = 2.3.0, 'v3' = has `block`). */
   generatorSeen?: Record<string, 'v2' | 'v3'>;
+  /** 2.4.2 F59g coaches (device only, no server field): "Not now" on the program-ended banner, per team → hide until date. */
+  endedSnooze?: Record<string, string>;
 };
 
 export type LocalTeamCalendar = {

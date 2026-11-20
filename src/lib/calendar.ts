@@ -3,6 +3,7 @@ import { WEEKDAYS } from './types';
 import { sourceOf } from './source';
 import { getExercise } from './exercises';
 import { CAP_REPLACE_ORDER, homeTypeOf, isSetupProgram } from './homeV3';
+import { FLAGS } from './flags';
 
 /**
  * Turns a program's default week + calendar dates + per-date overrides into
@@ -218,6 +219,11 @@ export function weekPlan(program: Program, monday: Date, athleteExperience?: Exp
   for (let i = 0; i < 7; i++) {
     if (!breakOn(program, days[i])) continue;
     plan[i] = { ...plan[i], sessionId: null, break: true, note: 'Break week', source: plan[i].source };
+  }
+
+  // 2.4.2 F59g: after a program's end date there's no session (UX proposal; Product to confirm). Rolling programs never end.
+  if (FLAGS.plannerV3 && program.endDate) {
+    for (const p of plan) if (p.date > program.endDate) Object.assign(p, { sessionId: null, note: 'Program finished', source: 'auto' as const });
   }
 
   // 5. Testing days replace that day's lift with a Testing session (the day keeps its day type).

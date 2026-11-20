@@ -2,12 +2,16 @@ import { ALL_EQUIPMENT, CATALOG_V3_IDS, EXERCISES, fits, getExercise } from './e
 import { FLAGS } from './flags';
 import { clubInSeason, generateProgramV3 } from './generatorV3';
 import { generateWeekV3, kindsFor } from './weekV3';
+import { applyPlanner } from './plannerBuild';
 import type { DayKind } from './homeV3';
 import { lengthTarget, restFor, RestContext, withFloor } from './rest';
 import { autoGroup } from './groups';
 import type {
+  CalendarEvent,
   DayType,
+  EndType,
   Equipment,
+  GeneratedFormat,
   Exercise,
   Experience,
   Pattern,
@@ -45,6 +49,18 @@ export type GeneratorInput = {
   events?: { date: string; type: string; teamName?: string }[];
   /** 2.4.1 Part D: the Week setup card (Off · Weight room · Home workout · Mobility per weekday, Monday first). Input only. */
   kinds?: DayKind[];
+  /** 2.4.2 Part A (plannerV3): first day (stored as `blockStart`), last day (`endDate`) and end type (`endType`). */
+  start?: string;
+  endDate?: string;
+  endType?: EndType;
+  /** 2.4.2 Part B: the style for generated weight-room days (`generatedFormat`). Team programs only. */
+  generatedFormat?: GeneratedFormat;
+  /** 2.4.2 Part B/C: rack group size for the rotation layout (3–5; 4 by default). Input only, never stored. */
+  groupSize?: number;
+  /** 2.4.2 Part B: racks (stations count when the style is Stations). Input only. */
+  racks?: number;
+  /** 2.4.2 Part A: this team's calendar for the plan (phases by date, breaks, testing suggestions). Input only. */
+  planEvents?: CalendarEvent[];
 };
 
 const isMatch = (d: DayType) => d === 'game' || d === 'tournament';
@@ -613,7 +629,7 @@ export function weekSummary(program: Program): { line: string; beginners: string
 
 export function generateProgram(input: GeneratorInput): Program {
   // 2.4.0: generator v3 behind its flag (program-design §1–§9). Off = the 2.3.0 generator below, unchanged.
-  if (FLAGS.generatorV3) return generateV3(input);
+  if (FLAGS.generatorV3) return FLAGS.plannerV3 ? applyPlanner(generateV3(input), input) : generateV3(input);
   if (input.weightRoomDays) return withAutoGroups(finishProgram(input, schoolHomeWeek(input)), input);
   return withAutoGroups(generateStandard(input), input);
 }

@@ -44,6 +44,8 @@ import { BATTERY_LABEL } from '../../lib/testing';
 import { useTeams } from '../../lib/team';
 import { DAY_TYPES, WEEKDAYS } from '../../lib/types';
 import { weekdayIndex } from '../../lib/util';
+import { FLAGS } from '../../lib/flags';
+import { athleteEndedLine, programEnded } from '../../lib/planner';
 
 export default function Home() {
   const { data } = useStore();
@@ -272,6 +274,12 @@ function Today() {
                 onPress={() => router.push({ pathname: '/workout', params: { programId: activeProgram.id, sessionId: session.id } })}
               />
             )}
+          </>
+        ) : FLAGS.plannerV3 && activeProgram.endDate && programEnded(activeProgram, dateKey(today())) ? (
+          <>
+            {/* 2.4.2 F59g (UX proposal, Product to confirm): no session after the program's end date. */}
+            <H2>No lift today</H2>
+            <Body muted>{athleteEndedLine(activeProgram.endDate)}</Body>
           </>
         ) : (
           <>

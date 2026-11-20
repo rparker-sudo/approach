@@ -27,6 +27,9 @@ import { ALL, summarizeReadiness, teamProgramId, useTeams } from '../../lib/team
 import { PHASES } from '../../lib/types';
 import { liftDayCount } from '../../lib/generator';
 import { formatDate } from '../../lib/util';
+import { FLAGS } from '../../lib/flags';
+import { endedLine, programEnded } from '../../lib/planner';
+import { EndedBanner, snoozeUntil } from '../../components/PlannerCards';
 
 /** 2.3.0: general teams get the trainer's Clients screen; volleyball teams keep the 2.2.1 team screen below. */
 export default function TeamRoute() {
@@ -38,7 +41,7 @@ export default function TeamRoute() {
 
 function TeamScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data } = useStore();
+  const { data, mutate } = useStore();
   const t = useTeams();
   const termsOk = useCoachTermsOk();
   const team = t.teams.find((x) => x.id === id);
@@ -171,6 +174,19 @@ function TeamScreen() {
       ) : null}
       {tab === 'team' ? (
       <>
+      {(() => {
+        // 2.4.2 F59g: the team program ended (from the day after its end date; never for rolling programs).
+        const tp = data.programs.find((p) => p.id === teamProgramId(team.id, ALL));
+        const key = dateKey(today());
+        if (!FLAGS.plannerV3 || !tp?.endDate || !programEnded(tp, key) || (data.endedSnooze?.[team.id] ?? '') > key) return null;
+        return (
+          <EndedBanner
+            text={endedLine(team.name, tp.endDate)}
+            onBuild={() => router.push({ pathname: '/builder', params: { teamId: team.id, groupKey: ALL, programId: tp.id } })}
+            onNotNow={() => mutate((d) => ({ ...d, endedSnooze: { ...(d.endedSnooze ?? {}), [team.id]: snoozeUntil(key) } }))}
+          />
+        );
+      })()}
       <TestingBanner team={team} onReviewLevels={() => setReviewLevels(true)} />
       <StationControls team={team} />
       <Button
